@@ -29,7 +29,11 @@ export const webText = {
   statsLoading: '통계를 불러오는 중이에요',
   // 공부를 끝낸 뒤 "오늘의 공부" 카드(앱에 없는 화면, 사용자 결정 2026-11-23).
   recapTimeLabel: '오늘 공부한 시간',
-  recapStreakRow: (days: number) => `${days}일 연속`,
+  recapStreakLabel: '연속 공부',
+  recapStreakUnit: '일',
+  recapRankLabel: '이 방 오늘 순위',
+  recapRankUnit: '등',
+  recapRankTotal: (total: number) => `/ ${total}명`,
   recapGoalReached: '목표 달성',
   recapGoalPercent: (percent: number) => `목표의 ${percent}%`,
   recapMoreChip: (duration: string) => `어제보다 +${duration}`,

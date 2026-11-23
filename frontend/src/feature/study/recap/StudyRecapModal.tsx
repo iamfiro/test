@@ -9,7 +9,7 @@ import { IslandButton } from '../../../core/ui/IslandButton'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
 import { logger } from '../../../core/log/log'
 import { formatStudyDuration } from '../home/studyFormat'
-import { drawStory, loadCardAssets, type CardAssets } from './cardDraw'
+import { cardLayout, drawStory, loadCardAssets, type CardAssets } from './cardDraw'
 import { CardArt, stageSize } from './CardArt'
 import type { StudyRecap } from './studyRecap'
 import s from './recap.module.css'
@@ -52,12 +52,13 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
   }, [recap])
 
   // 카드를 창에 맞춘다: 좌우 16 여백, 아래로는 단추 자리(약 110)를 남긴다.
+  const box = stageSize(cardLayout(recap))
   useEffect(() => {
-    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / stageSize.width, (window.innerHeight - 110) / stageSize.height))
+    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / box.width, (window.innerHeight - 110) / box.height))
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [])
+  }, [box.width, box.height])
 
   // 포커스: 열리면 대화상자로, Tab은 안에서만, 닫히면 원래 자리로.
   useEffect(() => {
@@ -105,7 +106,7 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
     <div className={`palette-day ${s.root}`}>
       <div className={s.backdrop} onClick={onClose} />
       <div ref={dialog} className={s.floating} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
-        <div className={s.fit} style={{ '--fit': fit, width: stageSize.width * fit, height: stageSize.height * fit } as CSSProperties}>
+        <div className={s.fit} style={{ '--fit': fit, width: box.width * fit, height: box.height * fit } as CSSProperties}>
           {assets ? <CardArt recap={recap} assets={assets} label={label} /> : <div className={s.artLoading} aria-busy="true" />}
         </div>
         <div className={s.actions}>

@@ -1,15 +1,17 @@
 // 화면 속 "오늘의 공부" 카드. cardDraw.ts의 같은 그리기 함수로 카드와 스티커를 따로 그려 겹쳐 두고,
-// 들어올 때 카드가 기울며 올라온 뒤 목표 달성 스티커가 툭 붙는다.
+// 들어올 때 카드가 기울며 올라온다.
 // 홀로그램 포일(사용자 결정 2026-11-23, 레인보우 레어 카드 레퍼런스): 무지개 포일·빛 띠·반짝이·에칭 줄·빛 반사를
 // CSS 레이어로 카드 얼굴 위에 겹치고, 포인터(없으면 천천히 도는 가상 빛)에 따라 카드가 기울며 포일이 흐른다.
 import { useEffect, useRef, type CSSProperties, type PointerEvent } from 'react'
-import { card, drawCard, drawSticker, hasSticker, photoSlot, sticker, type CardAssets } from './cardDraw'
+import { cardLayout, drawCard, type CardAssets, type CardLayout } from './cardDraw'
 import type { StudyRecap } from './studyRecap'
 import s from './recap.module.css'
 
-/** 카드 무대 여백: 스티커가 오른쪽 위로 삐져나오는 자리. */
-export const stage = { left: 20, top: 40, right: 40, bottom: 20 } as const
-export const stageSize = { width: stage.left + card.width + stage.right, height: stage.top + card.height + stage.bottom } as const
+/** 카드 무대 여백: 기울임·그림자 자리. */
+export const stage = { left: 20, top: 20, right: 20, bottom: 24 } as const
+export function stageSize(layout: CardLayout) {
+  return { width: stage.left + layout.width + stage.right, height: stage.top + layout.height + stage.bottom }
+}
 
 /** 레이어 캔버스 화소 배율: 기울임·확대에도 또렷하게 기기 배율보다 조금 높게. */
 const layerScale = () => Math.min(3.5, Math.max(2, window.devicePixelRatio || 1) * 1.5)
@@ -90,31 +92,23 @@ export function CardArt({ recap, assets, label }: { recap: StudyRecap; assets: C
     apply(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)), 1)
   }
   const onLeave = () => { hovering.current = false }
-  const size = sticker.size + 24
+  const L = cardLayout(recap)
+  const box = stageSize(L)
   return (
-    <div className={s.art} role="img" aria-label={label} onPointerMove={onMove} onPointerLeave={onLeave} onPointerUp={onLeave} style={{ width: stageSize.width, height: stageSize.height }}>
+    <div className={s.art} role="img" aria-label={label} onPointerMove={onMove} onPointerLeave={onLeave} onPointerUp={onLeave} style={{ width: box.width, height: box.height }}>
       <div className={s.tilt} ref={tilt} style={{ left: stage.left, top: stage.top }}>
-        <div className={s.card} style={{ width: card.width, height: card.height }}>
-          <Layer width={card.width} height={card.height} draw={(ctx) => drawCard(ctx, recap)} className={s.cardBase} />
+        <div className={s.card} style={{ width: L.width, height: L.height }}>
+          <Layer width={L.width} height={L.height} draw={(ctx) => drawCard(ctx, recap, assets)} className={s.cardBase} />
           <span className={s.foil} aria-hidden="true" style={{ '--glitter': `url(${glitter()})` } as CSSProperties}>
             <span className={s.rainbow} />
             <span className={s.paperGlitter} />
             {/* 강한 빛(빛 띠·반짝이·반사)은 사진 칸에만: 글자가 하얗게 뜨지 않게. */}
-            <span className={s.photoFoil} style={{ left: photoSlot.x, top: photoSlot.y - 16, width: photoSlot.width, height: photoSlot.height }}>
+            <span className={s.photoFoil} style={{ left: L.photo.x, top: L.photo.y - 16, width: L.photo.width, height: L.photo.height }}>
               <span className={s.shine} />
               <span className={s.glitter} />
               <span className={s.glare} />
             </span>
           </span>
-          {hasSticker(recap) && (
-            <Layer
-              width={size}
-              height={size}
-              className={s.sticker}
-              style={{ left: sticker.x - size / 2, top: sticker.y - size / 2, '--rot': `${sticker.rotate}deg` } as CSSProperties}
-              draw={(ctx) => { ctx.translate(size / 2, size / 2); drawSticker(ctx, assets) }}
-            />
-          )}
         </div>
       </div>
     </div>

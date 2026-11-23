@@ -1,17 +1,15 @@
-/* "오늘의 공부" 카드: 흐린 공부방 위에 카드 한 장과 섬 단추만. 앱 공부 화면 톤(섬 팔레트 낮 값, 섬 단추).
-   들어오는 순서: 막 → 카드가 기울며 올라옴 → 목표 달성 스티커 → 단추. */
+/* "오늘의 공부" 카드: 어둡게 한 공부방 위에 카드 한 장과 섬 단추만. 앱 공부 화면 톤(섬 팔레트 낮 값, 섬 단추).
+   들어오는 순서: 막 → 카드가 기울며 올라옴 → 단추. */
 .root {
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --spring: cubic-bezier(0.3, 1.45, 0.5, 1);
   position: fixed; inset: 0; z-index: 90; /* 탭바(20) 위, 토스트(100) 아래 */
   display: flex; align-items: center; justify-content: center;
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   font-family: var(--font-sans);
 }
-/* 막: 앱 시트 막(검정 35%)보다 조금 진하게, 방은 흐리게 남긴다. */
+/* 막: 앱 시트 막(검정 35%)과 같은 어둡기. 방은 흐리지 않고 그대로 보인다(사용자 결정 2026-11-23). */
 .backdrop {
-  position: absolute; inset: 0; background: rgb(0 0 0 / 0.45);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  position: absolute; inset: 0; background: rgb(0 0 0 / 0.35);
   animation: fade 260ms ease-out both;
 }
 .floating { position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px; outline: none; }
@@ -34,7 +32,6 @@
   animation: card 720ms 100ms var(--ease-out) both;
 }
 .cardBase { display: block; }
-.sticker { position: absolute; transform: rotate(var(--rot)); animation: stick 460ms 820ms var(--spring) both; }
 /* 홀로그램 포일(사용자 결정 2026-11-23, 레인보우 레어 카드 레퍼런스). 카드 얼굴(위 테이프 16·아래 턱 10 제외)에만
    겹친다. --px·--py(0~100%)가 빛의 자리: 무지개 포일과 빛 띠가 흐르고, 반짝이가 깜빡이고, 빛 반사가 따라온다. */
 .foil {
@@ -60,7 +57,7 @@
 }
 /* 빛 띠(사진 칸): 무지개 빛 한 줄기가 사진을 쓸고 지나간다. */
 .shine {
-  mix-blend-mode: color-dodge; opacity: 0.55;
+  mix-blend-mode: color-dodge; opacity: 0.45;
   background: linear-gradient(115deg,
     transparent 32%, hsl(50 100% 80% / 0.75) 44%, hsl(180 100% 82% / 0.8) 50%, hsl(290 100% 86% / 0.75) 56%, transparent 68%);
   background-size: 260% 260%;
@@ -83,10 +80,9 @@
 
 @keyframes fade { from { opacity: 0; } }
 @keyframes card { from { opacity: 0; transform: translateY(36px) rotate(-5deg) scale(0.95); } }
-@keyframes stick { from { opacity: 0; transform: translateY(-14px) scale(1.35) rotate(calc(var(--rot) - 14deg)); } }
 @keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
 @keyframes breathe { 50% { opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
-  .backdrop, .card, .sticker, .actions, .artLoading { animation: none; }
+  .backdrop, .card, .actions, .artLoading { animation: none; }
   .tilt { transition: none; }
 }
