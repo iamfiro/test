@@ -15,6 +15,7 @@ import { colorToHex } from './model/color'
 import { StudyRoomLayout } from './model/layout'
 import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomSeat } from './model/scene'
 import { ThreeStudyRoomRenderer, roomLookFromLocation } from './three/ThreeStudyRoomRenderer'
+import { registerRoomSnapshot } from './roomSnapshot'
 import { StudyRoomSky } from './StudyRoomSky'
 
 export type SeatPlacement = {
@@ -221,7 +222,9 @@ export function StudyRoom3dView(props: {
       if (next != null) wake = window.setTimeout(schedule, next)
     }
 
+    let lastFrame: Frame | null = null
     const draw = (frame: Frame, now: number) => {
+      lastFrame = frame
       const p = latest.current
       const zoomSeat = state.current.zoomedSeat != null && state.current.zoomedSeat < layout.seatCount ? state.current.zoomedSeat : null
       const base = cameraFor(p.scene, layout, size, frame, state.current.fromMode, state.current.mode, viewerSeat)
@@ -254,6 +257,29 @@ export function StudyRoom3dView(props: {
     const onQuality = () => { scheduler.invalidateCamera(); schedule() }
     quality?.addListener(onQuality)
     const unsubscribeRenderer = renderer.subscribe(() => { scheduler.invalidateCamera(); schedule() })
+    // 요약 카드 사진: 내 자리를 집중 모드 시점으로 한 번 찍고, 같은 순간 원래 화면을 다시 그려 깜빡임을 없앤다.
+    const unregisterSnapshot = registerRoomSnapshot((width, height) => {
+      if (viewerSeat >= layout.seatCount) return null
+      const shot = { width, height }
+      const result = renderer.render({
+        camera: StudyRoomSeatCamera.portrait(layout.seat(viewerSeat), shot),
+        width, height,
+        devicePixelRatio: 2,
+        motionSeconds: lastFrame?.motionSeconds ?? 0,
+        quality: StudyRoomQuality.high,
+        hiddenSeat: null,
+        cutHeight: 0,
+      })
+      if (!result) return null
+      const out = document.createElement('canvas')
+      out.width = renderer.canvas.width
+      out.height = renderer.canvas.height
+      out.getContext('2d')?.drawImage(renderer.canvas, 0, 0)
+      if (lastFrame) draw(lastFrame, performance.now())
+      scheduler.invalidateCamera()
+      schedule()
+      return out
+    })
     if (visible) quality?.startWatching()
     scheduler.invalidateCamera()
     schedule()
@@ -261,6 +287,7 @@ export function StudyRoom3dView(props: {
       document.removeEventListener('visibilitychange', onVisibility)
       quality?.removeListener(onQuality)
       unsubscribeRenderer()
+      unregisterSnapshot()
       quality?.stopWatching()
       cancelAnimationFrame(raf)
       window.clearTimeout(wake)

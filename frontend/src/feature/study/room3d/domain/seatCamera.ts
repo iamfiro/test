@@ -70,6 +70,23 @@ export const StudyRoomSeatCamera = {
   },
 
   /**
+   * 웹 전용(공부 요약 카드 사진): 앉은 사람을 책상 너머 앞에서 조금 내려다보며 상반신을 담는다.
+   * 카메라 yaw를 자리 yaw 그대로 두면(다른 시점은 +180) 사람 얼굴 쪽에서 본다.
+   */
+  portrait(seat: StudyRoomSeat, size: StudyRoomSize, s = { pitch: 10, fov: 30, distance: 2.4, height: 0.52 }): StudyRoomCamera {
+    const aspect = size.width / size.height;
+    return new StudyRoomCamera({
+      projection: 'perspective',
+      pitchDegrees: s.pitch,
+      yawDegrees: MathUtils.radToDeg(seat.yaw),
+      fovYDegrees: s.fov,
+      target: seat.anchor.add(new Vector3(0, s.height, 0)),
+      viewWidth: s.distance * 2 * Math.tan(MathUtils.degToRad(s.fov) / 2) * aspect,
+      minViewHeight: 0,
+    });
+  },
+
+  /**
    * orbitDegrees: 3인칭에서 내 자리 둘레로 돈 각도(끌어서 돌린다). 다른 시점은 무시한다.
    * pitchDegrees·distanceScale(웹 전용, 사용자 결정 2026-11-23): 3인칭에서 위아래로 끌어 내려다보는 각도,
    * 휠·두 손가락으로 거리를 바꾼다. 카메라가 천장(4.2m) 위로 나가지 않게 거리를 줄인다.
