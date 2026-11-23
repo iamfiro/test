@@ -5,7 +5,7 @@
 // 폴라로이드(오늘의 공부방), 티켓 스티커와 클립, 앱 스티커. 레퍼런스의 캐릭터·로고·문구는 쓰지 않는다.
 // 이름·목표·과목은 넣지 않고 남은 항목을 크게 쓴다(사용자 결정 2026-11-23).
 // 톤은 앱 공부 화면: 섬 팔레트 낮 값(tokens.css), 둥근 글꼴, 햇살 노랑 강조, 앱 스티커 아트(원본 PocketTime
-// assets/icons/study_*.png). 클립보드·티켓·클립·테이프는 Codex로 그린 일러스트(public/assets/study_recap,
+// assets/icons/study_*.png). 판·집게·티켓·클립·테이프·낙서는 Codex로 그린 일러스트(public/assets/study_recap,
 // 원본·프롬프트 tool/assets/recap_codex)이고, 글자·사진·스티커는 그 위에 캔버스로 그린다. 화면과 저장 이미지(인스타그램 스토리 1080×1920)는 같은 함수로 그린다.
 // 다크 모드에서 저장해도 같은 이미지가 나오도록 값은 낮 팔레트로 고정한다.
 import '@fontsource/gaegu/400.css'
@@ -33,8 +33,14 @@ const fonts = {
   hand: '"Gaegu", "Pretendard Variable", sans-serif',
 } as const
 
-/** 시트(논리 pt) = 클립보드 일러스트(1200×1686)를 3분의 1로. 종이는 x 16–384, y 32–540, 집게는 y 59까지 내려온다. */
-export const sheet = { width: 400, height: 562 } as const
+/**
+ * 시트(논리 pt). 판(1200×1686 일러스트를 3분의 1로, 종이는 x 17–382·y 33–540)을 위에서 clipTop만큼 내려 그리고,
+ * 집게(따로 그린 일러스트)는 판 위 가장자리에 걸쳐 그 위로 솟게 얹는다. 아래 좌표는 모두 판 기준이다.
+ */
+const clipTop = 60
+const board = { width: 400, height: 562 } as const
+const clip = { width: 156, height: 156 * (420 / 600), lip: 50 } as const
+export const sheet = { width: board.width, height: clipTop + board.height } as const
 /** 프로필 사진(정면)과 폴라로이드(전경) 크기. 3D 방은 이 비율로 찍는다. */
 export const portraitSize = { width: 136, height: 148 } as const
 export const sceneSize = { width: 98, height: 98 } as const
@@ -42,7 +48,8 @@ export const sceneSize = { width: 98, height: 98 } as const
 const stickerUrls = {
   trophy: '/assets/icons/study_trophy.png',
   camera: '/assets/icons/study_camera.png',
-  clipboard: '/assets/study_recap/clipboard.webp',
+  board: '/assets/study_recap/board.webp',
+  clip: '/assets/study_recap/clip.webp',
   ticket: '/assets/study_recap/ticket.webp',
   paperclip: '/assets/study_recap/paperclip.webp',
   tape: '/assets/study_recap/tape.webp',
@@ -89,7 +96,9 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   // 규칙 셋(사용자 피드백 2026-11-24 "중구난방"): 글꼴은 숫자=둥근 글꼴, 라벨·메모=손글씨 둘만. 색은 데이터=잉크 갈색,
   // 손글씨·장식=청록(낙서의 반짝이만 햇살 노랑), 강조=숫자 밑 햇살 형광펜. 큰 장식은 뜻이 있는 것(테이프·티켓 클립·
   // 폴라로이드 카메라·화살표·순위 트로피)만, 자잘한 낙서는 정해 둔 빈자리에 작게. 위 칸(사진 + 연속·순위)과 아래 칸(이번 공부·공부일 + 폴라로이드)을 손그림 구분선으로 나눈다.
-  ctx.drawImage(assets.clipboard, 0, 0, sheet.width, sheet.height)
+  ctx.save()
+  ctx.translate(0, clipTop)
+  ctx.drawImage(assets.board, 0, 0, board.width, board.height)
   titleDuration(ctx, recap.todaySeconds, 152, 114, 244)
   drawTicket(ctx, assets, 334, 86)
   drawPortrait(ctx, recap, assets)
@@ -102,19 +111,27 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   doodle(ctx, assets.sparkle, 46, 520, 18, 0)
   drawBottomRows(ctx, recap, assets)
   drawPolaroid(ctx, recap, assets)
+  ctx.restore()
+  // 집게: 아래 입술이 판 위 lip에 오도록, 판 위로 솟게.
+  ctx.save()
+  ctx.shadowColor = 'rgba(60,40,20,0.3)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 4
+  ctx.drawImage(assets.clip, (board.width - clip.width) / 2, clipTop + clip.lip - clip.height, clip.width, clip.height)
+  ctx.restore()
 }
 
-/** 티켓 스티커(일러스트) 위에 서비스 이름, 그 위에 꽂힌 클립. */
+/** 레트로 승차권(일러스트: 청록 띠·바코드 절취부) 위에 서비스 이름, 그 위에 꽂힌 클립. */
 function drawTicket(ctx: CanvasRenderingContext2D, assets: CardAssets, cx: number, cy: number) {
-  const w = 112
-  const h = w * (220 / 420)
+  const w = 118
+  const h = w * (220 / 480)
   ctx.save()
   ctx.translate(cx, cy); ctx.rotate((8 * Math.PI) / 180)
   ctx.shadowColor = 'rgba(90,55,20,0.22)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2
   ctx.drawImage(assets.ticket, -w / 2, -h / 2, w, h)
   ctx.shadowColor = 'transparent'
-  text(ctx, 'STUDY', -w / 2 + w * 0.42, -4, { font: `800 9.5px ${fonts.round}`, color: c.ink, spacing: 0.8 })
-  text(ctx, 'VILLAGE', -w / 2 + w * 0.42, 7, { font: `800 9.5px ${fonts.round}`, color: c.ink, spacing: 0.8 })
+  // 띠 아래 빈 몸통(왼쪽 약 4분의 3) 가운데에 서비스 이름 두 줄.
+  const mid = -w / 2 + w * 0.4
+  text(ctx, 'STUDY', mid, 1, { font: `800 10.5px ${fonts.round}`, color: c.title, align: 'center', spacing: 1.2 })
+  text(ctx, 'VILLAGE', mid, 14, { font: `800 10.5px ${fonts.round}`, color: c.ink, align: 'center', spacing: 1.2 })
   ctx.restore()
   const pw = 18
   ctx.save()
