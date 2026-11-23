@@ -184,6 +184,7 @@ uniform float haze;       // 먼 곳 공기 원근 세기
 uniform vec3 hazeTop;
 uniform vec3 hazeBottom;
 uniform float leak;       // 빛샘 세기
+uniform vec2 leakAt;      // 빛샘이 시작하는 모서리(uv)
 varying vec2 vUv;
 
 float viewDistance(vec2 uv) { return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
@@ -248,7 +249,7 @@ void main() {
   // 그림자를 우윳빛으로 들어 올려 파스텔 느낌.
   color = color * (1.0 - liftAmount) + lift * liftAmount;
   // 빛샘: 해 쪽 모서리에서 번지는 옅은 크림빛.
-  if (leak > 0.0) color += vec3(1.0, 0.94, 0.86) * leak * smoothstep(0.9, 0.0, distance(vUv, vec2(1.05, 1.05)));
+  if (leak > 0.0) color += vec3(1.0, 0.94, 0.86) * leak * smoothstep(0.9, 0.0, distance(vUv, leakAt));
   // 비네트.
   vec2 d = vUv - 0.5;
   color *= 1.0 - vignette * smoothstep(0.35, 0.85, length(d * vec2(1.0, 0.8)));
@@ -258,7 +259,8 @@ void main() {
 }
 `
 
-export type MoodLook = { bloom: number; depthOfField: boolean; grain: number; vignette: number; ao: boolean }
+/** day: 0 밤 – 1 밝은 낮(해가 떠 있으면 0.5 이상). sunX: 해가 화면 가로 어디쯤(0 왼쪽 – 1 오른쪽). */
+export type MoodLook = { bloom: number; depthOfField: boolean; grain: number; vignette: number; ao: boolean; day: number; sunX: number }
 export type ComposerStyle = 'soft' | 'toon'
 
 function pass(fragmentShader: string, uniforms: Record<string, THREE.IUniform>) {
@@ -353,10 +355,12 @@ export class ToonComposer {
     hazeTop: { value: new THREE.Vector3(0.9, 0.93, 1.0) },
     hazeBottom: { value: new THREE.Vector3(1.0, 0.95, 0.9) },
     leak: { value: 0 },
+    leakAt: { value: new THREE.Vector2(1.05, 1.05) },
   })
   private readonly skyMask = pass(skyMaskFragment, { tColor: { value: this.aa.texture }, tDepth: { value: this.normal.depthTexture } })
   private readonly raysPass = pass(raysFragment, { tMask: { value: this.raysB.texture }, sun: { value: new THREE.Vector2(0.82, 1.15) }, decay: { value: 0.965 } })
   private width = 1
+  private softBase = { exposure: 1, highlightLift: 0, haze: 0, leak: 0, rays: 0 }
   private height = 1
 
   constructor(readonly style: ComposerStyle = 'soft') {
@@ -376,6 +380,7 @@ export class ToonComposer {
       ;(fu.bloomTint!.value as THREE.Vector3).set(1.06, 0.96, 0.92)
       fu.haze!.value = 0.32
       fu.leak!.value = 0.07
+      this.softBase = { exposure: 1.08, highlightLift: 0.04, haze: 0.32, leak: 0.07, rays: 0.55 }
     }
   }
 
@@ -472,7 +477,18 @@ export class ToonComposer {
     }
 
     const fu = this.final.mesh.material.uniforms
-    fu.rays!.value = useRays ? 0.55 : 0
+    // 감성 효과는 해 따라: 밝은 낮(특히 아침·한낮)에는 이미 밝으니 노출·공기·빛샘·빛줄기를 줄이고,
+    // 해 질 녘·밤에는 다 살린다(사용자 피드백 2026-11-23: 아침이 너무 밝다). 빛줄기·빛샘은 해 쪽에서 온다.
+    if (this.style === 'soft') {
+      const calm = 1 - 0.55 * mood.day
+      fu.exposure!.value = 1 + (this.softBase.exposure - 1) * (1 - mood.day) - 0.04 * mood.day
+      fu.highlightLift!.value = this.softBase.highlightLift * (1 - mood.day)
+      fu.haze!.value = this.softBase.haze * calm
+      fu.leak!.value = this.softBase.leak * calm
+      ;(fu.leakAt!.value as THREE.Vector2).set(mood.sunX < 0.5 ? -0.05 : 1.05, 1.05)
+      ;(this.raysPass.mesh.material.uniforms.sun!.value as THREE.Vector2).set(mood.sunX, 1.15)
+    }
+    fu.rays!.value = useRays ? this.softBase.rays * (1 - 0.5 * mood.day) : 0
     fu.near!.value = camera.near
     fu.far!.value = camera.far
     fu.focus!.value = focusDistance

@@ -347,8 +347,13 @@ export class ThreeStudyRoomRenderer {
       this.composer.setSize(Math.round(opts.width * pixelRatio), Math.round(opts.height * pixelRatio))
       // 감성 후처리: 높은 단계는 전부, 중간은 심도 없이, 낮은 단계는 외곽선만.
       const q = opts.quality.name
-      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.015, vignette: this.look === 'soft' ? 0.18 : 0.1, ao: true }
-        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.015, vignette: this.look === 'soft' ? 0.18 : 0.1, ao: false }
+      const d = this.daylight
+      // 해가 떠 있으면 아침·저녁도 0.5 이상(밝은 하늘), 한낮 1. 해는 아침엔 왼쪽, 오후엔 오른쪽에서 든다.
+      const day = d?.sunUp ? 0.5 + 0.5 * d.sunHeight : 0
+      const sunX = d?.sunUp ? -0.15 + 1.3 * d.arc : 0.82
+      const vignette = this.look === 'soft' ? 0.18 : 0.1
+      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.015, vignette, ao: true, day, sunX }
+        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.015, vignette, ao: false, day, sunX }
         : null
       const focus = rig.eye.distanceTo(opts.camera.target)
       this.composer.render(gl, this.world, this.camera, pixelRatio, focus, mood)
