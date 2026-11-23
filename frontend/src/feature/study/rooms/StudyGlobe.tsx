@@ -271,28 +271,14 @@ export function StudyGlobe(props: { className?: string }) {
       students.push({ body, holder, head, phase: i * 1.7 })
     }
     let clock = 0
-    const worldUp = new THREE.Vector3(0, 1, 0)
-    const radial = new THREE.Vector3()
-    const target = new THREE.Vector3()
-    const holderQuat = new THREE.Quaternion()
     const updateStudents = (dt: number) => {
       clock += dt
       for (const w of students) {
-        // 지구 중앙에서는 정수리만 보이므로 몸을 화면 위쪽으로 기울여 앞모습이 보이게 한다(앉은 자리는 그대로).
-        w.holder.getWorldQuaternion(holderQuat)
-        radial.set(0, 1, 0).applyQuaternion(holderQuat)
-        target.copy(radial).addScaledVector(worldUp, 1.0).normalize()
-        const tilt = radial.angleTo(target)
-        target.applyQuaternion(holderQuat.invert())
-        w.body.quaternion.setFromUnitVectors(worldUp, target)
-        // 기울이면 책상 앞쪽이 지면 아래로 파묻혀 잘리므로, 기운 만큼 몸 전체를 지면 위로 띄운다.
-        w.body.position.y = 0.012 + 0.06 * Math.sin(tilt)
         // 책을 보며 고개를 숙이고 가끔 끄덕이며 필기한다.
         w.head.rotation.x = 0.4 + Math.sin(clock * 2.2 + w.phase) * 0.07
         w.head.rotation.y = Math.sin(clock * 0.6 + w.phase) * 0.12
       }
     }
-    updateStudents(0)
 
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0
