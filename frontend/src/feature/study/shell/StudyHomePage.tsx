@@ -62,7 +62,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
       {tab !== 'study' && (
         <header className={`${s.header} ${s.headerCorner}`}>
-          <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(-1)} /></span>
+          <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(paths.study)} /></span>
         </header>
       )}
       {tab !== 'study' && tab !== 'rooms' && (
