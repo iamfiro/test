@@ -170,12 +170,12 @@ function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: 
 type Row = { label: string; icon: HTMLImageElement; draw: (x: number, base: number, maxW: number) => void }
 
 /** 큰 항목 한 묶음: 작은 낙서 + 손글씨 라벨(청록, 위) → 값(둥근 글꼴 크게, 아래) → 손으로 그은 점선. */
-function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, right: number, startY: number, rowH: number) {
+function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, right: number, startY: number, rowH: number, valueDrop = rowH - 31) {
   list.forEach((r, i) => {
     const y = startY + i * rowH
     ctx.drawImage(r.icon, x - 1, y + 1, 16, 16)
     text(ctx, r.label, x + 18, y + 15, { font: `700 18px ${fonts.hand}`, color: c.title })
-    const base = y + rowH - 16
+    const base = y + 15 + valueDrop
     r.draw(x, base, right - x)
     handDash(ctx, x, right, base + 9, i * 7 + Math.round(startY))
   })
@@ -223,7 +223,7 @@ function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets
     { label: webText.recapFields.session, icon: assets.note, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, valueFont) },
     { label: webText.recapFields.date, icon: assets.sparkle, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), valueFont, w), x, b, { font: valueFont, color: c.ink }) },
   ]
-  rows(ctx, list, 32, 236, 356, 72)
+  rows(ctx, list, 32, 236, 356, 62, 31)
 }
 
 /** 폴라로이드: 3인칭으로 본 오늘의 공부방, 아래 여백에 글씨, 카메라 스티커. */
