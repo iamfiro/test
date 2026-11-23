@@ -91,7 +91,10 @@
   display: flex;
   align-items: center;
   pointer-events: auto;
+  transition: bottom 400ms cubic-bezier(0.645, 0.045, 0.355, 1);
 }
+/* 탭바가 숨으면(공부 중) 미니 타이머와 함께 내려간다. */
+.bottomButtonsLow { bottom: calc(var(--bottom) + 124px); }
 .gapXl { width: 24px; flex: none; }
 
 /* 자리 이동 안내: top = topInset + sm, left = lg + 48 + sm, right = lg. */

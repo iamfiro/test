@@ -158,7 +158,7 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
       } as CSSProperties}
     >
       {roomButtons && (showsSeatMove || showsFocusButton) && (
-        <div className={s.bottomButtons}>
+        <div className={`${s.bottomButtons} ${studyTabBarHidden(props) ? s.bottomButtonsLow : ''}`}>
           {showsSeatMove && (
             <>
               <StickerButton asset={icon('study_seat.png')} size={bottomSize} label={t('studySeatMove')} onClick={props.onOpenSeatPlan} />
