@@ -142,8 +142,8 @@
    안내 말풍선(시점 이름·새 채팅)은 각 단추 왼쪽에 붙는다. */
 .rail {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 16px);
-  right: 20px;
+  top: calc(env(safe-area-inset-top, 0px) + 32px);
+  right: 32px;
   z-index: 11;
   display: flex;
   flex-direction: column;
