@@ -105,7 +105,6 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   drawTopRows(ctx, recap, assets)
   handDash(ctx, 32, 368, 336, 3)
   // 자잘한 손그림(사용자 요청 2026-11-24 "자잘한 표현은 남겨"): 청록·노랑 낙서만, 정해 둔 빈자리에 작게.
-  doodle(ctx, assets.sparkle, 292, 134, 24, 0)
   doodle(ctx, assets.star, 356, 316, 18, 14)
   doodle(ctx, assets.note, 224, 356, 20, -10)
   doodle(ctx, assets.sparkle, 46, 520, 18, 0)
@@ -214,7 +213,7 @@ function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: C
       text(ctx, webText.recapRankTotal(rank.total), x + 30 + measure(ctx, num, big) + 6, b, { font: `700 17px ${fonts.hand}`, color: c.inkSoft })
     } })
   }
-  rows(ctx, list, 200, 372, 132, 72)
+  rows(ctx, list, 200, 372, 132, 66, 34)
 }
 
 function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
