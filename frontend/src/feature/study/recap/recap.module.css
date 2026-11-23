@@ -64,8 +64,7 @@
   animation: passport 760ms 160ms var(--ease-out) both;
 }
 .passportBase { display: block; }
-.subjectStamp, .completionStamp { position: absolute; transform: rotate(var(--rot)); }
-.subjectStamp { animation: stick 420ms var(--delay) var(--spring) both; }
+.completionStamp { position: absolute; transform: rotate(var(--rot)); }
 .completionStamp { animation: stamp 520ms var(--delay) var(--spring) both; }
 /* 마우스를 올리면 아주 옅은 빛이 종이를 스친다(엠보싱·코팅 느낌). */
 .sheen {
@@ -94,11 +93,10 @@
 @keyframes fade { from { opacity: 0; } }
 @keyframes sheet { from { opacity: 0; transform: translateY(30px) rotate(0deg); } }
 @keyframes passport { from { opacity: 0; transform: translateY(34px) rotate(-5deg); } }
-@keyframes stick { from { opacity: 0; transform: translateY(-8px) scale(1.22) rotate(calc(var(--rot) - 8deg)); } }
 @keyframes stamp { 0% { opacity: 0; transform: scale(1.9) rotate(calc(var(--rot) + 10deg)); } 60% { opacity: 1; } }
 @keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
 @keyframes breathe { 50% { opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
-  .backdrop, .brag, .backSheet, .passport, .subjectStamp, .completionStamp, .actions, .close, .artLoading { animation: none; }
+  .backdrop, .brag, .backSheet, .passport, .completionStamp, .actions, .close, .artLoading { animation: none; }
   .tilt, .close { transition: none; }
 }

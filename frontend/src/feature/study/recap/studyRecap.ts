@@ -4,9 +4,6 @@ import type { StudyRecord } from '../timer/timerStore'
 import type { StudyStats } from '../timer/statsStore'
 import type { StudySettings } from '../timer/settingsStore'
 
-/** 여권 우표 칸에 붙이는 과목 수. 나머지는 목록에만 쓴다. */
-export const passportStampSlots = 2
-
 export type StudyRecap = {
   nickname: string
   /** 공부일(YYYY-MM-DD, 04:00 경계). */

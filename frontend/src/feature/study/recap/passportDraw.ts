@@ -1,58 +1,55 @@
-// "오늘의 공부 여권" 아트. 화면은 레이어(여권 본체·과목 우표·완료 도장)를 따로 그려 하나씩 움직이고,
-// 저장 이미지(인스타그램 스토리 1080×1920, 점 격자 종이 위 여권 한 장)는 같은 함수로 합친다.
-// 앱에 없는 화면이라 사용자가 정한 문구용품 팔레트(아이보리·피치·버터·코랄·세이지·잉크, 2026-11-23)를 쓰고,
-// 섬 언어(작은 시계 무늬, 3D 방 사진)만 이어 받는다. 그라데이션 광원·이모지·범용 아이콘은 쓰지 않는다.
+// "오늘의 공부 인증" 카드. 화면은 레이어(카드 본체·소인 도장)를 따로 그려 도장이 나중에 찍히게 하고,
+// 저장 이미지(인스타그램 스토리 1080×1920)는 같은 함수로 한 장에 합친다. 그래서 미리보기와 저장본이 같다.
+// 구성은 사용자가 준 여권 카드 레퍼런스(2026-11-23)를 따른다: 위 크림 띠(물결 줄·제목), 가운데 색 띠(사진·소인·
+// 말풍선·아이콘 줄·큰 이름·실루엣), 아래 크림 띠(발행 번호·판독 기호). 레퍼런스 게임 고유의 나뭇잎 무늬·야자수 섬은
+// 쓰지 않고 섬 언어(작은 시계 무늬)와 공부 실루엣(스탠드·책)으로 바꿨다. 팔레트는 사용자가 정한 문구용품 색.
 import { paintClockField } from '../../../core/ui/IslandBackground'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
 import { formatStudyDuration } from '../home/studyFormat'
 import { flameShape } from '../stats/StreakFlame'
-import { goalReached, passportStampSlots, type StudyRecap } from './studyRecap'
+import { goalReached, type StudyRecap } from './studyRecap'
 
 export const ink = {
   ivory: '#FFF8ED', peach: '#F6B5A9', butter: '#F8DFA7', coral: '#E98D86', sage: '#A8BDA4', ink: '#302D35',
   /** 작은 글자용: 코랄은 아이보리 위 대비가 낮아 글자에는 진한 코랄을 쓴다. */
   coralText: '#B4504A',
-  inkSoft: '#77717B', line: '#E7DCC8', edge: '#E6D8C0', paperShade: '#F7EEDC', white: '#FFFFFF',
+  inkSoft: '#77717B', white: '#FFFFFF',
+  /** 가운데 띠: 코랄 바탕과 한 단계 밝은 무늬, 띠 위 선. */
+  band: '#E98D86', bandPattern: '#EFA49D', bandLine: 'rgba(255,248,237,0.55)',
+  /** 물결 줄·소인 잉크(남색 잉크). */
+  guilloche: 'rgba(59,63,107,0.55)', stampInk: '#3B3F6B',
 } as const
 
 export const fonts = {
   sans: '"Pretendard Variable", Pretendard, -apple-system, sans-serif',
-  serif: 'ui-serif, "New York", "Iowan Old Style", Georgia, serif',
   mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
   round: '"TmoneyRoundWind", "Pretendard Variable", sans-serif',
 } as const
 
-/** 여권 본체(논리 pt, 가로). 왼쪽 면은 사진·이름과 오늘 공부한 시간(주인공), 세로 절취선 오른쪽 면(비자 칸)은
- *  연속 공부·과목 우표·완료 도장. 자랑 카드라 가장 큰 글자는 늘 공부 시간이다. */
+/** 카드(논리 pt, 가로). */
 export const passport = { width: 480, height: 300, radius: 18 } as const
-const stubX = 318
-/** 사진 칸. 3D 방은 이 비율로 찍는다. */
-export const photoSlot = { x: 30, y: 54, width: 84, height: 104 } as const
-/** 과목 우표 크기와 붙는 자리(여권 좌표, 가운데 기준). */
-export const subjectStamp = { width: 68, height: 82, margin: 6 } as const
-export const subjectSlots = [
-  { x: 362, y: 158, rotate: -5 },
-  { x: 434, y: 162, rotate: 4 },
-] as const satisfies readonly { x: number; y: number; rotate: number }[]
-/** 완료 도장(여권 좌표, 가운데 기준). */
-export const completionStamp = { x: 414, y: 250, radius: 44, rotate: -12, margin: 6 } as const
+const band = { top: 46, bottom: 250 } as const
+/** 사진 칸(정사각). 3D 방은 이 비율로 찍는다. */
+export const photoSlot = { x: 30, y: 66, width: 124, height: 124 } as const
+/** 소인 도장(카드 좌표, 가운데 기준). 사진 왼쪽 아래에 걸쳐 찍힌다. */
+export const postmark = { x: 104, y: 214, width: 176, height: 62, rotate: -7 } as const
 
 const weekdays = ['월', '화', '수', '목', '금', '토', '일']
 
 /** 그리기 전에 글꼴을 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
 export async function loadPassportFonts(recap: StudyRecap): Promise<void> {
-  const brag = bragChip(recap)
   const sample = [
-    recap.nickname, ...recap.subjects.map((s) => s.subject ?? t('studySubjectNone')), brag ?? '',
-    webText.recapPassportTitle(12, 31), webText.recapStampGoal, webText.recapStampDone, webText.recapFieldName, webText.recapFieldStreak,
-    webText.recapHeroLabel, webText.recapStoryHeadlineLead, webText.recapStoryHeadlineTail, webText.recapStoryStreak(recap.streakDays),
-    formatStudyDuration(recap.todaySeconds), '0123456789시간분일과목()월화수목금토일%·+', t('studySubjectNone'),
+    recap.nickname, topSubjectLabel(recap), bragChip(recap) ?? '', quote(recap), fullDate(recap.studyDate),
+    webText.recapCardTitle, webText.recapStampGoal, webText.recapStampDone, webText.recapIssue,
+    webText.recapStoryHeadlineLead, webText.recapStoryHeadlineTail, webText.recapStoryStreak(recap.streakDays),
+    webText.recapStreakRow(recap.streakDays), webText.recapSubjectCount(recap.subjects.length),
+    formatStudyDuration(recap.todaySeconds), '0123456789시간분일과목()월화수목금토일%·+!', t('studySubjectNone'),
   ].join('')
-  await Promise.all([600, 700, 800].map((w) => document.fonts.load(`${w} 16px ${fonts.sans}`, sample)).concat(document.fonts.load(`800 16px ${fonts.round}`, webText.recapBrand)))
+  await Promise.all([600, 700, 800, 900].map((w) => document.fonts.load(`${w} 16px ${fonts.sans}`, sample)).concat(document.fonts.load(`800 16px ${fonts.round}`, webText.recapBrand)))
 }
 
-/** 공부 시간 옆 자랑 한 줄: 목표가 있으면 목표 대비 %, 없으면 어제보다 더 한 만큼. 둘 다 아니면 없음. */
+/** 자랑 한 줄: 목표가 있으면 목표 대비 %, 없으면 어제보다 더 한 만큼. 둘 다 아니면 없음. */
 export function bragChip(recap: StudyRecap): string | null {
   if (recap.goalSeconds != null && recap.goalSeconds > 0) {
     return webText.recapGoalChip(formatStudyDuration(recap.goalSeconds), Math.floor((recap.todaySeconds * 100) / recap.goalSeconds))
@@ -62,64 +59,71 @@ export function bragChip(recap: StudyRecap): string | null {
   return null
 }
 
-// ── 여권 본체 ──
+function quote(recap: StudyRecap): string {
+  return webText.recapQuote(formatStudyDuration(recap.todaySeconds))
+}
+
+function topSubjectLabel(recap: StudyRecap): string {
+  const top = recap.subjects[0]
+  return top ? top.subject ?? t('studySubjectNone') : t('studySubjectNone')
+}
+
+// ── 카드 본체 ──
 
 export function drawPassportBase(ctx: CanvasRenderingContext2D, recap: StudyRecap): void {
   const { width: W, height: H, radius } = passport
   ctx.save()
   ctx.beginPath(); ctx.roundRect(0, 0, W, H, radius); ctx.clip()
+
+  // 위·아래 크림 띠와 물결 줄.
   ctx.fillStyle = ink.ivory
   ctx.fillRect(0, 0, W, H)
-  ctx.save(); ctx.globalAlpha = 0.32; paintClockField(ctx, W, H, ink.ivory, '#F1DCCB', true); ctx.restore()
-  grain(ctx, W, H, 11, 1800)
-  // 오른쪽 면(비자 칸)은 아주 옅은 버터색 종이.
-  ctx.fillStyle = 'rgba(248,223,167,0.28)'
-  ctx.fillRect(stubX, 0, W - stubX, H)
-  ctx.restore()
+  grain(ctx, W, H, 11, 1600)
+  guilloche(ctx, 0, 8, W, band.top - 12, 5)
+  guilloche(ctx, 0, band.bottom + 8, W, H - band.bottom - 16, 5)
 
-  // 겹 테두리.
-  hairRect(ctx, 9, 9, W - 18, H - 18, 12, 'rgba(233,141,134,0.42)', 1)
-  hairRect(ctx, 12.5, 12.5, W - 25, H - 25, 9.5, 'rgba(233,141,134,0.2)', 0.75)
-
-  // 머리: 미세 글자와 번호.
-  text(ctx, webText.recapPassportBrand, 30, 34, { font: `600 6.8px ${fonts.mono}`, color: ink.inkSoft, spacing: 1.4 })
-  const serialRight = stubX - 18
-  text(ctx, 'No.', serialRight - measure(ctx, recap.serial, `700 9.5px ${fonts.mono}`, 0.6) - 4, 34, { font: `500 6.8px ${fonts.mono}`, color: ink.inkSoft, align: 'right' })
-  text(ctx, recap.serial, serialRight, 34, { font: `700 9.5px ${fonts.mono}`, color: ink.coralText, align: 'right', spacing: 0.6 })
-
-  drawPhotoSlot(ctx, recap)
-  drawIdentity(ctx, recap)
-  drawHero(ctx, recap)
-  drawMachineLine(ctx, recap)
-
-  // 세로 절취선과 위아래 펀치 홈.
+  // 가운데 색 띠: 코랄 + 옅은 시계 무늬.
   ctx.save()
-  ctx.strokeStyle = 'rgba(48,45,53,0.28)'; ctx.lineWidth = 1; ctx.setLineDash([2.5, 3.5])
-  ctx.beginPath(); ctx.moveTo(stubX, 20); ctx.lineTo(stubX, H - 20); ctx.stroke()
+  ctx.beginPath(); ctx.rect(0, band.top, W, band.bottom - band.top); ctx.clip()
+  ctx.translate(0, band.top)
+  paintClockField(ctx, W, band.bottom - band.top, ink.band, ink.bandPattern, true)
   ctx.restore()
-  ctx.save()
-  ctx.globalCompositeOperation = 'destination-out'
-  for (const y of [0, H]) { ctx.beginPath(); ctx.arc(stubX, y, 10, 0, Math.PI * 2); ctx.fill() }
+  ctx.fillStyle = 'rgba(48,45,53,0.12)'
+  ctx.fillRect(0, band.top, W, 1); ctx.fillRect(0, band.bottom - 1, W, 1)
+
+  drawSilhouette(ctx)
   ctx.restore()
 
-  drawStub(ctx, recap)
+  // 제목: 위 띠 가운데, 물결 줄을 끊고 들어간다.
+  const titleFont = `800 15px ${fonts.sans}`
+  const tw = measure(ctx, webText.recapCardTitle, titleFont, 1.2)
+  ctx.fillStyle = ink.ivory
+  ctx.fillRect(W / 2 - tw / 2 - 14, 12, tw + 28, 24)
+  text(ctx, webText.recapCardTitle, W / 2, 30, { font: titleFont, color: ink.stampInk, align: 'center', spacing: 1.2 })
+  ctx.fillStyle = ink.stampInk
+  ctx.fillRect(W / 2 - tw / 2 - 2, 34, tw + 4, 1.5)
+
+  drawPhoto(ctx, recap)
+  drawBubble(ctx, recap)
+  drawRows(ctx, recap)
+
+  // 아래 띠: 발행 번호와 판독 기호.
+  ctx.fillStyle = ink.ivory
+  ctx.fillRect(18, H - 30, 200, 18); ctx.fillRect(W - 210, H - 30, 192, 18)
+  text(ctx, `${webText.recapIssue} ${recap.serial}`, 26, H - 17, { font: `700 10px ${fonts.mono}`, color: ink.ink, spacing: 0.3 })
+  text(ctx, '<'.repeat(22), W - 26, H - 17, { font: `700 10px ${fonts.mono}`, color: ink.stampInk, align: 'right', spacing: 0.6, alpha: 0.75 })
 }
 
-function drawPhotoSlot(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+/** 사진: 흰 테두리 둥근 정사각(3D 방에서 앞에서 찍은 내 자리). */
+function drawPhoto(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
   const { x, y, width: w, height: h } = photoSlot
-  // 오려 붙일 자리 점선(여권 사진 칸).
   ctx.save()
-  ctx.strokeStyle = 'rgba(48,45,53,0.32)'; ctx.lineWidth = 1; ctx.setLineDash([3, 2.5])
-  ctx.beginPath(); ctx.roundRect(x - 7, y - 7, w + 14, h + 14, 8); ctx.stroke()
-  ctx.restore()
-  // 흰 인화지.
-  ctx.save()
-  ctx.shadowColor = 'rgba(48,45,53,0.18)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2
+  ctx.shadowColor = 'rgba(48,45,53,0.25)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3
   ctx.fillStyle = ink.white
-  ctx.fillRect(x - 3, y - 3, w + 6, h + 6)
+  ctx.beginPath(); ctx.roundRect(x - 6, y - 6, w + 12, h + 12, 20); ctx.fill()
   ctx.restore()
   ctx.save()
-  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip()
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 15); ctx.clip()
   if (recap.photo) {
     const p = recap.photo
     const s = Math.max(w / p.width, h / p.height)
@@ -128,217 +132,127 @@ function drawPhotoSlot(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
     ctx.fillStyle = ink.butter
     ctx.fillRect(x, y, w, h)
     ctx.save(); ctx.globalAlpha = 0.5; ctx.translate(x, y); paintClockField(ctx, w, h, ink.butter, '#EBCB8A', true); ctx.restore()
-    clockGlyph(ctx, x + w / 2, y + h / 2, 14, ink.ink, 2)
+    clockIcon(ctx, x + w / 2, y + h / 2, 18, ink.ink)
   }
   ctx.restore()
-  paperclip(ctx, x + 12, y - 12, -8)
 }
 
-/** 사진 옆: 제목(n월 n일 공부 인증), 이름, 공부일. */
-function drawIdentity(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const x = 134
-  const right = stubX - 22
-  const [, month, day] = parseDate(recap.studyDate)
-  text(ctx, webText.recapPassportTitle(month, day), x, 68, { font: `800 16px ${fonts.sans}`, color: ink.ink, spacing: -0.3 })
-  text(ctx, webText.recapPassportKind, x, 83, { font: `italic 500 10.5px ${fonts.serif}`, color: ink.inkSoft })
-  label(ctx, webText.recapFieldName, 'Name', x, 110)
-  const nameFont = `800 15px ${fonts.sans}`
-  text(ctx, ellipsize(ctx, recap.nickname, nameFont, right - x - 34), x, 128, { font: nameFont, color: ink.ink })
+/** 말풍선: 오늘 공부한 시간 자랑. 꼬리가 사진 쪽을 가리킨다. */
+function drawBubble(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+  const x = 176
+  const y = 60
+  const w = passport.width - 22 - x
+  const h = 38
   ctx.save()
-  ctx.strokeStyle = 'rgba(48,45,53,0.22)'; ctx.lineWidth = 0.8; ctx.setLineDash([1, 2.2])
-  ctx.beginPath(); ctx.moveTo(x, 134); ctx.lineTo(right, 134); ctx.stroke()
+  ctx.shadowColor = 'rgba(48,45,53,0.18)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2
+  ctx.fillStyle = ink.ivory
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(x + 6, y + h - 12); ctx.lineTo(x - 9, y + h + 4); ctx.lineTo(x + 20, y + h - 1); ctx.closePath(); ctx.fill()
   ctx.restore()
-  text(ctx, dateLabel(recap.studyDate), x, 152, { font: `600 8.6px ${fonts.mono}`, color: ink.inkSoft, spacing: 0.4 })
-  embossSeal(ctx, right - 14, 118, 14)
+  const value = quote(recap)
+  let size = 16
+  while (size > 11 && measure(ctx, value, `800 ${size}px ${fonts.sans}`, -0.3) > w - 24) size -= 0.5
+  text(ctx, value, x + w / 2, y + h / 2 + size * 0.36, { font: `800 ${size}px ${fonts.sans}`, color: ink.ink, align: 'center', spacing: -0.3 })
 }
 
-/** 주인공: 오늘 공부한 시간. 숫자는 크게, 단위는 작게, 숫자 아래에 버터색 형광펜. 아래에 자랑 한 줄. */
-function drawHero(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const x = 30
-  const maxW = stubX - 22 - x
-  ctx.fillStyle = ink.line
-  ctx.fillRect(x, 172, maxW, 1)
-  label(ctx, webText.recapHeroLabel, "Today's focus", x, 190)
+/** 아이콘 줄(시간·연속·과목 수 / 가장 많이 한 과목·자랑), 큰 이름, 날짜. 줄 사이는 크림 선. */
+function drawRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+  const x = 178
+  const right = passport.width - 22
+  const rowFont = `800 13.5px ${fonts.sans}`
+  const item = (icon: (cx: number, cy: number) => void, value: string, at: number, baseline: number, maxW: number, font = rowFont) => {
+    icon(at + 8, baseline - 5)
+    text(ctx, ellipsize(ctx, value, font, maxW - 26), at + 21, baseline, { font, color: ink.ink })
+  }
+  const line = (y: number, to = right) => { ctx.fillStyle = ink.bandLine; ctx.fillRect(x, y, to - x, 1.2) }
 
-  const parts = formatStudyDuration(recap.todaySeconds).match(/\d+|\D+/g) ?? []
-  let big = 56
-  const layout = () => parts.map((p) => {
-    const digit = /\d/.test(p)
-    const value = digit ? p : p.trim()
-    const font = digit ? `800 ${big}px ${fonts.sans}` : `700 ${Math.round(big * 0.36)}px ${fonts.sans}`
-    return { value, digit, font, width: measure(ctx, value, font, digit ? -1.5 : 0) }
-  })
-  let items = layout()
-  const gap = (i: number) => (i === 0 ? 0 : items[i]!.digit ? 9 : 3)
-  const total = () => items.reduce((sum, it, i) => sum + it.width + gap(i), 0)
-  while (total() > maxW && big > 32) { big -= 2; items = layout() }
-  const baseline = 238
-  let cx = x
-  items.forEach((it, i) => {
-    cx += gap(i)
-    if (it.digit) {
-      // 형광펜: 숫자 아래 절반을 살짝 기울여 칠한다.
-      ctx.save()
-      ctx.fillStyle = 'rgba(248,223,167,0.95)'
-      ctx.beginPath()
-      ctx.moveTo(cx - 3, baseline - big * 0.26); ctx.lineTo(cx + it.width + 3, baseline - big * 0.3)
-      ctx.lineTo(cx + it.width + 2, baseline + 3); ctx.lineTo(cx - 2, baseline + 4); ctx.closePath(); ctx.fill()
-      ctx.restore()
-      text(ctx, it.value, cx, baseline, { font: it.font, color: ink.ink, spacing: -1.5 })
-    } else {
-      text(ctx, it.value, cx, baseline, { font: it.font, color: ink.inkSoft })
-    }
-    cx += it.width
-  })
+  // 1줄: 공부 시간 · 연속 · 과목 수.
+  const col = (right - x) / 3
+  item((cx, cy) => clockIcon(ctx, cx, cy, 7, ink.ink), formatStudyDuration(recap.todaySeconds), x, 125, col + 6)
+  item((cx, cy) => flame(ctx, cx - 7, cy - 8, 16, recap.streakDays > 0), webText.recapStreakRow(recap.streakDays), x + col + 6, 125, col)
+  item((cx, cy) => bookIcon(ctx, cx, cy, ink.ink), webText.recapSubjectCount(recap.subjects.length), x + col * 2 + 6, 125, col - 6)
+  line(136)
 
+  // 2줄: 가장 많이 한 과목 · 자랑(목표 %·어제보다).
   const brag = bragChip(recap)
-  if (brag) {
-    const font = `800 9.5px ${fonts.sans}`
-    const w = measure(ctx, brag, font) + 18
-    ctx.fillStyle = goalReached(recap) ? 'rgba(233,141,134,0.22)' : 'rgba(168,189,164,0.32)'
-    ctx.beginPath(); ctx.roundRect(x, 249, w, 18, 9); ctx.fill()
-    text(ctx, brag, x + 9, 261.5, { font, color: goalReached(recap) ? ink.coralText : '#4C6A48' })
-  }
+  const half = brag ? (right - x) * 0.46 : right - x
+  item((cx, cy) => pencilIcon(ctx, cx, cy, ink.ink), topSubjectLabel(recap), x, 160, half)
+  if (brag) item((cx, cy) => targetIcon(ctx, cx, cy, ink.ink), brag, x + half, 160, right - x - half, `800 12.5px ${fonts.sans}`)
+  line(171, 372)
+
+  // 큰 이름.
+  text(ctx, ellipsize(ctx, recap.nickname, `800 26px ${fonts.sans}`, 372 - x), x, 206, { font: `800 26px ${fonts.sans}`, color: ink.ink, spacing: -0.6 })
+  line(216, 372)
+
+  // 날짜.
+  item((cx, cy) => calendarIcon(ctx, cx, cy, ink.ink), fullDate(recap.studyDate), x, 239, 372 - x, `700 12.5px ${fonts.sans}`)
 }
 
-/** 여권 아래 기계 판독 줄(실제 값으로 만든다: 공부일·집중 시간·연속·번호). */
-function drawMachineLine(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const font = `500 6.8px ${fonts.mono}`
-  const width = stubX - 52
-  const charW = measure(ctx, '<', font, 1) || 5
-  const n = Math.max(10, Math.floor(width / charW))
-  const minutes = Math.floor(recap.todaySeconds / 60)
-  const hhmm = `${String(Math.floor(minutes / 60)).padStart(2, '0')}${String(minutes % 60).padStart(2, '0')}`
-  const line = `P<SV<${recap.studyDate.replace(/-/g, '')}<<FOCUS${hhmm}<<STREAK${String(recap.streakDays).padStart(3, '0')}<<${recap.serial.replace(/-/g, '')}`
-  text(ctx, line.length >= n ? line.slice(0, n) : line + '<'.repeat(n - line.length), 30, passport.height - 18, { font, color: 'rgba(48,45,53,0.4)', spacing: 1 })
-}
-
-/** 비자 칸: 연속 공부(불꽃 + n일), 과목 우표 자리. */
-function drawStub(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const W = passport.width
-  const x = stubX + 20
-  text(ctx, 'VISA', x, 34, { font: `700 6.8px ${fonts.mono}`, color: ink.inkSoft, spacing: 1.6 })
-  text(ctx, stampDate(recap.studyDate), W - 26, 34, { font: `600 6.8px ${fonts.mono}`, color: ink.inkSoft, align: 'right', spacing: 0.8 })
-  label(ctx, webText.recapFieldStreak, 'Streak', x, 60)
-  drawFlame(ctx, x, 70, 24, recap.streakDays > 0)
-  const value = t('studyStatsStreakValue', { count: recap.streakDays })
-  text(ctx, value, x + 26, 92, { font: `800 24px ${fonts.sans}`, color: recap.streakDays > 0 ? ink.coralText : ink.inkSoft, spacing: -0.6 })
-  ctx.fillStyle = ink.line
-  ctx.fillRect(x, 108, W - stubX - 46, 1)
-  // 비어 있는 우표 자리(점선 틀). 우표가 붙으면 그 아래에 가려진다.
-  for (let i = 0; i < passportStampSlots; i++) {
-    const slot = subjectSlots[i]!
-    ctx.save()
-    ctx.translate(slot.x, slot.y)
-    ctx.strokeStyle = 'rgba(48,45,53,0.16)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3])
-    ctx.beginPath(); ctx.roundRect(-subjectStamp.width / 2 + 2, -subjectStamp.height / 2 + 2, subjectStamp.width - 4, subjectStamp.height - 4, 4); ctx.stroke()
-    ctx.restore()
-  }
-}
-
-function drawFlame(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, lit: boolean) {
-  const colors = lit ? flameShape.lit : flameShape.unlit
+/** 오른쪽 아래 공부 실루엣: 둥근 언덕 위 책 더미와 스탠드. 크림색으로 띠 위에 얹는다. */
+function drawSilhouette(ctx: CanvasRenderingContext2D) {
+  const c = 'rgba(255,248,237,0.9)'
   ctx.save()
-  ctx.translate(x, y)
-  ctx.scale((size * 0.88) / 44, size / 50)
-  ctx.fillStyle = colors.body; ctx.fill(new Path2D(flameShape.body))
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = colors.shine; ctx.lineWidth = 3.4; ctx.stroke(new Path2D(flameShape.shine))
-  ctx.fillStyle = colors.face; ctx.beginPath(); ctx.arc(22, 35, 9, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = colors.hand; ctx.lineWidth = 2.2; ctx.stroke(new Path2D(flameShape.hand))
+  ctx.fillStyle = c; ctx.strokeStyle = c
+  // 언덕.
+  ctx.beginPath(); ctx.ellipse(424, band.bottom + 4, 74, 24, 0, Math.PI, 0); ctx.fill()
+  // 책 세 권.
+  ctx.beginPath(); ctx.roundRect(380, 220, 64, 12, 3); ctx.fill()
+  ctx.beginPath(); ctx.roundRect(386, 207, 56, 11, 3); ctx.fill()
+  ctx.save(); ctx.translate(414, 199); ctx.rotate(-0.06); ctx.beginPath(); ctx.roundRect(-26, -5, 50, 10, 3); ctx.fill(); ctx.restore()
+  // 스탠드: 받침·기둥·팔·갓.
+  ctx.beginPath(); ctx.roundRect(446, 226, 30, 6, 3); ctx.fill()
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 4
+  ctx.beginPath(); ctx.moveTo(461, 227); ctx.lineTo(467, 190); ctx.lineTo(446, 170); ctx.stroke()
+  ctx.save(); ctx.translate(446, 170); ctx.rotate(0.55)
+  ctx.beginPath(); ctx.moveTo(-14, 10); ctx.lineTo(14, 10); ctx.lineTo(7, -4); ctx.lineTo(-7, -4); ctx.closePath(); ctx.fill()
+  ctx.restore()
   ctx.restore()
 }
 
-// ── 과목 우표 ──
+// ── 소인 도장 ──
 
-/** 우표 한 장. ctx 원점이 우표 가운데. */
-export function drawSubjectStamp(ctx: CanvasRenderingContext2D, item: { subject: string | null; seconds: number }, index: number): void {
-  const { width: w, height: h } = subjectStamp
-  const tint = [ink.peach, ink.butter, ink.sage][index % 3]!
-  ctx.save()
-  ctx.shadowColor = 'rgba(48,45,53,0.22)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2
-  // 톱니 가장자리: 흰 종이에 구멍을 뚫는다(같은 캔버스의 다른 그림을 지우지 않게 따로 그려 붙인다).
-  const scale = ctx.getTransform().a
-  const paper = document.createElement('canvas')
-  paper.width = Math.ceil((w + 2) * scale); paper.height = Math.ceil((h + 2) * scale)
-  const p = paper.getContext('2d')!
-  p.setTransform(scale, 0, 0, scale, 0, 0)
-  p.translate(1, 1)
-  p.fillStyle = ink.white
-  p.fillRect(0, 0, w, h)
-  p.globalCompositeOperation = 'destination-out'
-  const r = 2.4
-  for (let x = 4; x < w; x += 7) { hole(p, x, 0, r); hole(p, x, h, r) }
-  for (let y = 4; y < h; y += 7) { hole(p, 0, y, r); hole(p, w, y, r) }
-  ctx.drawImage(paper, -w / 2 - 1, -h / 2 - 1, w + 2, h + 2)
-  ctx.restore()
-
-  ctx.save()
-  ctx.translate(-w / 2, -h / 2)
-  ctx.fillStyle = tint
-  ctx.fillRect(6, 6, w - 12, h - 12)
-  ctx.save(); ctx.globalAlpha = 0.18; ctx.translate(6, 6); grain(ctx, w - 12, h - 12, 31 + index, 160); ctx.restore()
-  ctx.strokeStyle = 'rgba(48,45,53,0.35)'; ctx.lineWidth = 0.6
-  ctx.strokeRect(8.5, 8.5, w - 17, h - 17)
-  text(ctx, `SV·${String(index + 1).padStart(2, '0')}`, 12, 18, { font: `700 5.8px ${fonts.mono}`, color: 'rgba(48,45,53,0.7)', spacing: 0.6 })
-  clockGlyph(ctx, w - 16, 15.5, 3.6, 'rgba(48,45,53,0.7)', 0.9)
-  // 단어가 중간에서 끊기지 않게, 가장 긴 단어가 한 줄에 들어갈 때까지 글자를 줄인 뒤 단어 단위로 나눈다.
-  const name = item.subject ?? t('studySubjectNone')
-  const maxW = w - 22
-  let size = 10
-  const longest = () => Math.max(...name.split(' ').map((word) => measure(ctx, word, `800 ${size}px ${fonts.sans}`)))
-  while (size > 7.5 && longest() > maxW) size -= 0.5
-  const nameFont = `800 ${size}px ${fonts.sans}`
-  const lines = wrap(ctx, name, nameFont, maxW, 3)
-  const lh = size * 1.22
-  lines.forEach((line, i) => text(ctx, line, w / 2, 42 + i * lh - ((lines.length - 1) * lh) / 2, { font: nameFont, color: ink.ink, align: 'center' }))
-  ctx.fillStyle = 'rgba(48,45,53,0.35)'
-  ctx.fillRect(14, h - 26, w - 28, 0.6)
-  text(ctx, formatStudyDuration(item.seconds), w / 2, h - 14.5, { font: `700 8.5px ${fonts.sans}`, color: ink.ink, align: 'center' })
-  ctx.restore()
-}
-
-// ── 완료 도장 ──
-
-/** 둥근 잉크 도장. ctx 원점이 도장 가운데. */
-export function drawCompletionStamp(ctx: CanvasRenderingContext2D, recap: StudyRecap): void {
-  const r = completionStamp.radius
-  const scale = ctx.getTransform().a
-  const size = r * 2 + 4
+/** 우체국 소인: 둥근 네모 안에 "기록 완료"/"목표 달성", 오른쪽으로 물결 소인선. ctx 원점이 도장 가운데. */
+export function drawPostmark(ctx: CanvasRenderingContext2D, recap: StudyRecap): void {
+  const { width: W, height: H } = postmark
+  const m = ctx.getTransform()
+  const scale = Math.hypot(m.a, m.b) || 1
   const stamp = document.createElement('canvas')
-  stamp.width = Math.ceil(size * scale); stamp.height = Math.ceil(size * scale)
+  stamp.width = Math.ceil(W * scale); stamp.height = Math.ceil(H * scale)
   const s = stamp.getContext('2d')!
   s.setTransform(scale, 0, 0, scale, 0, 0)
-  s.translate(size / 2, size / 2)
-  // 코랄보다 한 단계 진한 잉크(작은 글자까지 읽히게).
-  const color = '#D8665E'
+  const color = ink.stampInk
   s.strokeStyle = color; s.fillStyle = color
+  const ox = 50
+  const oy = H / 2
   s.lineWidth = 2.6
-  s.beginPath(); s.arc(0, 0, r - 1.5, 0, Math.PI * 2); s.stroke()
+  s.beginPath(); s.roundRect(ox - 44, oy - 19, 88, 38, 10); s.stroke()
   s.lineWidth = 1
-  s.beginPath(); s.arc(0, 0, r - 6, 0, Math.PI * 2); s.stroke()
-  s.beginPath(); s.arc(0, 0, r - 21, 0, Math.PI * 2); s.stroke()
-  arcText(s, webText.recapStampTop, r - 13.5, -Math.PI / 2, `800 8.6px ${fonts.mono}`, color, 2.2, false)
-  arcText(s, webText.recapStampBottom, r - 13.5, Math.PI / 2, `800 8.6px ${fonts.mono}`, color, 2.2, true)
-  for (const a of [Math.PI, 0]) { s.save(); s.translate(Math.cos(a) * (r - 13.5), Math.sin(a) * (r - 13.5)); star(s, 3.2); s.restore() }
-  const center = goalReached(recap) ? webText.recapStampGoal : webText.recapStampDone
-  text(s, center, 0, 2, { font: `800 12.5px ${fonts.sans}`, color, align: 'center', spacing: -0.2 })
-  text(s, stampDate(recap.studyDate), 0, 14, { font: `700 6.8px ${fonts.mono}`, color, align: 'center', spacing: 0.4 })
+  s.beginPath(); s.roundRect(ox - 39, oy - 14.5, 78, 29, 7); s.stroke()
+  const label = goalReached(recap) ? webText.recapStampGoal : webText.recapStampDone
+  text(s, label, ox, oy + 5.5, { font: `900 16px ${fonts.sans}`, color, align: 'center', spacing: -0.2 })
+  // 물결 소인선 네 줄.
+  s.lineWidth = 1.6; s.lineCap = 'round'
+  for (let i = 0; i < 4; i++) {
+    const y = oy - 13 + i * 8.6
+    s.beginPath()
+    for (let px = 0; px <= 70; px += 2) {
+      const yy = y + Math.sin((px / 70) * Math.PI * 3 + i * 0.6) * 2.4
+      if (px === 0) s.moveTo(ox + 50 + px, yy); else s.lineTo(ox + 50 + px, yy)
+    }
+    s.stroke()
+  }
   // 잉크가 덜 묻은 자국.
   s.globalCompositeOperation = 'destination-out'
   const rand = seeded(97)
-  for (let i = 0; i < 110; i++) {
-    const a = rand() * Math.PI * 2
-    const d = Math.sqrt(rand()) * r
-    s.globalAlpha = 0.15 + rand() * 0.55
-    s.beginPath(); s.arc(Math.cos(a) * d, Math.sin(a) * d, 0.3 + rand() * 1.1, 0, Math.PI * 2); s.fill()
+  for (let i = 0; i < 120; i++) {
+    s.globalAlpha = 0.15 + rand() * 0.6
+    s.beginPath(); s.arc(rand() * W, rand() * H, 0.3 + rand() * 1.1, 0, Math.PI * 2); s.fill()
   }
-  // 한쪽이 더 눌린 자국.
-  s.globalAlpha = 0.22
-  s.beginPath(); s.arc(r * 0.95, r * 0.8, r * 0.62, 0, Math.PI * 2); s.fill()
+  s.globalAlpha = 0.25
+  s.beginPath(); s.ellipse(W * 0.9, H * 0.85, 40, 22, 0, 0, Math.PI * 2); s.fill()
   ctx.save()
-  ctx.globalAlpha = 0.97
-  ctx.drawImage(stamp, -size / 2, -size / 2, size, size)
+  ctx.globalAlpha = 0.9
+  ctx.drawImage(stamp, -W / 2, -H / 2, W, H)
   ctx.restore()
 }
 
@@ -363,7 +277,7 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap): void {
   grain(ctx, W, H, 3, 2600)
 
   // 자랑 문구: "오늘 [6시간 25분] 공부했어요" — 시간만 코랄 형광펜. 아래에 연속 공부(없으면 공부일).
-  text(ctx, `${webText.recapPassportBrand}  ·  ${stampDate(recap.studyDate)}`, W / 2, 150, { font: `600 7.5px ${fonts.mono}`, color: ink.inkSoft, align: 'center', spacing: 1.2 })
+  text(ctx, `${webText.recapBrand.toUpperCase()}  ·  ${stampDate(recap.studyDate)}`, W / 2, 150, { font: `600 7.5px ${fonts.mono}`, color: ink.inkSoft, align: 'center', spacing: 1.2 })
   const lead = webText.recapStoryHeadlineLead
   const tail = webText.recapStoryHeadlineTail
   const time = formatStudyDuration(recap.todaySeconds)
@@ -381,10 +295,10 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap): void {
   text(ctx, time, hx, hy, { font: f(), color: ink.ink, spacing: -0.6 })
   hx += tw + 8
   text(ctx, tail, hx, hy, { font: f(), color: ink.ink, spacing: -0.6 })
-  const sub = recap.streakDays > 0 ? webText.recapStoryStreak(recap.streakDays) : dateLabel(recap.studyDate)
+  const sub = recap.streakDays > 0 ? webText.recapStoryStreak(recap.streakDays) : fullDate(recap.studyDate)
   text(ctx, sub, W / 2, hy + 30, { font: `700 13.5px ${fonts.sans}`, color: ink.coralText, align: 'center' })
 
-  // 여권 묶음: 뒤 피치 종이 + 여권 + 우표 + 도장. 가로 여권은 스토리 폭에 맞춰 줄인다.
+  // 카드 묶음: 뒤 피치 종이 + 카드 + 소인. 가로 카드는 스토리 폭에 맞춰 줄인다.
   const k = (W - 28) / passport.width
   const cx = W / 2
   const cy = 418
@@ -396,7 +310,6 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap): void {
   ctx.fillStyle = ink.peach
   ctx.beginPath(); ctx.roundRect(-passport.width / 2, -passport.height / 2, passport.width, passport.height, passport.radius); ctx.fill()
   ctx.restore()
-
   ctx.save()
   ctx.translate(cx, cy); ctx.rotate((-2 * Math.PI) / 180)
   ctx.translate(-passport.width / 2, -passport.height / 2)
@@ -405,11 +318,7 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap): void {
   ctx.shadowColor = 'rgba(48,45,53,0.24)'; ctx.shadowBlur = 22; ctx.shadowOffsetY = 12
   ctx.drawImage(base, 0, 0, passport.width, passport.height)
   ctx.restore()
-  recap.subjects.slice(0, passportStampSlots).forEach((item, i) => {
-    const slot = subjectSlots[i]!
-    ctx.save(); ctx.translate(slot.x, slot.y); ctx.rotate((slot.rotate * Math.PI) / 180); drawSubjectStamp(ctx, item, i); ctx.restore()
-  })
-  ctx.save(); ctx.translate(completionStamp.x, completionStamp.y); ctx.rotate((completionStamp.rotate * Math.PI) / 180); drawCompletionStamp(ctx, recap); ctx.restore()
+  ctx.save(); ctx.translate(postmark.x, postmark.y); ctx.rotate((postmark.rotate * Math.PI) / 180); drawPostmark(ctx, recap); ctx.restore()
   ctx.restore()
   ctx.restore()
 
@@ -429,92 +338,78 @@ export function layer(w: number, h: number, scale: number, draw: (ctx: CanvasRen
   return canvas
 }
 
-// ── 장식 도우미 ──
+// ── 장식·아이콘(선 아이콘을 직접 그린다: 이모지·범용 아이콘 대신) ──
 
-function label(ctx: CanvasRenderingContext2D, ko: string, en: string, x: number, y: number) {
-  const koFont = `700 8.2px ${fonts.sans}`
-  text(ctx, ko, x, y, { font: koFont, color: ink.inkSoft })
-  text(ctx, en, x + measure(ctx, ko, koFont) + 4, y, { font: `italic 500 8px ${fonts.serif}`, color: 'rgba(119,113,123,0.8)' })
-}
-
-function hairRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, color: string, width: number) {
-  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.stroke(); ctx.restore()
-}
-
-/** 종이에 눌러 찍은 문장(紋章): 그림자 쪽과 빛 쪽을 반 점씩 어긋나게 그려 도드라져 보이게. */
-function embossSeal(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  const pass = (dx: number, dy: number, color: string) => {
-    ctx.save()
-    ctx.translate(x + dx, y + dy)
-    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke()
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2
-      ctx.beginPath(); ctx.arc(Math.cos(a) * (r - 3), Math.sin(a) * (r - 3), 0.6, 0, Math.PI * 2); ctx.fill()
+/** 지폐·여권의 물결 무늬 줄. */
+function guilloche(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, lines: number) {
+  ctx.save()
+  ctx.strokeStyle = ink.guilloche; ctx.lineWidth = 0.7
+  for (let i = 0; i < lines; i++) {
+    const base = y + (h * (i + 0.5)) / lines
+    ctx.beginPath()
+    for (let px = x; px <= x + w; px += 3) {
+      const yy = base + Math.sin(px / 22 + i * 0.9) * 2.2 + Math.sin(px / 61 + i) * 1.4
+      if (px === x) ctx.moveTo(px, yy); else ctx.lineTo(px, yy)
     }
-    ctx.beginPath(); ctx.arc(0, 0, r - 6, 0, Math.PI * 2); ctx.stroke()
-    clockGlyph(ctx, 0, 0, 5.5, color, 1.1)
-    ctx.restore()
+    ctx.stroke()
   }
-  pass(0.7, 0.7, 'rgba(48,45,53,0.16)')
-  pass(-0.6, -0.6, 'rgba(255,255,255,0.95)')
-  pass(0, 0, 'rgba(230,216,192,0.7)')
-}
-
-function paperclip(ctx: CanvasRenderingContext2D, x: number, y: number, deg: number) {
-  ctx.save()
-  ctx.translate(x, y); ctx.rotate((deg * Math.PI) / 180)
-  const path = new Path2D('M3 30 V7 a4.5 4.5 0 0 1 9 0 V34 a6 6 0 0 1 -12 0 V11 a3 3 0 0 1 6 0 V29')
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
-  ctx.strokeStyle = 'rgba(48,45,53,0.25)'; ctx.lineWidth = 2.4
-  ctx.save(); ctx.translate(0.8, 1.2); ctx.stroke(path); ctx.restore()
-  ctx.strokeStyle = '#8FA39B'; ctx.lineWidth = 2
-  ctx.stroke(path)
-  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.7
-  ctx.save(); ctx.translate(-0.4, -0.4); ctx.stroke(path); ctx.restore()
   ctx.restore()
 }
 
-function clockGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, width: number) {
+function clockIcon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
   ctx.save()
-  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.5, r * 0.2); ctx.lineCap = 'round'
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - r * 0.6); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.45, y + r * 0.2); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - r * 0.55); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.45, y + r * 0.2); ctx.stroke()
   ctx.restore()
 }
 
-function star(ctx: CanvasRenderingContext2D, r: number) {
-  ctx.beginPath()
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 - Math.PI / 2
-    const d = i % 2 ? r * 0.4 : r
-    ctx.lineTo(Math.cos(a) * d, Math.sin(a) * d)
-  }
-  ctx.closePath(); ctx.fill()
-}
-
-function hole(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
-}
-
-/** 원을 따라 글자를 놓는다. bottom이면 아래 호를 왼쪽에서 오른쪽으로 읽히게. */
-function arcText(ctx: CanvasRenderingContext2D, value: string, radius: number, center: number, font: string, color: string, spacing: number, bottom: boolean) {
+function bookIcon(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
   ctx.save()
-  ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  const widths = [...value].map((ch) => ctx.measureText(ch).width + spacing)
-  const total = widths.reduce((a, b) => a + b, 0) - spacing
-  let angle = center + (bottom ? 1 : -1) * (total / 2 / radius)
-  ;[...value].forEach((ch, i) => {
-    const step = widths[i]! / radius
-    const a = angle + (bottom ? -1 : 1) * (step - spacing / radius) / 2
-    ctx.save()
-    ctx.translate(Math.cos(a) * radius, Math.sin(a) * radius)
-    ctx.rotate(a + (bottom ? -Math.PI / 2 : Math.PI / 2))
-    ctx.fillText(ch, 0, 0)
-    ctx.restore()
-    angle += (bottom ? -1 : 1) * step
-  })
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'
+  ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.quadraticCurveTo(x - 4, y - 7, x - 8, y - 6); ctx.lineTo(x - 8, y + 5); ctx.quadraticCurveTo(x - 4, y + 4, x, y + 7)
+  ctx.quadraticCurveTo(x + 4, y + 4, x + 8, y + 5); ctx.lineTo(x + 8, y - 6); ctx.quadraticCurveTo(x + 4, y - 7, x, y - 4); ctx.lineTo(x, y + 7); ctx.stroke()
+  ctx.restore()
+}
+
+function pencilIcon(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  ctx.save()
+  ctx.translate(x, y); ctx.rotate(-Math.PI / 4)
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'
+  ctx.beginPath(); ctx.rect(-7, -2.8, 11, 5.6); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(4, -2.8); ctx.lineTo(8.5, 0); ctx.lineTo(4, 2.8); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(-4, -2.8); ctx.lineTo(-4, 2.8); ctx.stroke()
+  ctx.restore()
+}
+
+function targetIcon(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  ctx.save()
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x, y, 3.8, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(x, y, 1.3, 0, Math.PI * 2); ctx.fill()
+  ctx.restore()
+}
+
+function calendarIcon(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  ctx.save()
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineCap = 'round'
+  ctx.beginPath(); ctx.roundRect(x - 7, y - 5.5, 14, 12.5, 2.5); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x - 7, y - 1); ctx.lineTo(x + 7, y - 1); ctx.moveTo(x - 3.5, y - 8); ctx.lineTo(x - 3.5, y - 4); ctx.moveTo(x + 3.5, y - 8); ctx.lineTo(x + 3.5, y - 4); ctx.stroke()
+  ctx.restore()
+}
+
+/** 앱 연속 공부 불꽃(StreakFlame) 모양 그대로. */
+function flame(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, lit: boolean) {
+  const colors = lit ? flameShape.lit : flameShape.unlit
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale((size * 0.88) / 44, size / 50)
+  ctx.fillStyle = colors.body; ctx.fill(new Path2D(flameShape.body))
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = colors.shine; ctx.lineWidth = 3.4; ctx.stroke(new Path2D(flameShape.shine))
+  ctx.fillStyle = colors.face; ctx.beginPath(); ctx.arc(22, 35, 9, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = colors.hand; ctx.lineWidth = 2.2; ctx.stroke(new Path2D(flameShape.hand))
   ctx.restore()
 }
 
@@ -569,40 +464,15 @@ function ellipsize(ctx: CanvasRenderingContext2D, value: string, font: string, m
   return `${out}…`
 }
 
-/** 글자 단위로 줄을 나눈다(한글은 띄어쓰기 없이도 나뉜다). 넘치면 마지막 줄 끝을 줄임표로. */
-function wrap(ctx: CanvasRenderingContext2D, value: string, font: string, max: number, maxLines: number): string[] {
-  const words = value.split(' ')
-  const lines: string[] = []
-  let line = ''
-  const push = (piece: string) => {
-    const next = line ? `${line} ${piece}` : piece
-    if (measure(ctx, next, font) <= max) { line = next; return }
-    if (line) lines.push(line)
-    line = piece
-    while (measure(ctx, line, font) > max && line.length > 1) {
-      let cut = line.length
-      while (cut > 1 && measure(ctx, line.slice(0, cut), font) > max) cut--
-      lines.push(line.slice(0, cut))
-      line = line.slice(cut)
-    }
-  }
-  words.forEach(push)
-  if (line) lines.push(line)
-  if (lines.length <= maxLines) return lines
-  const kept = lines.slice(0, maxLines)
-  kept[maxLines - 1] = ellipsize(ctx, `${kept[maxLines - 1]}${lines.slice(maxLines).join('')}`, font, max)
-  return kept
-}
-
 // ── 문구 ──
 
 function parseDate(studyDate: string): [number, number, number] {
   return studyDate.split('-').map(Number) as [number, number, number]
 }
 
-export function dateLabel(studyDate: string): string {
+function fullDate(studyDate: string): string {
   const [y, m, d] = parseDate(studyDate)
-  return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')} (${weekdays[(new Date(y, m - 1, d).getDay() + 6) % 7]})`
+  return webText.recapDateRow(y, m, d, weekdays[(new Date(y, m - 1, d).getDay() + 6) % 7]!)
 }
 
 export function stampDate(studyDate: string): string {
