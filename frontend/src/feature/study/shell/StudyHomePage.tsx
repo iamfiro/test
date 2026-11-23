@@ -26,9 +26,8 @@ const titles: Record<StudyTab, () => string> = {
   rooms: () => t('studyRoomsTitle'),
   schedule: () => t('studyTabSchedule'),
   stats: () => t('studyTabStats'),
-  outfit: () => t('studyTabOutfit'),
 }
-const paths: Record<StudyTab, string> = { study: '/', rooms: '/rooms', schedule: '/schedule', stats: '/stats', outfit: '/outfit' }
+const paths: Record<StudyTab, string> = { study: '/', rooms: '/rooms', schedule: '/schedule', stats: '/stats' }
 
 /** 원본: StudyHomePage. 탭 본문은 화면별로 채운다. */
 export function StudyHomePage({ tab }: { tab: StudyTab }) {
@@ -54,7 +53,6 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'stats' && <IslandBackground ground="lake" />}
       {tab === 'stats' && <StudyStatsPage />}
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
-      {tab === 'outfit' && <div className={s.paper} />}
       {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode={camera.mode} topInset={68} /></div>}
       {/* 뒤로 버튼은 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 제목은 앱 폭 칸 가운데에 두고,
           공부방은 본문의 "모든 공부방"이 제목을 대신한다. */}

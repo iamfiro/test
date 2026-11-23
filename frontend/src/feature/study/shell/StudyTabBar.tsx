@@ -7,7 +7,7 @@ import s from './StudyTabBar.module.css'
  * 모양은 사용자 결정(2026-11-23)으로 앱과 다르다: 아래에서 위로 옅어지는 검정 그라데이션, 큰 아이콘(44),
  * 외곽선 없는 흰 둥근 글꼴 라벨, 고른 탭은 아이콘이 올라오고 커진다. docs/design-parity/exceptions.md 참고.
  */
-export const studyTabs = ['study', 'rooms', 'schedule', 'stats', 'outfit'] as const
+export const studyTabs = ['study', 'rooms', 'schedule', 'stats'] as const
 export type StudyTab = (typeof studyTabs)[number]
 
 const labels: Record<StudyTab, () => string> = {
@@ -15,7 +15,6 @@ const labels: Record<StudyTab, () => string> = {
   rooms: () => t('studyRoomsTitle'),
   schedule: () => t('studyTabSchedule'),
   stats: () => t('studyTabStats'),
-  outfit: () => t('studyTabOutfit'),
 }
 
 /** 탭바 바탕은 지금 페이지 바탕과 맞춘다(원본 `_tabSurface`). */
@@ -24,7 +23,6 @@ export const tabSurface: Record<StudyTab, string> = {
   rooms: 'var(--i-grass)',
   schedule: 'var(--tab-schedule)',
   stats: 'var(--i-lake)',
-  outfit: 'var(--i-paper)',
 }
 
 export function StudyTabBar(props: { current: StudyTab; onSelect: (tab: StudyTab) => void; hidden?: boolean }) {

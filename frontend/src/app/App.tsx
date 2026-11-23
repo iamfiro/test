@@ -18,7 +18,6 @@ export function App() {
             <Route path="/rooms" element={<RequireSession><StudyHomePage tab="rooms" /></RequireSession>} />
             <Route path="/schedule" element={<RequireSession><StudyHomePage tab="schedule" /></RequireSession>} />
             <Route path="/stats" element={<RequireSession><StudyHomePage tab="stats" /></RequireSession>} />
-            <Route path="/outfit" element={<RequireSession><StudyHomePage tab="outfit" /></RequireSession>} />
             <Route path="/subjects" element={<RequireSession><SubjectManageRoute /></RequireSession>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
