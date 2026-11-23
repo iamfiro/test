@@ -103,6 +103,9 @@ void main() {
 }
 `
 
+/** 캔버스가 요소보다 큰 배율. 광륜 끝(1.15)이 화면 반높이(1.125·bleed) 안에 들어오게. */
+const bleed = 1.3
+
 export function StudyGlobe(props: { className?: string }) {
   const host = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -111,12 +114,16 @@ export function StudyGlobe(props: { className?: string }) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' })
     renderer.setClearColor(0x000000, 0)
     renderer.outputColorSpace = THREE.LinearSRGBColorSpace
+    // 대기 광륜(반지름 1.15)이 요소 밖까지 퍼지므로 캔버스를 요소보다 bleed배 크게 가운데 맞춰 그린다.
+    // 카메라도 같은 배만큼 물려서 지구 크기는 요소 기준 그대로다.
     renderer.domElement.style.display = 'block'
+    renderer.domElement.style.position = 'absolute'
+    renderer.domElement.style.pointerEvents = 'none'
     el.appendChild(renderer.domElement)
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50)
-    camera.position.set(0, 0, 4.2)
+    camera.position.set(0, 0, 4.2 * bleed)
     const light = new THREE.Vector3(-0.6, 0.7, 0.8).normalize()
     const globe = new THREE.Group()
     globe.rotation.z = 0.35
@@ -151,12 +158,14 @@ export function StudyGlobe(props: { className?: string }) {
     let velocity = 0
 
     const resize = () => {
-      const w = el.clientWidth
-      const h = el.clientHeight
+      const w = Math.round(el.clientWidth * bleed)
+      const h = Math.round(el.clientHeight * bleed)
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
       renderer.setSize(w, h, false)
       renderer.domElement.style.width = `${w}px`
       renderer.domElement.style.height = `${h}px`
+      renderer.domElement.style.left = `${(el.clientWidth - w) / 2}px`
+      renderer.domElement.style.top = `${(el.clientHeight - h) / 2}px`
       camera.aspect = w / Math.max(1, h)
       camera.updateProjectionMatrix()
       draw()
