@@ -91,7 +91,8 @@ uniform float grain;      // 그레인 세기
 uniform float vignette;   // 비네트 세기
 uniform vec3 lift;        // 그림자를 들어 올릴 색(우윳빛)
 uniform float liftAmount;
-uniform vec3 warm;        // 따뜻하게 곱할 색
+uniform vec3 warm;        // 전체에 곱할 색(중성에 가깝게)
+uniform float deOrange;   // 주황 계열만 채도를 덜어 내는 정도(0–1)
 varying vec2 vUv;
 
 float viewDistance(vec2 uv) { return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
@@ -121,8 +122,16 @@ void main() {
     color = sum / weight;
   }
   color += texture2D(tBloom, vUv).rgb * bloom;
-  // 색 보정: 따뜻하게, 그림자를 우윳빛으로 들어 올려 파스텔 느낌.
+  // 색 보정: 주황 계열(빨강 > 초록 > 파랑, 색상 비 0.2–0.7)만 채도를 덜어 회갈색 쪽으로 눌러 준다.
+  // 나무·바닥이 넓게 차지하는 방이라 전체 색온도를 내리면 차가워지므로 주황만 골라 뺀다.
+  float spread = color.r - color.b;
+  float hueRatio = (color.g - color.b) / max(spread, 1e-4);
+  float orange = smoothstep(0.03, 0.2, spread) * step(color.b, color.g) * step(color.g, color.r)
+    * (1.0 - smoothstep(0.25, 0.3, abs(hueRatio - 0.45)));
+  float luma = dot(color, vec3(0.299, 0.587, 0.114));
+  color = mix(color, vec3(luma), orange * deOrange);
   color *= warm;
+  // 그림자를 우윳빛으로 들어 올려 파스텔 느낌.
   color = color * (1.0 - liftAmount) + lift * liftAmount;
   // 비네트.
   vec2 d = vUv - 0.5;
@@ -190,9 +199,12 @@ export class ToonComposer {
     bloom: { value: 0.55 },
     grain: { value: 0.025 },
     vignette: { value: 0.2 },
-    lift: { value: new THREE.Vector3(1.0, 0.95, 0.92) },
+    // 우윳빛(살짝 중성): 예전 크림색(1, 0.95, 0.92)은 그림자까지 주황으로 물들였다.
+    lift: { value: new THREE.Vector3(0.98, 0.97, 0.96) },
     liftAmount: { value: 0.07 },
-    warm: { value: new THREE.Vector3(1.04, 1.0, 0.97) },
+    // 주황끼를 빼려고 거의 중성으로(예전 1.04, 1.0, 0.97). 사용자 결정 2026-11-23.
+    warm: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+    deOrange: { value: 0.32 },
   })
   private width = 1
   private height = 1

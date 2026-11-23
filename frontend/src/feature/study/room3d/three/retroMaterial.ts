@@ -153,7 +153,8 @@ export function setRetroFloats(material: THREE.ShaderMaterial, f: number[]) {
 
 /** 카툰 룩 값. 켜지 않으면 원본 셰이더와 같은 결과. */
 export type ToonLook = { enabled: boolean; shade: number; threshold: number; saturation: number; rim: number }
-export const toonDefault: ToonLook = { enabled: true, shade: 0.86, threshold: 0.12, saturation: 0.25, rim: 0.28 }
+// 채도 +25%는 v2 방의 오렌지 나무를 더 주황으로 밀어서 +12%로 낮췄다(사용자 결정 2026-11-23).
+export const toonDefault: ToonLook = { enabled: true, shade: 0.86, threshold: 0.12, saturation: 0.12, rim: 0.28 }
 
 export function setToon(material: THREE.ShaderMaterial, toon: ToonLook) {
   ;(material.uniforms.toon!.value as THREE.Vector4).set(toon.enabled ? 1 : 0, toon.shade, toon.threshold, toon.saturation)
