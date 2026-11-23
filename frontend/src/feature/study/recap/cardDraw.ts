@@ -100,7 +100,7 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   ctx.translate(0, clipTop)
   ctx.drawImage(assets.board, 0, 0, board.width, board.height)
   titleDuration(ctx, recap.todaySeconds, 152, 114, 244)
-  drawTicket(ctx, assets, 334, 86)
+  drawTicket(ctx, assets, 334, 62)
   drawPortrait(ctx, recap, assets)
   drawTopRows(ctx, recap, assets)
   handDash(ctx, 32, 368, 336, 3)
