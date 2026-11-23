@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.2.1
+  version: 0.3.0
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -19,6 +19,7 @@ tags:
   - name: auth
   - name: profile
   - name: timer
+  - name: rooms
 paths:
   /auth/session:
     get:
@@ -408,6 +409,44 @@ paths:
                   meta: { $ref: '#/components/schemas/Meta' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /study-rooms:
+    get:
+      tags: [rooms]
+      operationId: listStudyRooms
+      summary: 공부방 목록(최신 100개)
+      description: |
+        `mine`은 내가 멤버인 방(비밀번호 방 포함), `all`은 모든 방. `q`가 있으면 서버가 방 이름에 그 글자가
+        들어간 방만 돌려준다(대소문자 무시, 앞뒤 공백 제거, 1–40자). 비밀번호는 목록에 싣지 않는다.
+        `studying_count`는 서버가 presence로 본 "지금 공부 중"인 멤버 수다.
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema: { type: string, enum: [mine, all] }
+        - name: q
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 40 }
+      responses:
+        '200':
+          description: 방 목록(최신 순)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [rooms]
+                    properties:
+                      rooms: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/Room' } }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
 components:
   securitySchemes:
     session:
@@ -602,6 +641,42 @@ components:
           minItems: 112
           maxItems: 112
           items: { $ref: '#/components/schemas/DayTotal' }
+    RoomMap:
+      type: string
+      enum: [cafe, library, rooftop]
+      description: 3D 방 맵. cafe는 무료, library·rooftop은 상점에서 산다(지금은 카페 3D를 함께 씀). 모두 33석.
+    RoomImage:
+      type: object
+      additionalProperties: false
+      required: [id, url]
+      properties:
+        id: { type: string }
+        url: { type: string, description: API 호스트가 내주는 고정 공개 URL(오래 캐시) }
+    Room:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, has_password, capacity, map, member_count, studying_count, is_member, is_host, host_nickname, created_at, banner, logo]
+      properties:
+        id: { type: string }
+        name: { type: string, minLength: 1, maxLength: 40 }
+        description: { type: [string, 'null'], maxLength: 100, description: 방장이 쓴 소개(줄바꿈 가능) }
+        has_password: { type: boolean, description: 비밀번호가 있는 방(참여할 때 비밀번호가 필요) }
+        capacity: { type: integer, minimum: 2, maximum: 50, description: 맵 자리 수(33)를 넘지 않는다 }
+        map: { $ref: '#/components/schemas/RoomMap' }
+        member_count: { type: integer, minimum: 1, maximum: 50 }
+        studying_count: { type: integer, minimum: 0, description: 지금 공부 중인 멤버 수(서버 presence 기준) }
+        is_member: { type: boolean }
+        is_host: { type: boolean }
+        host_nickname: { $ref: '#/components/schemas/Nickname' }
+        created_at: { type: string, format: date-time }
+        banner:
+          oneOf:
+            - { $ref: '#/components/schemas/RoomImage' }
+            - { type: 'null' }
+        logo:
+          oneOf:
+            - { $ref: '#/components/schemas/RoomImage' }
+            - { type: 'null' }
   responses:
     LoggedIn:
       description: 로그인 성공. `sv_session` 쿠키를 둔다. 새 계정이면 닉네임·캐릭터를 무작위로 정한다(PocketTime과 같은 규칙).
