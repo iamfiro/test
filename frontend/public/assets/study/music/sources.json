@@ -1,0 +1,48 @@
+{
+  "added": "2026-11-20",
+  "provenance": "Supplied by the project owner as Pixabay downloads (filename pattern <author>-<title>-<pixabay id>.mp3). Confirm each track's Pixabay Content License page before release.",
+  "processing": "Measured EBU R128 integrated loudness and applied linear gain to -16 LUFS, peak limit 0.89, metadata stripped, AAC 128kbps stereo 44100Hz with faststart.",
+  "albums": [
+    {
+      "id": "cafe",
+      "tracks": [
+        {
+          "id": "chill_lofi",
+          "author": "zephiramusic",
+          "original": "zephiramusic-chill-lofi-585360.mp3",
+          "originalSha256": "d4fbd1db6b9eff3ab1e49851099322f6bf2f6b9936a934b030ce63a9c70f9a35",
+          "sha256": "883676a8386beca1da62869fec1f740355aeb7dfe1f820c6f08bc6df0e809b4e",
+          "seconds": 137.424,
+          "bytes": 2261482
+        },
+        {
+          "id": "lofi_chill",
+          "author": "velariomusic",
+          "original": "velariomusic-lofi-chill-581723.mp3",
+          "originalSha256": "e4db66749d4c206a24a4d60d45f6c5a6878f8ab0ad5307b4cfc9d55b919f586b",
+          "sha256": "d49874aa4e882858acc1707187a330b2327663d4fa233787c78181d48051f51a",
+          "seconds": 185.904,
+          "bytes": 3045496
+        },
+        {
+          "id": "coffee_shop",
+          "author": "alex-morgan",
+          "original": "alex-morgan-lofi-coffee-shop-568150.mp3",
+          "originalSha256": "539c5d83e32e618e08885a31051891bc24ad5e4f99cfb6ff4c54958b54334e0f",
+          "sha256": "6cfab6adadee5d4bcb9f79eb7d4b80a89a3f1be0626b08c708e7521df1ca6ed1",
+          "seconds": 113.88,
+          "bytes": 1869461
+        },
+        {
+          "id": "study_session",
+          "author": "alex-morgan",
+          "original": "alex-morgan-lofi-study-session-568160.mp3",
+          "originalSha256": "ff1623940c54085a5ae4fb058a699d2b461eb25f2b61be435e520c2701d2b11e",
+          "sha256": "d2afcca95135f516575da0c8db14b1841ad5e1d93c04e911b7d26d9ba027f3e8",
+          "seconds": 131.304,
+          "bytes": 2154437
+        }
+      ]
+    }
+  ]
+}

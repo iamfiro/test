@@ -1,0 +1,78 @@
+{
+  "verified": "2026-11-15",
+  "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "processing": "Trim boundary silence below -55dB, circular crossfade (100ms), AAC 128kbps stereo 44100Hz; no synthesized replacements.",
+  "sounds": [
+    {
+      "id": "white_noise",
+      "author": "ShawnyBoy",
+      "source": "https://freesound.org/people/ShawnyBoy/sounds/165395/",
+      "download": "https://cdn.freesound.org/previews/165/165395_2989529-hq.mp3",
+      "license": "CC0-1.0",
+      "sha256": "8f7991f0663d3184c1d650805cb8bf90f0452aa91b2b3ef3c4107d1d17e42fd7",
+      "seconds": 89.9,
+      "bytes": 1457787
+    },
+    {
+      "id": "rain",
+      "author": "samesamesame",
+      "source": "https://freesound.org/people/samesamesame/sounds/242889/",
+      "download": "https://cdn.freesound.org/previews/242/242889_4047489-hq.mp3",
+      "license": "CC0-1.0",
+      "sha256": "2eb66dd388d7149a15f2bc72b7d15790cccf28e4f10693a94d36143f43e22da3",
+      "seconds": 47.913,
+      "bytes": 776645
+    },
+    {
+      "id": "cafe",
+      "author": "wolfdoctor",
+      "source": "https://freesound.org/people/wolfdoctor/sounds/516435/",
+      "download": "https://cdn.freesound.org/previews/516/516435_3210738-hq.mp3",
+      "license": "CC0-1.0",
+      "sha256": "7ba9a5b8f01efaafcec4a79d40ba7515f61f1a4897049720ea47ea8a6418b395",
+      "seconds": 13.471,
+      "bytes": 218905
+    },
+    {
+      "id": "pages",
+      "author": "Bratok999",
+      "source": "https://freesound.org/people/Bratok999/sounds/173563/",
+      "download": "https://cdn.freesound.org/previews/173/173563_1785726-hq.mp3",
+      "license": "CC0-1.0",
+      "sha256": "4c338a97c1da6a2b629d91ee8f1e7285db265ca0a102185e632d9bfc64e153b9",
+      "seconds": 12.636,
+      "bytes": 92680
+    },
+    {
+      "id": "keyboard",
+      "author": "grcekh",
+      "source": "https://freesound.org/people/grcekh/sounds/546165/",
+      "download": "https://cdn.freesound.org/previews/546/546165_12206738-hq.mp3",
+      "license": "CC0-1.0",
+      "sha256": "3aab0127ec28bdf7be1a3d38349fa23c52f0edc1e0ca0e2b57d5cb2c1798c0f8",
+      "seconds": 149.396,
+      "bytes": 2413899
+    },
+    {
+      "id": "fire",
+      "author": "felix.blume",
+      "source": "https://freesound.org/people/felix.blume/sounds/779876/",
+      "download": "https://cdn.freesound.org/previews/779/779876_1661766-hq.mp3",
+      "license": "CC0-1.0",
+      "sha256": "427cb3b9e9cec9f61c5ca00b98911ce99594c6fbeb73d93ff20a88670ff5debd",
+      "seconds": 60.9,
+      "bytes": 1076871
+    },
+    {
+      "id": "pencil",
+      "author": "NachtmahrTV / AntumDeluge",
+      "source": "https://opengameart.org/content/pencil-sounds",
+      "download": "https://opengameart.org/sites/default/files/pencil.zip",
+      "original": "https://freesound.org/s/571800/",
+      "license": "CC0-1.0",
+      "sha256": "58dd863d481429f03aa85290d51637821a1d520fb1fc1ae961c53cfbfcdc8c4c",
+      "seconds": 1.219,
+      "bytes": 20657
+    }
+  ]
+}
