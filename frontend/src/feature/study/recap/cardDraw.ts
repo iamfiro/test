@@ -135,7 +135,7 @@ function drawTicket(ctx: CanvasRenderingContext2D, assets: CardAssets, cx: numbe
   ctx.restore()
   const pw = 18
   ctx.save()
-  ctx.translate(cx + w / 2 - 14, cy - h / 2 - 4); ctx.rotate((12 * Math.PI) / 180)
+  ctx.translate(cx + w / 2 - 14, cy - h / 2 + 8); ctx.rotate((12 * Math.PI) / 180)
   ctx.shadowColor = 'rgba(60,40,20,0.25)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1.5
   ctx.drawImage(assets.paperclip, -pw / 2, -pw * (360 / 160) / 2, pw, pw * (360 / 160))
   ctx.restore()
