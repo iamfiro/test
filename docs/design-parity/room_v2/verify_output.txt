@@ -15,7 +15,7 @@ study_room.glb
   ok   seat yaw max diff 0.0000 rad (≤ 0.01)
 
 study_room_v2.glb
-  triangles 44884, textures 2048x2048, 2048x2048 (image/jpeg, image/jpeg), file 3.86 MB, materials 2, meshes 3
+  triangles 44800, textures 2048x2048, 2048x2048 (image/jpeg, image/jpeg), file 3.84 MB, materials 2, meshes 3
   ok   triangles ≤ 45000
   ok   textures ≤ 2048²
   ok   file ≤ 4.5 MB

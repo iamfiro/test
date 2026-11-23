@@ -36,11 +36,11 @@ def srgb_to_linear(hex_value):
 # 이름: (sRGB 헥스, 발광 세기). 발광 0이면 일반 표면.
 PALETTE = {
     # ① 크림(벽·큰 면)
-    "cream": ("#FBF1DC", 0), "cream_deep": ("#F1DEBC", 0), "ceiling": ("#FBF1DC", 0.35), "paper": ("#FFF9EC", 0), "page": ("#EEDFC3", 0), "page_shade": ("#D8C4A3", 0), "wainscot": ("#CFE3B4", 0),
+    "cream": ("#FBF1DC", 0), "cream_deep": ("#F1DEBC", 0), "ceiling": ("#FBF1DC", 0.35), "paper": ("#FFF9EC", 0), "page": ("#EEDFC3", 0), "wainscot": ("#CFE3B4", 0),
     # ② 오렌지 우드(가구). wood_hi는 상판 가장자리 하이라이트 띠. 오래 보는 책상 면이라 채도·노란빛을 낮춘다
-    # (사용자 관점 리뷰 2026-11-23: 넓은 주황 책상이 2~3시간 보기에 진하다).
-    "wood": ("#DD9262", 0), "wood_mid": ("#E6A06E", 0), "wood_light": ("#EDAE7C", 0),
-    "wood_hi": ("#F6D2A8", 0), "wood_deep": ("#C27443", 0),
+    # (사용자 관점 리뷰 2026-11-23, 두 번: 넓은 주황 책상·바닥이 2~3시간 보기에 진하다).
+    "wood": ("#D89A72", 0), "wood_mid": ("#E2A67E", 0), "wood_light": ("#EAB48C", 0),
+    "wood_hi": ("#F4D6B6", 0), "wood_deep": ("#B97A53", 0),
     # ③ 잎 초록
     "leaf": ("#6DB35E", 0), "leaf_light": ("#8CC56A", 0), "leaf_deep": ("#4E9A4E", 0), "sage": ("#A8CC8C", 0),
     "sage_deep": ("#86B470", 0), "stem": ("#5E8A3E", 0), "grass": ("#9BCB6E", 0), "bark": ("#A8673A", 0),
@@ -51,7 +51,7 @@ PALETTE = {
     "butter": ("#F8D66A", 0), "butter_deep": ("#E8BE48", 0), "lilac": ("#C9B6E4", 0),
     "terracotta": ("#E07F55", 0), "soil": ("#7A4E33", 0), "ink": ("#5B4A6B", 0), "coffee": ("#8A5634", 0),
     # 바닥: 따뜻한 큰 타일 + 또렷한 줄눈(텍스처에서 4px 이상)
-    "floor_tile": ("#EACFAE", 0), "floor_tile_b": ("#E3C49F", 0), "grout": ("#D6B48F", 0),
+    "floor_tile": ("#E8D6C0", 0), "floor_tile_b": ("#E1CCB2", 0), "grout": ("#D3BC9F", 0),
     # 빛: 전구·스탠드 갓 안쪽(베이크에서 #FFE9A8 이상으로 남긴다)
     "glow": ("#FFE9A8", 6.0), "glow_soft": ("#FFE9A8", 2.0),
 }
@@ -512,10 +512,10 @@ def book_stack(name, seed, n=3):
 def open_book(name, cover="sky"):
     mb = MB()
     mb.box((0.34, 0.24, 0.014), (0, 0, 0.007), cover, r=0, segs=0)
-    # 종이는 아이보리(순백은 1인칭에서 빈 흰 판처럼 보인다) + 가운데 접힌 곳 음영.
+    # 종이는 아이보리(순백은 1인칭에서 빈 흰 판처럼 보인다). 가운데는 두 쪽을 V로 더 기울여 접힌 곳이
+    # 그늘로 읽히게 한다(따로 띠를 얹으면 1인칭에서 떠 보이는 흰·노란 줄이 된다).
     for sx in (-1, 1):
-        mb.box((0.16, 0.22, 0.016), (sx * 0.083, 0, 0.02), "page", r=0, segs=0, rot=(0, -sx * 4, 0))
-    mb.box((0.028, 0.215, 0.004), (0, 0, 0.0265), "page_shade", r=0, segs=0)
+        mb.box((0.16, 0.22, 0.016), (sx * 0.084, 0, 0.022), "page", r=0, segs=0, rot=(0, -sx * 7, 0))
     return mb.mesh(name)
 
 
