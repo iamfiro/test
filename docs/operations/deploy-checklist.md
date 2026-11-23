@@ -15,6 +15,8 @@ last_verified: 2026-11-23
 ## 데이터베이스
 
 - 관리형 PostgreSQL. 마이그레이션은 `server/drizzle/` 순서대로 적용.
+- 공부방 태그(계약 0.4.0, 서버 미구현): `tags`·`tag_aliases`·`user_tags`·`room_tags`·`tag_suggestions`,
+  인덱스 `room_tags(tag_id)`. 배포 뒤 서버 CLI로 초기 카탈로그 시드(`docs/plan/study-tags.md` 2절).
 
 ## 환경 변수
 

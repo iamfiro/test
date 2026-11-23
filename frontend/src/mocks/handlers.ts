@@ -4,6 +4,7 @@ import type { components } from '../core/api/schema'
 import { API, fail, ok } from './util'
 import { timerHandlers } from './timer'
 import { roomHandlers } from './rooms'
+import { tagHandlers } from './tags'
 
 type Session = components['schemas']['Session']
 let signedIn = sessionStorageFlag()
@@ -26,4 +27,5 @@ export const handlers = [
   http.get(`${API}/users/me/profile`, () => ok({ profile: me.profile })),
   ...timerHandlers,
   ...roomHandlers,
+  ...tagHandlers,
 ]

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.3.0
+  version: 0.4.0
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -20,6 +20,7 @@ tags:
   - name: profile
   - name: timer
   - name: rooms
+  - name: tags
 paths:
   /auth/session:
     get:
@@ -415,21 +416,23 @@ paths:
       operationId: listStudyRooms
       summary: 공부방 목록(최신 100개)
       description: |
-        `mine`은 내가 멤버인 방(비밀번호 방 포함), `all`은 모든 방. `q`가 있으면 서버가 방 이름에 그 글자가
-        들어간 방만 돌려준다(대소문자 무시, 앞뒤 공백 제거, 1–40자). 비밀번호는 목록에 싣지 않는다.
+        `mine`은 내가 멤버인 방(비밀번호 방 포함), `all`은 모든 방. `recommended`는 방 태그가 내 태그와 하나라도
+        겹치는 방이다(비밀번호 방·꽉 찬 방 포함, 내 태그가 없으면 빈 목록). `recommended`의 순서는 겹친 태그 수
+        많은 순 → `studying_count` 많은 순 → 최신 순이고, 다른 scope는 최신 순이다. `q`가 있으면 서버가 방 이름에
+        그 글자가 들어간 방만 돌려준다(대소문자 무시, 앞뒤 공백 제거, 1–40자). 비밀번호는 목록에 싣지 않는다.
         `studying_count`는 서버가 presence로 본 "지금 공부 중"인 멤버 수다.
       parameters:
         - name: scope
           in: query
           required: true
-          schema: { type: string, enum: [mine, all] }
+          schema: { type: string, enum: [mine, all, recommended] }
         - name: q
           in: query
           required: false
           schema: { type: string, minLength: 1, maxLength: 40 }
       responses:
         '200':
-          description: 방 목록(최신 순)
+          description: 방 목록(순서는 위 설명)
           content:
             application/json:
               schema:
@@ -447,6 +450,94 @@ paths:
                   meta: { $ref: '#/components/schemas/Meta' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /tags:
+    get:
+      tags: [tags]
+      operationId: listTags
+      summary: 태그 카탈로그·자동완성
+      description: |
+        `q`가 없으면 카탈로그 전체(`exam` 먼저, 그다음 이름 순). `q`가 있으면 서버가 정규화(앞뒤 공백·`#` 제거,
+        대소문자 무시, NFC)한 뒤 정규 이름이나 별칭에 그 글자가 들어간 태그를 돌려준다. 별칭으로 맞아도 정규 태그
+        하나로 나온다.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 20 }
+      responses:
+        '200': { $ref: '#/components/responses/TagsOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/me/tags:
+    get:
+      tags: [tags]
+      operationId: getMyTags
+      summary: 내 태그(남에게 보이지 않고 추천에만 쓴다)
+      responses:
+        '200': { $ref: '#/components/responses/TagsOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [tags]
+      operationId: putMyTags
+      summary: 내 태그를 통째로 바꾼다
+      description: '`tag_ids`는 카탈로그에 있는 태그, 서로 다르게 최대 5개. 응답은 바뀐 내 태그(카탈로그 순서).'
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tag_ids]
+              properties:
+                tag_ids: { type: array, maxItems: 5, uniqueItems: true, items: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/TagsOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /tag-suggestions:
+    post:
+      tags: [tags]
+      operationId: suggestTag
+      summary: 카탈로그에 없는 태그 제안
+      description: 바로 태그가 되지 않는다. 운영자가 서버 CLI로 검토해 새 태그나 기존 태그의 별칭으로 넣는다.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 20, description: 앞뒤 공백을 지운 뒤 1–20자 }
+      responses:
+        '201':
+          description: 제안을 받았다
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [name]
+                    properties:
+                      name: { type: string }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 components:
   securitySchemes:
     session:
@@ -655,7 +746,7 @@ components:
     Room:
       type: object
       additionalProperties: false
-      required: [id, name, description, has_password, capacity, map, member_count, studying_count, is_member, is_host, host_nickname, created_at, banner, logo]
+      required: [id, name, description, has_password, capacity, map, member_count, studying_count, is_member, is_host, host_nickname, created_at, banner, logo, tags]
       properties:
         id: { type: string }
         name: { type: string, minLength: 1, maxLength: 40 }
@@ -677,7 +768,33 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/RoomImage' }
             - { type: 'null' }
+        tags: { type: array, maxItems: 3, items: { $ref: '#/components/schemas/Tag' }, description: 방장이 고른 태그(카탈로그 순서) }
+    Tag:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [exam, kind], description: exam은 시험·목표, kind는 공부 종류 }
+        name: { type: string, minLength: 1, maxLength: 20, description: 정규 이름(별칭이 아니다) }
   responses:
+    TagsOk:
+      description: 태그 목록
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [tags]
+                properties:
+                  tags: { type: array, items: { $ref: '#/components/schemas/Tag' } }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
     LoggedIn:
       description: 로그인 성공. `sv_session` 쿠키를 둔다. 새 계정이면 닉네임·캐릭터를 무작위로 정한다(PocketTime과 같은 규칙).
       content:
