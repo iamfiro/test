@@ -10,6 +10,7 @@ import { StudyTabOverlay, studyTabBarHidden } from '../home/StudyTabOverlay'
 import { useStudyCameraCycle } from '../home/useStudyCameraCycle'
 import { useStudyTimer } from '../timer/useStudyTimer'
 import { RoomsPage } from '../rooms/RoomsPage'
+import { SpaceBackground } from '../rooms/SpaceBackground'
 import { useEffect, useState } from 'react'
 import { useSubjectEditor } from '../subject/useSubjectEditor'
 import { ChatSheet } from '../chat/ChatSheet'
@@ -47,7 +48,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   }, [myId])
   return (
     <div className={s.page}>
-      {tab === 'rooms' && <IslandBackground ground="grass" />}
+      {tab === 'rooms' && <SpaceBackground />}
       {tab === 'rooms' && <RoomsPage />}
       {tab === 'stats' && <IslandBackground ground="lake" />}
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}

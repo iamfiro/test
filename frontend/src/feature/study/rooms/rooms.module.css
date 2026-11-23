@@ -62,3 +62,21 @@
   .search { width: 58%; }
   .grid { gap: 14px 12px; }
 }
+
+/* 밤하늘 배경: 지구(왼쪽) 쪽이 조금 밝은 남색, 바깥은 짙은 남색. 좁은 화면은 지구가 위에 있다. */
+.space {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 18% 50%, rgb(86 140 230 / 0.42) 0%, rgb(86 140 230 / 0) 46%),
+    linear-gradient(160deg, #1d2b63 0%, #141d48 55%, #0e1434 100%);
+}
+.stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+@media (max-width: 899px) {
+  .space {
+    background:
+      radial-gradient(circle at 50% 6%, rgb(86 140 230 / 0.45) 0%, rgb(86 140 230 / 0) 55%),
+      linear-gradient(180deg, #1d2b63 0%, #141d48 55%, #0e1434 100%);
+  }
+}
