@@ -1,5 +1,6 @@
 // 공부를 끝낸 뒤 공부방 위에 뜨는 "오늘의 공부 여권"(앱에 없는 화면, 사용자 지정 2026-11-23).
-// 모달 틀 없이 흐린 공부방 위에 가로 여권만 띄운다. 닫기는 여권 모서리, 저장·공유는 여권 아래 작은 알약 하나.
+// 모달 틀 없이 흐린 공부방 위에 자랑 문구(오늘 n시간 공부했어요 · n일째 연속)와 가로 여권을 띄운다.
+// 닫기는 여권 모서리, 저장·공유는 여권 아래 작은 알약 하나. 저장 이미지와 같은 문구·같은 여권이다.
 // 접근성: dialog·aria-modal, 열리면 대화상자로 포커스, Tab은 안에서만 돈다, Esc·바깥으로 닫고 닫히면 원래 자리로 돌린다.
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconDownload, IconShare2, IconX } from '@tabler/icons-react'
@@ -52,9 +53,9 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
   }, [recap])
 
-  // 여권을 창에 맞춘다: 좌우 16 여백, 위아래로는 닫기·저장 자리(약 140)를 남긴다.
+  // 여권을 창에 맞춘다: 좌우 16 여백, 위아래로는 자랑 문구·저장 자리(약 250)를 남긴다.
   useEffect(() => {
-    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / artW, (window.innerHeight - 140) / artH))
+    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / artW, (window.innerHeight - 250) / artH))
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
@@ -106,6 +107,12 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
     <div className={s.root}>
       <div className={s.backdrop} onClick={onClose} />
       <div ref={dialog} className={s.floating} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
+        <header className={s.brag}>
+          <h2 className={s.bragTitle}>
+            {webText.recapStoryHeadlineLead} <mark>{formatStudyDuration(recap.todaySeconds)}</mark> {webText.recapStoryHeadlineTail}
+          </h2>
+          {recap.streakDays > 0 && <p className={s.bragSub}>{webText.recapStoryStreak(recap.streakDays)}</p>}
+        </header>
         <div className={s.fit} style={{ '--fit': fit, width: artW * fit, height: artH * fit } as CSSProperties}>
           {ready ? <PassportArt recap={recap} label={label} /> : <div className={s.artLoading} aria-busy="true" />}
           <button type="button" className={s.close} onClick={onClose} aria-label={webText.recapClose}><IconX size={18} stroke={2} /></button>

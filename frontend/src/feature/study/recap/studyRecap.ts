@@ -14,6 +14,7 @@ export type StudyRecap = {
   /** 방금 끝낸 기록 id에서 만든 여권 번호(예: SV-1A2B-3C4D). */
   serial: string
   todaySeconds: number
+  yesterdaySeconds: number
   sessionSeconds: number
   goalSeconds: number | null
   streakDays: number
@@ -37,6 +38,7 @@ export function buildRecap(input: {
     studyDate: stats.today.date,
     serial: `SV-${hex.slice(0, 4)}-${hex.slice(4, 8)}`,
     todaySeconds: stats.today.seconds,
+    yesterdaySeconds: stats.yesterday_seconds,
     sessionSeconds: record.focused_seconds,
     goalSeconds: settings?.daily_goal_minutes != null ? settings.daily_goal_minutes * 60 : null,
     streakDays: stats.streak_days,

@@ -21,6 +21,16 @@
 .floating {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 18px; outline: none;
 }
+.brag { text-align: center; color: #fff; animation: reveal 520ms 80ms var(--ease-out) both; }
+.bragTitle {
+  margin: 0; font-size: clamp(22px, 3.2vw, 34px); line-height: 1.25; font-weight: 800; letter-spacing: -0.025em;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.35); text-wrap: balance;
+}
+.bragTitle mark {
+  color: inherit; padding: 0 0.12em; border-radius: 4px;
+  background: linear-gradient(transparent 52%, rgb(233 141 134 / 0.85) 52%, rgb(233 141 134 / 0.85) 92%, transparent 92%);
+}
+.bragSub { margin: 8px 0 0; font-size: 14px; font-weight: 700; color: var(--butter); letter-spacing: -0.01em; }
 .fit { position: relative; flex: none; }
 /* 닫기: 여권 오른쪽 위 모서리에 걸친다(여권은 무대 안에서 20pt 들어가 있다). */
 .close {
@@ -89,6 +99,6 @@
 @keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
 @keyframes breathe { 50% { opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
-  .backdrop, .backSheet, .passport, .subjectStamp, .completionStamp, .actions, .close, .artLoading { animation: none; }
+  .backdrop, .brag, .backSheet, .passport, .subjectStamp, .completionStamp, .actions, .close, .artLoading { animation: none; }
   .tilt, .close { transition: none; }
 }
