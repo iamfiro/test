@@ -127,7 +127,7 @@
 }
 /* StudyRoomIslandPalette.day: 늘 낮 색(3D 방 위 버튼) */
 .palette-day {
-  --i-paper: #fffaeb; --i-paper-ledge: #e7daba; --i-paper-line: #e9dfc6;
+  --i-paper: #fffaeb; --i-paper-ledge: #e7daba; --i-paper-line: #e9dfc6; --i-muted: #efe6d0;
   --i-ink: #5e4a32; --i-ink-soft: #9a8667; --i-sun: #f8d66a; --i-on-sun: #5e4a32; --i-sun-ledge: #d9b246;
   --i-leaf: #5dae6b; --i-on-leaf: #ffffff; --i-studying: #f26a2e; --i-on-studying: #ffffff;
 }

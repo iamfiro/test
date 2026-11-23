@@ -1,4 +1,4 @@
-/* Row(mainAxisAlignment center, crossAxisAlignment stretch), 높이 60. */
+/* Row(mainAxisAlignment center, crossAxisAlignment stretch), 높이 72(웹에서 키움). */
 .row {
   display: flex;
   justify-content: center;
@@ -9,7 +9,7 @@
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 260px;
+  max-width: 320px;
 }
 .fill { flex: 1 1 auto; min-width: 0; }
 /* 과목 카드 안: 왼쪽 xl, 오른쪽 md. */
@@ -17,16 +17,16 @@
   display: flex;
   height: 100%;
   align-items: center;
-  padding: 0 12px 0 20px;
+  padding: 0 14px 0 22px;
   text-align: left;
 }
 /* 과목 색 세로 막대 5×28, 오른쪽 sm + 2. */
 .subjectBar {
   flex: none;
-  width: 5px;
-  height: 28px;
-  margin-right: 10px;
-  border-radius: 2.5px;
+  width: 6px;
+  height: 36px;
+  margin-right: 12px;
+  border-radius: 3px;
 }
 .subjectText {
   display: flex;
@@ -46,28 +46,34 @@
   letter-spacing: -0.5px;
 }
 /* titleSmall 16 w800 / labelSmall 12 w600. */
-.subjectName { font-size: 16px; font-weight: 800; color: var(--i-ink); }
-.subjectToday { font-size: 12px; font-weight: 600; color: var(--i-ink-soft); }
-.subjectIcon { flex: none; margin-left: 4px; color: var(--i-ink-soft); }
+.subjectName { font-size: 18px; font-weight: 800; line-height: 1.25; color: var(--i-ink); }
+.subjectToday { margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--i-ink-soft); font-variant-numeric: tabular-nums; }
+.subjectIcon {
+  flex: none; width: 30px; height: 30px; margin-left: 8px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--i-muted); color: var(--i-ink-soft);
+}
 
 .clockCard { flex: none; }
-.gap { width: 8px; flex: none; }
+.gap { width: 10px; flex: none; }
 /* 왼쪽 lg, 오른쪽 xs. */
 .clock {
   display: flex;
   height: 100%;
   align-items: center;
-  padding: 0 4px 0 16px;
+  padding: 0 7px 0 22px;
 }
 /* titleLarge 24 w800, 자릿수 고정폭. */
 .clockText {
-  margin-right: 8px;
-  font-size: 24px;
+  margin-right: 12px;
+  font-size: 32px;
   font-weight: 800;
-  letter-spacing: -0.5px;
+  letter-spacing: -1px;
+  transition: opacity 0.2s;
   color: var(--i-ink);
   font-variant-numeric: tabular-nums;
 }
 
 .collapse { display: flex; flex: none; overflow: hidden; }
 .collapseInner { display: flex; align-items: flex-start; flex: none; }
+/* 일시정지 중에는 시간이 흐리게 멈춰 있다. */
+.clockPaused { opacity: 0.55; }

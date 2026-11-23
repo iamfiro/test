@@ -9,11 +9,13 @@ import type { StudyTimerView } from './studyTimerView'
 import s from './MiniTimer.module.css'
 
 /** 턱까지 합친 높이. 카드 얼굴은 height - ledge. */
-export const miniTimerHeight = 60
-const ledge = 5
+export const miniTimerHeight = 72
+const ledge = 6
 
 /**
- * 원본: `_StudyMiniTimer`. 공부 탭 아래에 떠 있는 타이머 한 줄. 왼쪽 과목 카드(최대 260),
+ * 원본: `_StudyMiniTimer`. 웹은 사용자 결정(2026-11-23)으로 키웠다: 높이 60→72, 과목 카드 최대 260→320,
+ * 시간 24→32, 재생 단추 46→56(docs/design-parity/exceptions.md).
+ * 공부 탭 아래에 떠 있는 타이머 한 줄. 왼쪽 과목 카드(최대 260),
  * 가운데 지금 시간과 재생·일시정지, 공부 중이면 오른쪽 끝내기 단추. 늘 낮 섬 색(크림 종이).
  */
 export function MiniTimer(props: {
@@ -51,17 +53,17 @@ export function MiniTimer(props: {
                 {t('studySubjectToday', { duration: formatStudyDuration(timer.todaySeconds) })}
               </span>
             </span>
-            <SubjectIcon className={s.subjectIcon} size={18} stroke={2} aria-hidden />
+            <span className={s.subjectIcon}><SubjectIcon size={16} stroke={2.4} aria-hidden /></span>
           </span>
         </IslandSurface>
       </div>
       <span className={s.gap} />
       <IslandSurface stadium ledge={ledge} className={s.clockCard}>
         <span className={s.clock}>
-          <span className={s.clockText}>{formatStudyClock(timer.focusedSeconds)}</span>
+          <span className={`${s.clockText} ${active && !running ? s.clockPaused : ''}`}>{formatStudyClock(timer.focusedSeconds)}</span>
           <IslandIconButton
-            size={46}
-            iconSize={20}
+            size={56}
+            iconSize={24}
             label={label}
             icon={running ? IconPlayerPauseFilled : IconPlayerPlayFilled}
             emphasis="var(--c-accent)"
@@ -74,7 +76,7 @@ export function MiniTimer(props: {
         <span className={s.gap} />
         <IslandIconButton
           size={miniTimerHeight}
-          iconSize={20}
+          iconSize={24}
           label={t('studyFinish')}
           icon={IconPlayerStopFilled}
           onClick={() => props.onFinish?.()}

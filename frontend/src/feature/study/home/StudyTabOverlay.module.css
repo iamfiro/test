@@ -87,7 +87,7 @@
 .bottomButtons {
   position: absolute;
   right: 16px;
-  bottom: calc(var(--bottom) + var(--tab-bar) + 112px);
+  bottom: calc(var(--bottom) + var(--tab-bar) + 124px);
   display: flex;
   align-items: center;
   pointer-events: auto;
@@ -163,3 +163,6 @@
   z-index: 11;
 }
 .rankingCorner > button { pointer-events: auto; }
+
+/* 넓은 화면: 키운 미니 타이머가 다 들어가게 오버레이 칸을 넓힌다. */
+@media (min-width: 700px) { .overlay { width: min(100%, 600px); } }
