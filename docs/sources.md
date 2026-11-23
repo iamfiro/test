@@ -6,7 +6,9 @@ PocketTime에서 가져온 코드 의미·자산·문구. 원본 커밋: PocketT
 | StudyVillage | 원본 | 원본 커밋 | 비고 |
 | --- | --- | --- | --- |
 | `frontend/public/assets/icons/{study_*,nav/study_*,empty_*.svg,brand/*}` | PocketTime `assets/icons/` | f574f242 | 원본 그대로 |
-| `frontend/public/assets/study_themes/cafe_room_3d/` | PocketTime `assets/study_themes/cafe_room_3d/` (생성: `tool/blender/study_room/export_study_assets.py`) | f6865a86 (자산 마지막 변경) | Draco/meshopt 압축은 사본에만(Phase 8) |
+| `frontend/public/assets/study_themes/cafe_room_3d/` | PocketTime `assets/study_themes/cafe_room_3d/` (생성: `tool/blender/study_room/export_study_assets.py`) | f6865a86 (자산 마지막 변경) | Draco/meshopt 압축은 사본에만(Phase 8). `study_room_v2.glb`는 아래 v2 스크립트로 새로 만든 것 |
+| `tool/blender/study_room/{build_study_room,bake_and_export,export_study_assets}.py` | PocketTime `tool/blender/study_room/` 같은 이름 | f6865a86 (파일 마지막 변경, 복사 시점 f574f242) | 원본 그대로(v1 `study_room.glb` 재현용) |
+| `tool/blender/study_room/{cozy_kit,build_study_room_v2,bake_and_export_v2,export_study_assets_v2,preview_prototypes}.py`, `verify_study_room_glb.mjs` | 위 원본 스크립트(평면도·벽·창 구멍·자리 표·베이크 흐름) | f6865a86 | v2 카툰 카페: 가구·소품·색·조명을 새로 모델링. 외부 에셋 없음 |
 | `frontend/public/assets/study/sounds/` | PocketTime `assets/study/sounds/` + `sources.json` | f574f242 | CC0 1.0 |
 | `frontend/public/assets/study/music/` | PocketTime `assets/study/music/` + `sources.json` | f574f242 | Pixabay, 사용자 확인(2026-11-23) |
 | `frontend/public/assets/study_outfit/`, `study_shop/` | PocketTime 같은 경로 | f574f242 | |

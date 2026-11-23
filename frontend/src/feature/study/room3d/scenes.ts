@@ -78,7 +78,9 @@ export const StudyRoom3dScenes = {
    * 있다. 카메라는 내 자리 둘레(1인칭·3인칭·머리 위)만 비춘다.
    */
   cafe: new StudyRoom3dScene({
-    asset: 'assets/study_themes/cafe_room_3d/study_room.glb',
+    // 방 모델은 웹 전용 v2(카툰 카페, StudyVillage `tool/blender/study_room/export_study_assets_v2.py`).
+    // 자리·노드 계약은 앱 `study_room.glb`와 같다. 예외: docs/design-parity/exceptions.md
+    asset: 'assets/study_themes/cafe_room_3d/study_room_v2.glb',
     characterAsset: 'assets/study_themes/cafe_room_3d/study_characters.glb',
     propAsset: 'assets/study_themes/cafe_room_3d/study_props.glb',
     sceneryAsset: 'assets/study_themes/cafe_room_3d/study_scenery.glb',
