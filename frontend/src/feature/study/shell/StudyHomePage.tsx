@@ -19,6 +19,7 @@ import { StudyStatsPage } from '../stats/StudyStatsPage'
 import { useEffect, useRef, useState } from 'react'
 import { useSubjectEditor } from '../subject/useSubjectEditor'
 import { ChatSheet } from '../chat/ChatSheet'
+import { StudyRecapOverlay } from '../recap/StudyRecapOverlay'
 import { chatStore, useChat } from '../chat/chatStore'
 import s from './StudyHomePage.module.css'
 
@@ -39,7 +40,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   const { state } = useSession()
   // 원본 기본 시점(initialRoomCamera = thirdPerson). 누를 때마다 다음 시점, 이름은 1600ms.
   const camera = useStudyCameraCycle('thirdPerson')
-  const timer = useStudyTimer(state.status === 'signedIn')
+  const timer = useStudyTimer(state.status === 'signedIn' ? state.me.profile.nickname : null)
   const subjects = useSubjectEditor({ onManage: () => navigate('/subjects') })
   const chat = useChat()
   const [chatOpen, setChatOpen] = useState(false)
@@ -113,6 +114,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       )}
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
+      {timer.recap && <StudyRecapOverlay recap={timer.recap} onClose={timer.closeRecap} />}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )

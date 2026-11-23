@@ -10,18 +10,24 @@ import type { StudyTimerView } from '../home/studyTimerView'
 import { formatStudyClock, formatStudyDuration } from '../home/studyFormat'
 import { elapsedMs, finish, isRunning, pause, resume, start, startPresence, useTimer } from './timerStore'
 import { loadStats, useStats } from './statsStore'
-import { loadSettings, useStudySettings } from './settingsStore'
+import { currentSettings, loadSettings, useStudySettings } from './settingsStore'
+import { buildRecap, type StudyRecap } from '../recap/studyRecap'
+import { photoSize } from '../recap/drawRecapCard'
+import { takeRoomSnapshot } from '../room3d/roomSnapshot'
 import { subjectColorOf } from './subjectPalette'
 import { dateKey, splitByStudyDate, studyDateOf } from './studyDay'
 
 const log = logger('StudyTimerUi')
 
-export function useStudyTimer(hasOwner: boolean) {
+/** nickname: 로그인한 사람의 닉네임(요약 카드 이름 칸). 로그인 전이면 null. */
+export function useStudyTimer(nickname: string | null) {
+  const hasOwner = nickname != null
   const timer = useTimer()
   const stats = useStats()
   const settings = useStudySettings()
   const toast = useToast()
   const [, tick] = useState(0)
+  const [recap, setRecap] = useState<StudyRecap | null>(null)
 
   useEffect(() => {
     if (!hasOwner) return
@@ -91,12 +97,19 @@ export function useStudyTimer(hasOwner: boolean) {
       </AppBottomSheet>
     ))
     if (!ok) return
+    // 끝내기 전 내 자리 사진(카드 사진 칸). 방이 없으면 null이고 카드는 사진 칸 없이 그린다.
+    // 카드는 2.5배로 내보내므로(렌더러 화소 배율 상한 2) 사진 칸의 1.5배 화면으로 찍는다(비율은 같다).
+    const photo = takeRoomSnapshot(photoSize.width * 1.5, photoSize.height * 1.5)
     try {
       const record = await finish(session.id)
-      void loadStats()
-      if (record) toast(t('studyFinishedSnack', { duration: formatStudyDuration(record.focused_seconds) }))
+      const fresh = await loadStats()
+      if (!record) return
+      toast(t('studyFinishedSnack', { duration: formatStudyDuration(record.focused_seconds) }))
+      // 요약 카드는 끝낸 기록이 들어간 새 통계로만 만든다. 통계를 못 읽으면 카드 없이 기록 알림만 남긴다.
+      if (fresh && nickname != null) setRecap(buildRecap({ stats: fresh, record, settings: currentSettings(), nickname, photo }))
+      else log.warn('recap skipped: stats unavailable')
     } catch (e) { failed(e) }
   }
 
-  return { view, onTogglePause, onFinish }
+  return { view, onTogglePause, onFinish, recap, closeRecap: () => setRecap(null) }
 }

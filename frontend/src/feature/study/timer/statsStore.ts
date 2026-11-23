@@ -10,11 +10,13 @@ export type StudyStats = components['schemas']['StudyStats']
 let stats: StudyStats | null = null
 const listeners = new Set<() => void>()
 
-export async function loadStats(): Promise<void> {
+/** 새로 읽은 통계. 실패하면 null(이미 가진 값은 지우지 않는다). */
+export async function loadStats(): Promise<StudyStats | null> {
   const res = await api.GET('/study/stats', { params: { query: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } } })
-  if (!res.data) { log.warn('load failed', { code: errorOf(res).code }); return }
+  if (!res.data) { log.warn('load failed', { code: errorOf(res).code }); return null }
   stats = res.data.data
   listeners.forEach((l) => l())
+  return stats
 }
 
 export function useStats(): StudyStats | null {

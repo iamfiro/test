@@ -84,7 +84,11 @@ export const timerHandlers = [
     for (let i = recent.findIndex((d) => d.date === todayRow.date) - (todayRow.seconds >= 600 ? 0 : 1); i >= 0 && recent[i]!.seconds >= 600; i--) streak++
     return ok({
       today: todayRow,
-      today_by_subject: todayRow.seconds > 0 ? [{ subject: '수학', seconds: todayRow.seconds }] : [],
+      today_by_subject: todayRow.seconds > 0 ? [
+        { subject: '수학', seconds: Math.floor(todayRow.seconds * 0.5) },
+        { subject: '영어', seconds: Math.floor(todayRow.seconds * 0.3) },
+        { subject: null, seconds: todayRow.seconds - Math.floor(todayRow.seconds * 0.5) - Math.floor(todayRow.seconds * 0.3) },
+      ].filter((r) => r.seconds > 0) : [],
       yesterday_seconds: yesterday.seconds,
       week: { days: week, total_seconds: weekTotal },
       streak_days: streak,

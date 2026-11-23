@@ -1,0 +1,27 @@
+/* "오늘의 공부" 화면: 통계 화면과 같은 호수 바탕, 앱 폭(최대 430) 칸 가운데. 카드는 9:16 그대로 화면에 맞춘다. */
+.root {
+  position: fixed; inset: 0; z-index: 90; /* 탭바(20) 위, 토스트(100) 아래 */ display: flex; flex-direction: column; align-items: center;
+  padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 20px);
+  animation: enter 220ms ease-out;
+}
+.root > * { position: relative; z-index: 1; }
+.root > canvas { z-index: 0; }
+@keyframes enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .root { animation: none; } }
+
+.header { width: min(100%, var(--app-column)); min-height: 48px; display: flex; align-items: center; flex: none; }
+.side { width: 43px; flex: none; }
+.title {
+  flex: 1; margin: 0; text-align: center; font-family: var(--font-round); font-size: 18px; font-weight: 800;
+  color: #fff; text-shadow: 0 0 6px rgb(0 0 0 / 0.6); white-space: nowrap;
+}
+
+.preview { flex: 1; min-height: 0; width: min(100%, var(--app-column)); display: flex; align-items: center; justify-content: center; padding: 16px 0; }
+.card {
+  display: block; max-height: 100%; max-width: 100%; border-radius: 22px;
+  box-shadow: 0 4px 0 var(--i-paper-ledge), 0 10px 28px rgb(0 0 0 / 0.18);
+}
+.cardLoading { height: 100%; aspect-ratio: 9 / 16; background: color-mix(in srgb, var(--i-paper) 35%, transparent); }
+
+.actions { width: min(100%, var(--app-column)); display: flex; gap: 12px; flex: none; }
+.actions > * { flex: 1; min-width: 0; }

@@ -27,5 +27,17 @@ export const webText = {
   roomSearchEmpty: '찾는 공부방이 없어요',
   roomsAll: '모든 공부방',
   statsLoading: '통계를 불러오는 중이에요',
+  // 공부를 끝낸 뒤 요약 카드(앱에 없는 화면). '공유하기'는 앱 studyRoomShareRoom을 쓴다.
+  recapTitle: '오늘의 공부',
+  recapBrand: 'StudyVillage',
+  recapDate: (month: number, day: number, weekday: string) => `${month}월 ${day}일 ${weekday}요일`,
+  recapTopSubject: '가장 많이 한 과목',
+  recapStampGoal: '목표 달성',
+  recapStampDone: '공부 완료',
+  recapSave: '이미지 저장',
+  recapClose: '닫기',
+  recapSaved: '이미지를 저장했어요',
+  recapShareFailed: '공유하지 못했어요. 이미지를 저장해서 올려 주세요.',
+  recapImageAlt: '오늘 공부 요약 이미지',
   statsLoadFailed: '통계를 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
 } as const
