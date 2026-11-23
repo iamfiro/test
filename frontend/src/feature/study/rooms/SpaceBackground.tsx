@@ -28,16 +28,6 @@ export function SpaceBackground() {
         ctx.fillStyle = `rgb(255 255 255 / ${0.35 + rand() * 0.55})`
         ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
       }
-      // 반짝이는 큰 별 몇 개(십자 빛).
-      for (let i = 0; i < Math.max(4, Math.round(count / 60)); i++) {
-        const x = rand() * w
-        const y = rand() * h
-        const len = 5 + rand() * 4
-        ctx.strokeStyle = 'rgb(255 248 220 / 0.85)'
-        ctx.lineWidth = 1.2
-        ctx.lineCap = 'round'
-        ctx.beginPath(); ctx.moveTo(x - len, y); ctx.lineTo(x + len, y); ctx.moveTo(x, y - len); ctx.lineTo(x, y + len); ctx.stroke()
-      }
     }
     paint()
     const ro = new ResizeObserver(paint)

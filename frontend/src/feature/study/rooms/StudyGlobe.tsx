@@ -106,6 +106,12 @@ void main() {
 /** 캔버스가 요소보다 큰 배율. 광륜 끝(1.15)이 화면 반높이(1.125·bleed) 안에 들어오게. */
 const bleed = 1.3
 
+/** 지구 위를 걸어 다니는 작은 유저들. 지구 셰이더와 같은 값 공간(출력 LinearSRGB)에 맞춰 색 숫자를 그대로 쓴다. */
+const rawColor = (hex: number) => new THREE.Color().setRGB(((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255, THREE.LinearSRGBColorSpace)
+const shirts = [0xf26a2e, 0xf8d66a, 0x5dae6b, 0xe0568a, 0x8a6cf0, 0x3aa0ff, 0xffffff]
+const hairs = [0x3b2a1e, 0x5e4a32, 0x1f1b24, 0xb9772f]
+const walkerCount = 24
+
 export function StudyGlobe(props: { className?: string }) {
   const host = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -150,6 +156,94 @@ export function StudyGlobe(props: { className?: string }) {
     globe.add(earth, clouds)
     scene.add(outline)
 
+
+    // 공부하는 작은 유저들: 지구와 함께 돌도록 earth의 자식으로 두고, 풀밭 조각 위에서 책상에 앉아 공부한다.
+    type Student = { body: THREE.Group; holder: THREE.Group; head: THREE.Group; phase: number }
+    const disposables: { dispose(): void }[] = []
+    const track = <T extends { dispose(): void }>(x: T) => { disposables.push(x); return x }
+    const headGeo = track(new THREE.SphereGeometry(0.028, 16, 12))
+    const bodyGeo = track(new THREE.CapsuleGeometry(0.02, 0.022, 4, 10))
+    const legGeo = track(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 8))
+    const eyeGeo = track(new THREE.SphereGeometry(0.0045, 6, 6))
+    const hairGeo = track(new THREE.SphereGeometry(0.031, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.55))
+    const turfGeo = track(new THREE.CylinderGeometry(0.07, 0.075, 0.008, 24))
+    const deskGeo = track(new THREE.BoxGeometry(0.08, 0.004, 0.042))
+    const deskLegGeo = track(new THREE.BoxGeometry(0.004, 0.044, 0.004))
+    const bookGeo = track(new THREE.BoxGeometry(0.034, 0.004, 0.024))
+    const basic = (hex: number, side: THREE.Side = THREE.FrontSide) => track(new THREE.MeshBasicMaterial({ color: rawColor(hex), side }))
+    const white = basic(0xffffff, THREE.BackSide)
+    const skin = basic(0xffd9b8)
+    const eyeMat = basic(0x2a2018)
+    const legMat = basic(0x5e4a32)
+    const turfMat = basic(0x7fc058)
+    const deskMat = basic(0xc99a5b)
+    const bookMat = basic(0xfbfaf7)
+    const students: Student[] = []
+    const count = walkerCount
+    const golden = Math.PI * (3 - Math.sqrt(5))
+    for (let i = 0; i < count; i++) {
+      // 피보나치 구 분포로 고르게 흩어 놓는다(새로고침해도 같은 배치).
+      const y = 1 - ((i + 0.5) / count) * 2
+      const rad = Math.sqrt(1 - y * y)
+      const p0 = new THREE.Vector3(Math.cos(golden * i) * rad, y, Math.sin(golden * i) * rad)
+      const ref = Math.abs(p0.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)
+      const east = new THREE.Vector3().crossVectors(ref, p0).normalize()
+      const north = new THREE.Vector3().crossVectors(p0, east).normalize()
+      const a = i * 2.399
+      const forward = east.clone().multiplyScalar(Math.cos(a)).addScaledVector(north, Math.sin(a)).normalize()
+      const right = new THREE.Vector3().crossVectors(p0, forward).normalize()
+      const holder = new THREE.Group()
+      holder.position.copy(p0)
+      holder.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, p0, forward))
+      const body = new THREE.Group()
+      body.scale.setScalar(0.85)
+      holder.add(body)
+      const turf = new THREE.Mesh(turfGeo, turfMat); turf.position.y = 0.002
+      const turfOutline = new THREE.Mesh(turfGeo, white); turfOutline.position.y = 0.002; turfOutline.scale.set(1.1, 1.6, 1.1)
+      const shirt = basic(shirts[i % shirts.length]!)
+      const torso = new THREE.Mesh(bodyGeo, shirt); torso.position.set(0, 0.042, -0.012)
+      const torsoOutline = new THREE.Mesh(bodyGeo, white); torsoOutline.position.copy(torso.position); torsoOutline.scale.setScalar(1.28)
+      const head = new THREE.Group(); head.position.set(0, 0.088, -0.008)
+      const skull = new THREE.Mesh(headGeo, skin)
+      const skullOutline = new THREE.Mesh(headGeo, white); skullOutline.scale.setScalar(1.22)
+      const hair = new THREE.Mesh(hairGeo, basic(hairs[i % hairs.length]!)); hair.position.set(0, 0.002, -0.004)
+      const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.01, 0, 0.026)
+      const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.01, 0, 0.026)
+      head.add(skullOutline, skull, hair, eyeL, eyeR)
+      body.add(turfOutline, turf, torsoOutline, torso, head)
+      // 다리는 앞으로 뻗고(앉은 자세) 책상 아래로 들어간다.
+      for (const x of [-0.011, 0.011]) {
+        const hip = new THREE.Group(); hip.position.set(x, 0.026, -0.012); hip.rotation.x = -Math.PI / 2
+        const leg = new THREE.Mesh(legGeo, legMat); leg.position.y = -0.015
+        hip.add(leg); body.add(hip)
+      }
+      const top = new THREE.Mesh(deskGeo, deskMat); top.position.set(0, 0.046, 0.058)
+      const book = new THREE.Mesh(bookGeo, bookMat); book.position.set(0, 0.0505, 0.054)
+      body.add(top, book)
+      for (const x of [-0.034, 0.034]) { const l = new THREE.Mesh(deskLegGeo, deskMat); l.position.set(x, 0.022, 0.074); body.add(l) }
+      earth.add(holder)
+      students.push({ body, holder, head, phase: i * 1.7 })
+    }
+    let clock = 0
+    const worldUp = new THREE.Vector3(0, 1, 0)
+    const radial = new THREE.Vector3()
+    const target = new THREE.Vector3()
+    const holderQuat = new THREE.Quaternion()
+    const updateStudents = (dt: number) => {
+      clock += dt
+      for (const w of students) {
+        // 지구 중앙에서는 정수리만 보이므로 몸을 화면 위쪽으로 기울여 앞모습이 보이게 한다(앉은 자리는 그대로).
+        w.holder.getWorldQuaternion(holderQuat)
+        radial.set(0, 1, 0).applyQuaternion(holderQuat)
+        target.copy(radial).addScaledVector(worldUp, 1.5).normalize().applyQuaternion(holderQuat.invert())
+        w.body.quaternion.setFromUnitVectors(worldUp, target)
+        // 책을 보며 고개를 숙이고 가끔 끄덕이며 필기한다.
+        w.head.rotation.x = 0.4 + Math.sin(clock * 2.2 + w.phase) * 0.07
+        w.head.rotation.y = Math.sin(clock * 0.6 + w.phase) * 0.12
+      }
+    }
+    updateStudents(0)
+
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0
     let last = performance.now()
@@ -179,6 +273,7 @@ export function StudyGlobe(props: { className?: string }) {
       raf = 0
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
+      if (!reduce) updateStudents(dt)
       if (drag == null) {
         velocity *= 0.94
         spin += (reduce ? 0 : 0.12) * dt + velocity * dt
@@ -217,6 +312,7 @@ export function StudyGlobe(props: { className?: string }) {
       el.removeEventListener('pointercancel', onUp)
       document.removeEventListener('visibilitychange', onVisibility)
       for (const m of [earth, clouds, outline]) { m.geometry.dispose(); (m.material as THREE.Material).dispose() }
+      for (const d of disposables) d.dispose()
       renderer.dispose()
       renderer.domElement.remove()
     }

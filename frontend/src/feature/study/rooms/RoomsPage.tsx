@@ -1,6 +1,6 @@
 // 공부방 페이지(사용자 스케치 2026-11-23): 왼쪽 큰 지구, 오른쪽 제목·검색 알약과 공부방 카드 2열.
 // 앱 공부방 목록과 배치가 다르다(docs/design-parity/exceptions.md).
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { IconSearch, IconX } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
@@ -13,10 +13,17 @@ import s from './rooms.module.css'
 export function RoomsPage(props: { onOpenRoom?: (room: Room) => void }) {
   const [q, setQ] = useState('')
   const { rooms, failed, retry } = useRooms('all', q)
+  const panel = useRef<HTMLElement>(null)
+  // 지구 쪽(왼쪽)에서 휠을 돌려도 오른쪽 목록이 스크롤된다(사용자 요청 2026-11-23).
+  const forwardWheel = (e: React.WheelEvent) => {
+    const el = panel.current
+    if (!el || el.contains(e.target as Node)) return
+    el.scrollBy({ top: e.deltaY })
+  }
   return (
-    <div className={s.page}>
+    <div className={s.page} onWheel={forwardWheel}>
       <StudyGlobe className={s.globe} />
-      <section className={s.panel}>
+      <section ref={panel} className={s.panel}>
         <div className={s.head}>
           <h2 className={s.title}>{webText.roomsAll}</h2>
           <label className={s.search}>
