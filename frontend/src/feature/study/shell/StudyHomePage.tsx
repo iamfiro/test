@@ -54,10 +54,11 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
       {tab === 'outfit' && <div className={s.paper} />}
       {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode={camera.mode} topInset={68} /></div>}
-      <header className={s.header}>
+      {/* 공부방: 넓은 화면에서도 뒤로 버튼은 창 왼쪽 위에 두고, 제목은 본문의 "모든 공부방"이 대신한다(사용자 결정 2026-11-23). */}
+      <header className={tab === 'rooms' ? `${s.header} ${s.headerCorner}` : s.header}>
         <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(-1)} /></span>
-        <h1 className={s.title}>{titles[tab]()}</h1>
-        <span className={s.side} />
+        {tab !== 'rooms' && <h1 className={s.title}>{titles[tab]()}</h1>}
+        {tab !== 'rooms' && <span className={s.side} />}
       </header>
       {tab === 'study' && (
         <StudyTabOverlay
