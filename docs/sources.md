@@ -17,3 +17,8 @@ PocketTime에서 가져온 코드 의미·자산·문구. 원본 커밋: PocketT
 | `frontend/src/feature/study/shell/StudyTabBar.tsx` | `widgets/study_tab_bar.dart` | f574f242 | 의미 이식 |
 | `frontend/src/core/ui/Toast.tsx` | `lib/shared/widgets/app_toast.dart` | f574f242 | 값 복사 |
 | `frontend/src/feature/auth/LoginPage.tsx` | `lib/feature/auth/page/login_page.dart`, `widgets/*_login_button.dart` | f574f242 | 패턴 |
+| `frontend/src/feature/study/room3d/{model,domain,scenes.ts}` | `lib/feature/study/room3d/{model,domain}/*.dart`, `study_room_3d_scenes.dart` | f574f242 | 의미 이식(Dart 정수·나머지 규칙 유지) |
+| `frontend/src/feature/study/room3d/three/retroMaterial.ts` | `packages/flutter_scene/shaders/pocket_retro.frag`, `flutter_scene_retro_look.dart` | f574f242 | 셰이더 그대로 |
+| `frontend/src/feature/study/room3d/three/{ThreeStudyRoomRenderer,characterKit}.ts` | `infrastructure/flutter_scene/flutter_scene_{study_room_renderer,character_kit}.dart` | f574f242 | flutter_scene → three.js |
+| `frontend/src/feature/study/room3d/{StudyRoom3dView,StudyRoomSky}.tsx`, `skyStars.json` | `widgets/study_room_3d_view.dart`, `widgets/study_room_sky.dart` | f574f242 | 별 위치는 Dart `Random`으로 뽑은 값 |
+| `frontend/src/feature/study/timer/timerStore.ts` | `timer/domain/study_timeline.dart`(구간 합) | f574f242 | 진실은 서버 세션(결정 12) |
