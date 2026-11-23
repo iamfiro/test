@@ -11,6 +11,7 @@ import { useStudyCameraCycle } from '../home/useStudyCameraCycle'
 import { useStudyTimer } from '../timer/useStudyTimer'
 import { RoomsPage } from '../rooms/RoomsPage'
 import { SpaceBackground } from '../rooms/SpaceBackground'
+import { StudyStatsPage } from '../stats/StudyStatsPage'
 import { useEffect, useState } from 'react'
 import { useSubjectEditor } from '../subject/useSubjectEditor'
 import { ChatSheet } from '../chat/ChatSheet'
@@ -51,6 +52,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'rooms' && <SpaceBackground />}
       {tab === 'rooms' && <RoomsPage />}
       {tab === 'stats' && <IslandBackground ground="lake" />}
+      {tab === 'stats' && <StudyStatsPage />}
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
       {tab === 'outfit' && <div className={s.paper} />}
       {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode={camera.mode} topInset={68} /></div>}

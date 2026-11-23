@@ -11,11 +11,22 @@ let active: Session | null = null
 
 const now = () => new Date().toISOString()
 
-function dayList(from: Date, count: number) {
+const localKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+/** 개발용 표본: 날짜마다 정해진 모양의 공부량(초). `?stats=empty`면 전부 0. */
+function sampleSeconds(from: Date, i: number, empty: boolean): number {
+  if (empty) return 0
+  const d = new Date(from)
+  d.setDate(d.getDate() + i)
+  const n = (d.getDate() * 7 + d.getMonth() * 13) % 11
+  return n < 3 ? 0 : n * 1100
+}
+
+function dayList(from: Date, count: number, empty = true) {
   return Array.from({ length: count }, (_, i) => {
     const d = new Date(from)
     d.setDate(d.getDate() + i)
-    return { date: d.toISOString().slice(0, 10), seconds: 0 }
+    return { date: localKey(d), seconds: sampleSeconds(from, i, empty) }
   })
 }
 
@@ -58,19 +69,31 @@ export const timerHandlers = [
   }),
   http.put(`${API}/study/presence`, () => new HttpResponse(null, { status: 204 })),
   http.get(`${API}/study/stats`, () => {
+    const empty = new URLSearchParams(location.search).get('stats') === 'empty'
     const today = new Date()
     const monday = new Date(today)
     monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
     const start16 = new Date(monday)
     start16.setDate(monday.getDate() - 15 * 7)
+    const recent = dayList(start16, 112, empty)
+    const todayRow = recent.find((d) => d.date === localKey(today))!
+    const yesterday = recent.find((d) => d.date === localKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)))!
+    const week = recent.slice(105)
+    const weekTotal = week.reduce((sum, d) => sum + d.seconds, 0)
+    let streak = 0
+    for (let i = recent.findIndex((d) => d.date === todayRow.date) - (todayRow.seconds >= 600 ? 0 : 1); i >= 0 && recent[i]!.seconds >= 600; i--) streak++
     return ok({
-      today: { date: today.toISOString().slice(0, 10), seconds: 0 },
-      today_by_subject: [],
-      yesterday_seconds: 0,
-      week: { days: dayList(monday, 7), total_seconds: 0 },
-      streak_days: 0,
-      subjects_week: [],
-      recent_weeks: dayList(start16, 112),
+      today: todayRow,
+      today_by_subject: todayRow.seconds > 0 ? [{ subject: '수학', seconds: todayRow.seconds }] : [],
+      yesterday_seconds: yesterday.seconds,
+      week: { days: week, total_seconds: weekTotal },
+      streak_days: streak,
+      subjects_week: empty || weekTotal < 60 ? [] : [
+        { subject: '수학', seconds: Math.floor(weekTotal * 0.5) },
+        { subject: '영어', seconds: Math.floor(weekTotal * 0.3) },
+        { subject: null, seconds: Math.floor(weekTotal * 0.2) },
+      ].filter((r) => r.seconds >= 60),
+      recent_weeks: recent,
     })
   }),
   http.get(`${API}/study/records`, () => ok({ items: [] })),

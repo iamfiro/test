@@ -9,6 +9,8 @@ export const webText = {
   commonDurationHours: (hours: number) => `${hours}시간`,
   commonDurationHoursMinutes: (hours: number, minutes: number) => `${hours}시간 ${minutes}분`,
   commonDurationMinutes: (minutes: number) => `${minutes}분`,
+  // PocketTime lib/l10n/features/home_ko.arb (homeStudyStreakLabel)
+  homeStudyStreakLabel: '연속 공부',
   // StudyVillage 전용
   loginTitle: '공부방에 들어가려면\n로그인이 필요해요',
   loginDescription: '로그인하면 다른 기기에서도\n공부 기록이 이어져요.',
@@ -24,4 +26,6 @@ export const webText = {
   roomSearchPlaceholder: '공부방 이름으로 찾기',
   roomSearchEmpty: '찾는 공부방이 없어요',
   roomsAll: '모든 공부방',
+  statsLoading: '통계를 불러오는 중이에요',
+  statsLoadFailed: '통계를 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
 } as const
