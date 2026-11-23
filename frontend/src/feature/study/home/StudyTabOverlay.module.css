@@ -154,3 +154,12 @@
 .railRow { display: flex; align-items: center; gap: 8px; min-height: 52px; pointer-events: none; }
 .railRow button { pointer-events: auto; }
 .railChat { position: relative; display: block; }
+
+/* 랭킹 트로피: 창 왼쪽 위(오른쪽 줄과 같은 여백). 상점 단추는 웹에서 뺐다(사용자 결정 2026-11-23). */
+.rankingCorner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 32px);
+  left: 32px;
+  z-index: 11;
+}
+.rankingCorner > button { pointer-events: auto; }

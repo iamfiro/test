@@ -80,13 +80,25 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
   const chatAvailable = timer.hasOwner
   const unread = props.chatUnread ?? 0
   const rank = props.myRank ?? null
-  const shopEndsIn = props.shopEndsIn ?? null
-  const shop = props.shopEnabled
   const timerVeiled = focusMode || seatPlanOpen
   const onSetFocusMode = props.onSetFocusMode
 
   return (
     <>
+      {roomButtons && (
+        <div className={`${s.rankingCorner} palette-day`}>
+          <StickerButton asset={icon('study_trophy.png')} size={railSize} label={t('studyLiveRankingOpen')} onClick={props.onOpenRanking} />
+          {rank != null && (
+            <span className={s.chip}>
+              <StickerChip
+                label={t('studyLiveRankChip', { rank })}
+                semanticsLabel={t('studyLiveRankChipLabel', { rank })}
+                tone="gold"
+              />
+            </span>
+          )}
+        </div>
+      )}
       <div className={`${s.rail} palette-day`}>
         {!seatPlanOpen && (
           <div className={s.railRow}>
@@ -130,7 +142,6 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
     <div
       className={`${s.overlay} palette-day`}
       style={{
-        '--ranking-top': shop ? 'var(--ranking-top-with-shop)' : 'var(--ranking-top-alone)',
       } as CSSProperties}
     >
       {roomButtons && (showsCameraButton || showsSeatMove || showsFocusButton) && (
@@ -169,31 +180,6 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
       {seatPlanOpen && (
         <div className={s.seatPlan}>
           <SeatPlanHeader />
-        </div>
-      )}
-
-      {shop && roomButtons && (
-        <div className={s.shop}>
-          <StickerButton asset={icon('study_shop.png')} label={t('studyShopTitle')} onClick={props.onOpenShop} />
-          {shopEndsIn != null && (
-            <span className={s.chip}>
-              <StickerChip label={shopEndsIn} semanticsLabel={t('studyShopEndsIn', { time: shopEndsIn })} />
-            </span>
-          )}
-        </div>
-      )}
-      {roomButtons && (
-        <div className={s.ranking}>
-          <StickerButton asset={icon('study_trophy.png')} label={t('studyLiveRankingOpen')} onClick={props.onOpenRanking} />
-          {rank != null && (
-            <span className={s.chip}>
-              <StickerChip
-                label={t('studyLiveRankChip', { rank })}
-                semanticsLabel={t('studyLiveRankChipLabel', { rank })}
-                tone="gold"
-              />
-            </span>
-          )}
         </div>
       )}
 
