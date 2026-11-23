@@ -73,7 +73,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.collapse { display: flex; flex: none; overflow: hidden; }
+/* 가로로만 자른다(펼치는 동안). 세로는 보이게 둬서 단추 아래 턱·그림자가 잘리지 않게 한다. */
+.collapse { display: flex; flex: none; overflow-x: clip; overflow-y: visible; overflow-clip-margin: 12px; }
 .collapseInner { display: flex; align-items: flex-start; flex: none; }
 /* 일시정지 중에는 시간이 흐리게 멈춰 있다. */
 .clockPaused { opacity: 0.55; }

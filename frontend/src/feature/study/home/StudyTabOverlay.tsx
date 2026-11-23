@@ -66,16 +66,16 @@ export function studyTabBarHidden(p: Pick<StudyTabOverlayProps, 'timer' | 'focus
  */
 export function StudyTabOverlay(props: StudyTabOverlayProps) {
   const { timer } = props
-  const soundOpen = !!props.soundPanelOpen
   const focusMode = !!props.focusMode
   const seatPlanOpen = !!props.seatPlanOpen
   const timerReady = timer.phase === 'ready' && timer.hasOwner
   const showsCameraButton = timerReady && props.roomReady
   const showsSeatMove = showsCameraButton && timer.session === 'none'
   const showsFocusButton = timerReady
-  const showFocus = !soundOpen && timerReady
+  const showFocus = timerReady
   // 원본은 효과음 패널·집중 모드·자리 이동 중에 이 버튼들을 모두 걷는다.
-  const roomButtons = !soundOpen && !focusMode && !seatPlanOpen
+  // 웹: 사운드 패널을 열어도 방 버튼을 걷지 않는다(패널 뒤 어두운 막 아래에 그대로 둔다, 사용자 결정 2026-11-23).
+  const roomButtons = !focusMode && !seatPlanOpen
   // 원본 `_chat != null`: 내 id가 정해지면 방(없으면 lobby) 채팅을 붙인다.
   const chatAvailable = timer.hasOwner
   const unread = props.chatUnread ?? 0
