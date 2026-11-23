@@ -116,25 +116,29 @@ export class StudyRoomDirector {
       interior,
       seconds = 0,
       orbitDegrees = 0,
+      pitchDegrees = 0,
+      distanceScale = 1,
     }: {
       seats: readonly StudyRoomSeat[];
       size: StudyRoomSize;
       interior: StudyRoomInterior | null;
       seconds?: number;
       orbitDegrees?: number;
+      pitchDegrees?: number;
+      distanceScale?: number;
     },
   ): StudyRoomCamera {
     if (seats.length === 0) throw new Error('Bad state: No element');
     const me = at(seats, 0);
     const room = interior;
     if (room === null) {
-      return StudyRoomSeatCamera.of(local(mode), me, size, { orbitDegrees });
+      return StudyRoomSeatCamera.of(local(mode), me, size, { orbitDegrees, pitchDegrees, distanceScale });
     }
     let camera: StudyRoomCamera;
     switch (mode) {
       case 'firstPerson':
       case 'thirdPerson':
-        camera = StudyRoomSeatCamera.of(mode, me, size, { orbitDegrees });
+        camera = StudyRoomSeatCamera.of(mode, me, size, { orbitDegrees, pitchDegrees, distanceScale });
         break;
       case 'top':
         camera = high(me, size, room);

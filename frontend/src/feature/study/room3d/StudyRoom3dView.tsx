@@ -24,13 +24,15 @@ export type SeatPlacement = {
   pixelsPerMeter: number
 }
 
-type Frame = { modeBlend: number; zoom: number; motionSeconds: number; orbit: number; cameraSeconds: number }
+type Frame = { modeBlend: number; zoom: number; motionSeconds: number; orbit: number; pitch: number; distance: number; cameraSeconds: number }
 /** 다가간 자리 위·아래 위젯 위치(px). above는 아래 끝, below는 위 끝. landscape면 양옆. */
 type ZoomSpots = { t: number; landscape: boolean; above: { x: number; y: number }; below: { x: number; y: number } } | null
 
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 /** 끌기 1px당 도는 각도. */
 const orbitPerPixel = 0.35
+/** 위아래로 끌기 1px당 바뀌는 내려다보는 각도. */
+const pitchPerPixel = 0.25
 /** 시점 바꾸기 시간(공부하며 보는 화면이라 천천히). */
 const modeMs = 1600
 /** 집중 모드로 다가가기·물러나기 시간. */
@@ -103,6 +105,8 @@ export function StudyRoom3dView(props: {
     mode: props.cameraMode,
     modeStarted: null as number | null,
     orbit: 0,
+    pitch: 0,
+    distance: 1,
     cameraSeconds: 0,
     cameraTickedAt: null as number | null,
     motionMs: 0,
@@ -208,7 +212,7 @@ export function StudyRoom3dView(props: {
           return
         }
         const motionFrame = scheduler.motionFrameAt(s.motionMs)
-        const frame: Frame = { modeBlend, zoom, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, cameraSeconds: s.cameraSeconds }
+        const frame: Frame = { modeBlend, zoom, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, pitch: s.pitch, distance: s.distance, cameraSeconds: s.cameraSeconds }
         draw(frame, now)
         scheduler.didRender({ frameTimeMs: now, motionFrame })
       }
@@ -264,21 +268,52 @@ export function StudyRoom3dView(props: {
     }
   }, [phase, size, layout, renderer, scheduler, props.quality, reduceMotion, viewerSeat])
 
-  // 3인칭: 좌우로 끌어 카메라를 내 자리 둘레로 돌린다.
-  const drag = useRef<number | null>(null)
-  const canOrbit = props.cameraMode === 'thirdPerson'
-  const onPointerDown = (e: React.PointerEvent) => { if (canOrbit) drag.current = e.clientX }
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (drag.current == null) return
-    const dx = e.clientX - drag.current
-    drag.current = e.clientX
+  // 3인칭: 끌어서 자유롭게 본다. 좌우는 내 자리 둘레로 돌고, 위아래는 내려다보는 각도를 바꾼다.
+  // 휠·두 손가락 벌리기로 다가가고 물러난다(웹 전용, 사용자 결정 2026-11-23).
+  const drag = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<number | null>(null)
+  const canOrbit = props.cameraMode === 'thirdPerson' && props.zoomSeat == null
+  const moveCamera = (dOrbit: number, dPitch: number, distanceFactor: number) => {
     const s = state.current
-    s.orbit = (((s.orbit - dx * orbitPerPixel) % 360) + 360) % 360
+    s.orbit = (((s.orbit + dOrbit) % 360) + 360) % 360
+    s.pitch = Math.min(50, Math.max(-25, s.pitch + dPitch))
+    s.distance = Math.min(2.2, Math.max(0.65, s.distance * distanceFactor))
     scheduler.invalidateCamera()
     kick.current()
   }
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!canOrbit) return
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pointers.current.size === 1) drag.current = { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY }
+    else { drag.current = null; pinch.current = pinchDistance(pointers.current) }
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!pointers.current.has(e.pointerId)) return
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    if (pinch.current != null && pointers.current.size >= 2) {
+      const d = pinchDistance(pointers.current)
+      if (d > 0 && pinch.current > 0) moveCamera(0, 0, pinch.current / d)
+      pinch.current = d
+      return
+    }
+    const g = drag.current
+    if (!g) return
+    const dx = e.clientX - g.x
+    const dy = e.clientY - g.y
+    g.x = e.clientX
+    g.y = e.clientY
+    moveCamera(-dx * orbitPerPixel, dy * pitchPerPixel, 1)
+  }
+  const onWheel = (e: React.WheelEvent) => {
+    if (!canOrbit) return
+    moveCamera(0, 0, Math.exp(e.deltaY * 0.0015))
+  }
   const onPointerUp = (e: React.PointerEvent) => {
-    const moved = drag.current != null && Math.abs(e.clientX - drag.current) > 4
+    pointers.current.delete(e.pointerId)
+    if (pointers.current.size < 2) pinch.current = null
+    const g = drag.current
+    const moved = g != null && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) > 4
     drag.current = null
     if (!moved && props.onSeatTap && host.current) {
       const rect = host.current.getBoundingClientRect()
@@ -291,11 +326,22 @@ export function StudyRoom3dView(props: {
   return (
     <div
       ref={host}
-      style={{ position: 'absolute', inset: 0, overflow: 'hidden', touchAction: canOrbit ? 'pan-y' : 'auto', background: colorToHex(props.scene.backdrop) }}
+      style={{ position: 'absolute', inset: 0, overflow: 'hidden', touchAction: canOrbit ? 'none' : 'auto', cursor: canOrbit ? 'grab' : 'auto', background: colorToHex(props.scene.backdrop) }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => { drag.current = null }}
+      onPointerCancel={(e) => { drag.current = null; pointers.current.delete(e.pointerId); pinch.current = null }}
+      onWheel={onWheel}
+      // 두 번 누르면 기본 시점으로 돌아간다.
+      onDoubleClick={() => {
+        if (!canOrbit) return
+        const s = state.current
+        s.orbit = 0
+        s.pitch = 0
+        s.distance = 1
+        scheduler.invalidateCamera()
+        kick.current()
+      }}
     >
       <StudyRoomSky daylight={daylight} />
       {phase === 'ready' && (
@@ -315,6 +361,11 @@ export function StudyRoom3dView(props: {
       )}
     </div>
   )
+}
+
+function pinchDistance(points: Map<number, { x: number; y: number }>): number {
+  const [a, b] = [...points.values()]
+  return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
 }
 
 /** 다가간 정도(0–1, 곡선 전). */
@@ -397,7 +448,7 @@ function cameraFor(
   const seats = [layout.seat(viewerSeat)]
   for (let i = 0; i < layout.seatCount; i++) if (i !== viewerSeat) seats.push(layout.seat(i))
   const shot = (m: StudyRoomCameraMode) =>
-    StudyRoomDirector.shot(m, { seats, size, interior: scene.interior, seconds: frame.cameraSeconds, orbitDegrees: frame.orbit })
+    StudyRoomDirector.shot(m, { seats, size, interior: scene.interior, seconds: frame.cameraSeconds, orbitDegrees: frame.orbit, pitchDegrees: frame.pitch, distanceScale: frame.distance })
   const now = shot(mode)
   return frame.modeBlend >= 1 ? now : StudyRoomDirector.blend(shot(fromMode), now, frame.modeBlend, size, scene.interior)
 }

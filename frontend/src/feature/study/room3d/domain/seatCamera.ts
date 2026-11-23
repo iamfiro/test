@@ -69,10 +69,27 @@ export const StudyRoomSeatCamera = {
     return camera(focusShot, seat, size, seat.yaw);
   },
 
-  /** orbitDegrees: 3인칭에서 내 자리 둘레로 돈 각도(끌어서 돌린다). 다른 시점은 무시한다. */
-  of(mode: StudyRoomCameraMode, seat: StudyRoomSeat, size: StudyRoomSize, { orbitDegrees = 0 }: { orbitDegrees?: number } = {}): StudyRoomCamera {
-    const s = mode === 'firstPerson' ? firstPersonShot : mode === 'thirdPerson' ? thirdPersonShot : topShot;
+  /**
+   * orbitDegrees: 3인칭에서 내 자리 둘레로 돈 각도(끌어서 돌린다). 다른 시점은 무시한다.
+   * pitchDegrees·distanceScale(웹 전용, 사용자 결정 2026-11-23): 3인칭에서 위아래로 끌어 내려다보는 각도,
+   * 휠·두 손가락으로 거리를 바꾼다. 카메라가 천장(4.2m) 위로 나가지 않게 거리를 줄인다.
+   */
+  of(
+    mode: StudyRoomCameraMode,
+    seat: StudyRoomSeat,
+    size: StudyRoomSize,
+    { orbitDegrees = 0, pitchDegrees = 0, distanceScale = 1 }: { orbitDegrees?: number; pitchDegrees?: number; distanceScale?: number } = {},
+  ): StudyRoomCamera {
+    let s = mode === 'firstPerson' ? firstPersonShot : mode === 'thirdPerson' ? thirdPersonShot : topShot;
     const orbit = mode === 'thirdPerson' ? MathUtils.degToRad(orbitDegrees) : 0.0;
+    if (mode === 'thirdPerson' && (pitchDegrees !== 0 || distanceScale !== 1)) {
+      const pitch = Math.min(80, Math.max(5, s.pitch + pitchDegrees));
+      let distance = s.distance * distanceScale;
+      // 눈 높이 = 방석 + 초점 높이 + 거리·sin(각도). 천장 아래 3.9m까지.
+      const room = 3.9 - seat.y - s.focusHeight;
+      distance = Math.min(distance, room / Math.max(0.05, Math.sin(MathUtils.degToRad(pitch))));
+      s = { ...s, pitch, distance };
+    }
     return camera(s, seat, size, seat.yaw + orbit);
   },
 
