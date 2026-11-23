@@ -10,9 +10,9 @@ import s from './focus.module.css'
  * 원본: `_StudyFocusClock`. 집중 모드에서 내 머리 위에 띄우는 과목과 지금 시간. 세로 화면은
  * 머리 위로 xxl×3 띄우고, 가로 화면은 띄우지 않는다.
  */
-export function FocusClock(props: { timer: StudyTimerView; portrait: boolean }) {
+export function FocusClock(props: { timer: StudyTimerView; portrait: boolean; large?: boolean }) {
   return (
-    <div className={s.clock} style={{ paddingBottom: props.portrait ? 24 * 3 : 0 }}>
+    <div className={`${s.clock} ${props.large ? s.clockLarge : ''}`} style={{ paddingBottom: props.portrait ? 24 * 3 : 0 }}>
       <span className={s.clockSubject}>{props.timer.subject ?? t('studySubjectNone')}</span>
       <span className={s.clockTime}>{formatStudyClock(props.timer.focusedSeconds)}</span>
     </div>
@@ -23,29 +23,35 @@ export function FocusClock(props: { timer: StudyTimerView; portrait: boolean }) 
  * 원본: `_StudyFocusControls`. 집중 모드에서 내 책상 아래에 두는 재생·일시정지와 끝내기(섬 단추 72).
  * 끝내기는 세션이 없으면 누를 수 없다.
  */
-export function FocusControls(props: { timer: StudyTimerView; onTogglePause?: () => void; onFinish?: () => void }) {
+export function FocusControls(props: { timer: StudyTimerView; onTogglePause?: () => void; onFinish?: () => void; size?: number }) {
   const active = props.timer.session !== 'none'
   const running = props.timer.session === 'running'
   const onFinish = props.onFinish
+  const size = props.size ?? 72
   return (
     <div className={`${s.controls} palette-day`}>
       <IslandIconButton
-        size={72}
-        iconSize={30}
+        size={size}
+        iconSize={Math.round(size * 0.42)}
         icon={running ? IconPlayerPauseFilled : IconPlayerPlayFilled}
         label={!active ? t('studyStartFocus') : running ? t('studyPause') : t('studyResume')}
         // 지금 할 일(재생·일시정지)을 앱 강조색으로. 원본은 늘 누를 수 있는 단추다.
         emphasis="var(--c-accent)"
         onClick={() => props.onTogglePause?.()}
       />
-      <span className={s.gap} />
-      <IslandIconButton
-        size={72}
-        iconSize={30}
-        icon={IconPlayerStopFilled}
-        label={t('studyFinish')}
-        onClick={active && onFinish ? () => onFinish() : undefined}
-      />
+      {/* 세션이 없으면 끝낼 것이 없으니 끝내기는 숨긴다(사용자 결정 2026-11-23, 원본은 흐리게 둔다). */}
+      {active && (
+        <>
+          <span className={s.gap} />
+          <IslandIconButton
+            size={size}
+            iconSize={Math.round(size * 0.42)}
+            icon={IconPlayerStopFilled}
+            label={t('studyFinish')}
+            onClick={onFinish ? () => onFinish() : undefined}
+          />
+        </>
+      )}
     </div>
   )
 }
@@ -59,5 +65,18 @@ export function SeatPlanHeader() {
         <span className={s.seatPlanHint}>{t('studySeatPlanHint')}</span>
       </span>
     </IslandSurface>
+  )
+}
+
+/**
+ * 넓은 화면(PC) 집중 모드: 과목·시간·단추를 화면 가운데 세로로 쌓아 크게 보인다(사용자 결정 2026-11-23).
+ * 원본 가로 화면은 시간을 사람 왼쪽, 단추를 오른쪽에 두지만 PC 창에서는 작고 흩어져 보였다.
+ */
+export function FocusStack(props: { timer: StudyTimerView; onTogglePause?: () => void; onFinish?: () => void }) {
+  return (
+    <div className={s.stack}>
+      <FocusClock timer={props.timer} portrait={false} large />
+      <FocusControls timer={props.timer} onTogglePause={props.onTogglePause} onFinish={props.onFinish} size={96} />
+    </div>
   )
 }

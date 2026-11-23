@@ -12,7 +12,7 @@ import { useStudyTimer } from '../timer/useStudyTimer'
 import { RoomsPage } from '../rooms/RoomsPage'
 import { SoundPanel } from '../sound/SoundPanel'
 import { useStudySound } from '../sound/useStudySound'
-import { FocusClock, FocusControls } from '../home/focus'
+import { FocusClock, FocusControls, FocusStack } from '../home/focus'
 import { useTimer } from '../timer/timerStore'
 import { SpaceBackground } from '../rooms/SpaceBackground'
 import { StudyStatsPage } from '../stats/StudyStatsPage'
@@ -46,6 +46,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   const [soundOpen, setSoundOpen] = useState(false)
   const sound = useStudySound(state.status === 'signedIn')
   const focus = useFocusMode(tab === 'study', () => setSoundOpen(false))
+  const wide = useMediaQuery('(min-width: 768px) and (min-height: 500px) and (orientation: landscape)')
   const myId = state.status === 'signedIn' ? state.me.id : null
   // 원본 `_chat != null`: 내 id가 정해지면 방(없으면 lobby) 채팅에 붙는다.
   useEffect(() => {
@@ -63,10 +64,10 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'study' && <div className={s.stage}><StudyRoomStage
             cameraMode={camera.mode}
             topInset={68}
-            focus={focus.on ? {
+            focus={focus.on ? (wide ? { above: null, below: null } : {
               above: <FocusClock timer={timer.view} portrait={window.innerHeight >= window.innerWidth} />,
-              below: <FocusControls timer={timer.view} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />,
-            } : null}
+              below: <FocusControls timer={timer.view} size={80} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />,
+            }) : null}
           /></div>}
       {/* 뒤로 버튼은 공부 탭을 뺀 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 공부 탭은 3D 방이
           전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
@@ -107,6 +108,9 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
         />
       )}
       {tab === 'study' && <SoundPanel open={soundOpen} onClose={() => setSoundOpen(false)} />}
+      {tab === 'study' && focus.on && wide && (
+        <FocusStack timer={timer.view} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />
+      )}
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on })} onSelect={(next) => navigate(paths[next])} />
@@ -150,4 +154,15 @@ function useFocusMode(active: boolean, onEnter: () => void) {
     return () => { window.removeEventListener('keydown', onKey); void lock?.release().catch(() => {}) }
   }, [on])
   return { on: on && active, set }
+}
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const on = () => setMatches(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [query])
+  return matches
 }
