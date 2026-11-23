@@ -21,4 +21,7 @@ export const webText = {
   cancel: '취소',
   loadFailed: '불러오지 못했어요. 잠시 후 다시 시도해주세요.',
   retry: '다시 시도',
+  roomSearchPlaceholder: '공부방 이름으로 찾기',
+  roomSearchEmpty: '찾는 공부방이 없어요',
+  roomsAll: '모든 공부방',
 } as const
