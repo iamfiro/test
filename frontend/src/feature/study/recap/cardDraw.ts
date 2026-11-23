@@ -219,9 +219,10 @@ function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: C
 
 function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
   const font = `800 24px ${fonts.round}`
+  const dateFont = `700 30px ${fonts.hand}`
   const list: Row[] = [
     { label: webText.recapFields.session, icon: assets.note, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
-    { label: webText.recapFields.date, icon: assets.sparkle, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
+    { label: webText.recapFields.date, icon: assets.sparkle, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), dateFont, w), x, b, { font: dateFont, color: c.ink }) },
   ]
   rows(ctx, list, 32, 236, 356, 72)
 }
