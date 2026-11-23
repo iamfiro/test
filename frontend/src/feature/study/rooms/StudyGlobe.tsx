@@ -1,5 +1,6 @@
 // 공부방 페이지의 큰 지구(StudyVillage 전용, 앱에 없음: docs/design-parity/exceptions.md).
-// 탭바 지구 아이콘과 같은 결: 광택 있는 파란 바다, 둥근 초록 대륙, 흰 구름, 흰 스티커 테두리.
+// 탭바 지구 아이콘과 같은 결: 광택 있는 파란 바다, 둥근 초록 대륙, 흰 구름. 가장자리는 흰 테두리 대신
+// 은은한 대기 광륜(사용자 결정 2026-11-23: 흰 테두리가 부자연스러움).
 // 대륙·구름은 셰이더의 3D 노이즈로 만든다(텍스처 없음). 천천히 돌고, 끌면 돌린다. 탭이 가려지면 멈춘다.
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
@@ -86,6 +87,22 @@ void main() {
 }
 `
 
+// 대기 광륜: 뒷면만 그린 큰 공. 지구 가장자리에서 가장 밝고 바깥으로 갈수록 투명해진다(딱딱한 테두리 없음).
+// d는 바깥 실루엣에서 0, 안쪽으로 갈수록 커진다. 지구 가장자리(반지름 1)는 d≈0.49(반지름 1.15 기준).
+const atmosphereFragment = /* glsl */ `
+uniform vec3 light;
+varying vec3 vObj;
+varying vec3 vNormal;
+varying vec3 vView;
+void main() {
+  float d = max(-dot(vNormal, vView), 0.0);
+  float glow = pow(smoothstep(0.0, 0.5, d), 2.2);
+  float sun = 0.55 + 0.45 * smoothstep(-0.4, 0.8, dot(vNormal, light));
+  vec3 color = vec3(0.62, 0.84, 1.0);
+  gl_FragColor = vec4(color, glow * sun * 0.85);
+}
+`
+
 export function StudyGlobe(props: { className?: string }) {
   const host = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -111,8 +128,18 @@ export function StudyGlobe(props: { className?: string }) {
       new THREE.SphereGeometry(1.025, 72, 48),
       new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: cloudFragment, uniforms: { light: { value: light } }, transparent: true, depthWrite: false }),
     )
-    // 흰 스티커 테두리: 뒷면만 그린 조금 큰 공.
-    const outline = new THREE.Mesh(new THREE.SphereGeometry(1.045, 64, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.BackSide }))
+    const outline = new THREE.Mesh(
+      new THREE.SphereGeometry(1.15, 64, 48),
+      new THREE.ShaderMaterial({
+        vertexShader: vertex,
+        fragmentShader: atmosphereFragment,
+        uniforms: { light: { value: light } },
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
     globe.add(earth, clouds)
     scene.add(outline)
 
