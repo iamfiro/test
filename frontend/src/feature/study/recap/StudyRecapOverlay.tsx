@@ -1,16 +1,15 @@
-// 공부를 끝낸 뒤 뜨는 "오늘의 공부" 화면: 스토리 크기 요약 카드 미리보기와 공유·저장 단추.
-// 앱에 없는 화면이라 통계 화면(호수 바탕·섬 단추)과 같은 모양을 쓴다(docs/design-parity/exceptions.md).
+// 공부를 끝낸 뒤 공부방 위에 뜨는 "오늘의 공부" 모달: 스토리 크기 카드 미리보기와 공유·저장 단추.
+// 방은 어둡고 흐리게 남겨 두고 카드만 튀어 오른다. 바깥을 누르거나 Esc로 닫는다(docs/design-parity/exceptions.md).
 // 공유는 파일 공유를 지원하는 브라우저(주로 휴대폰)에서만 보이고, 어디서나 이미지 저장은 된다.
 import { useEffect, useState } from 'react'
 import { IconDownload, IconShare2, IconX } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
-import { IslandBackground } from '../../../core/ui/IslandBackground'
 import { IslandButton } from '../../../core/ui/IslandButton'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
 import { useToast } from '../../../core/ui/Toast'
 import { logger } from '../../../core/log/log'
-import { drawRecapCard, loadRecapFonts } from './drawRecapCard'
+import { drawRecapCard, loadRecapAssets } from './drawRecapCard'
 import type { StudyRecap } from './studyRecap'
 import s from './recap.module.css'
 
@@ -27,9 +26,9 @@ export function StudyRecapOverlay({ recap, onClose }: { recap: StudyRecap; onClo
     let url: string | null = null
     const started = performance.now()
     void (async () => {
-      await loadRecapFonts(recap)
+      const stickers = await loadRecapAssets(recap)
       const canvas = document.createElement('canvas')
-      drawRecapCard(canvas, recap)
+      drawRecapCard(canvas, recap, stickers)
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('toBlob returned null')
       if (cancelled) return
@@ -73,18 +72,18 @@ export function StudyRecapOverlay({ recap, onClose }: { recap: StudyRecap; onClo
 
   return (
     <div className={`palette-day ${s.root}`} role="dialog" aria-modal="true" aria-label={webText.recapTitle}>
-      <IslandBackground ground="lake" />
-      <header className={s.header}>
-        <span className={s.side} />
-        <h1 className={s.title}>{webText.recapTitle}</h1>
-        <IslandIconButton icon={IconX} label={webText.recapClose} onClick={onClose} />
-      </header>
-      <div className={s.preview}>
-        {image ? <img className={s.card} src={image.url} alt={webText.recapImageAlt} /> : <div className={`${s.card} ${s.cardLoading}`} />}
-      </div>
-      <div className={s.actions}>
-        {image?.canShare && <IslandButton primary expand icon={IconShare2} label={t('studyRoomShareRoom')} onClick={() => void share()} minHeight={52} />}
-        <IslandButton expand primary={!image?.canShare} icon={IconDownload} label={webText.recapSave} onClick={image ? save : undefined} minHeight={52} />
+      <div className={s.backdrop} onClick={onClose} />
+      <div className={s.modal}>
+        <div className={s.preview}>
+          <div className={s.frame}>
+            {image ? <img className={s.card} src={image.url} alt={webText.recapImageAlt} /> : <div className={`${s.card} ${s.cardLoading}`} aria-busy="true" />}
+            <span className={s.close}><IslandIconButton icon={IconX} label={webText.recapClose} onClick={onClose} size={44} iconSize={20} /></span>
+          </div>
+        </div>
+        <div className={s.actions}>
+          <IslandButton expand icon={IconDownload} label={webText.recapSave} onClick={image ? save : undefined} minHeight={50} />
+          {image?.canShare && <IslandButton primary expand icon={IconShare2} label={t('studyRoomShareRoom')} onClick={() => void share()} minHeight={50} />}
+        </div>
       </div>
     </div>
   )
