@@ -1,8 +1,12 @@
-import { useRef } from 'react'
+import { useRef, type CSSProperties } from 'react'
 import { t } from '../../../l10n/t'
 import s from './StudyTabBar.module.css'
 
-/** 원본: StudyTabBar. 순서가 곧 탭바 순서다. */
+/**
+ * 원본: StudyTabBar. 순서가 곧 탭바 순서다.
+ * 모양은 사용자 결정(2026-11-23)으로 앱과 다르다: 게임 UI 같은 두툼한 바(위→아래 그라데이션·아래 턱),
+ * 큰 아이콘(44), 둥근 글꼴 외곽선 라벨. docs/design-parity/exceptions.md 참고.
+ */
 export const studyTabs = ['study', 'rooms', 'schedule', 'stats', 'outfit'] as const
 export type StudyTab = (typeof studyTabs)[number]
 
@@ -29,8 +33,8 @@ const onLight: Record<StudyTab, boolean> = { study: true, rooms: false, schedule
 export function StudyTabBar(props: { current: StudyTab; onSelect: (tab: StudyTab) => void; hidden?: boolean }) {
   return (
     <nav
-      className={`${s.bar} ${props.hidden ? s.hidden : ''}`}
-      style={{ background: tabSurface[props.current] }}
+      className={`${s.bar} ${onLight[props.current] ? s.barLight : ''} ${props.hidden ? s.hidden : ''}`}
+      style={{ '--surface': tabSurface[props.current] } as CSSProperties}
       aria-label={t('studyTabStudy')}
     >
       <div className={s.row}>
@@ -62,7 +66,7 @@ function TabButton(props: { tab: StudyTab; selected: boolean; onLight: boolean; 
       onClick={() => { wiggle(); props.onSelect(props.tab) }}
     >
       <span className={s.iconBox}>
-        <img ref={icon} src={`/assets/icons/nav/study_tab_${props.tab}.png`} width={32} height={32} alt="" />
+        <img ref={icon} src={`/assets/icons/nav/study_tab_${props.tab}.png`} width={44} height={44} alt="" draggable={false} />
       </span>
       <span className={`${s.label} ${props.onLight ? s.labelDark : ''}`}>{labels[props.tab]()}</span>
     </button>
