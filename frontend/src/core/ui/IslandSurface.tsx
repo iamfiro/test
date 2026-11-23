@@ -13,6 +13,8 @@ export function IslandSurface(props: {
   stadium?: boolean
   className?: string
   label?: string
+  /** 고르기 단추(칩)면 골랐는지. */
+  pressed?: boolean
 }) {
   const ledge = props.ledge ?? 5
   const style = {
@@ -24,7 +26,7 @@ export function IslandSurface(props: {
   const cls = `${s.surface} ${props.className ?? ''}`
   if (props.onClick) {
     return (
-      <button type="button" className={`${cls} ${s.tappable}`} style={style} onClick={props.onClick} aria-label={props.label}>
+      <button type="button" className={`${cls} ${s.tappable}`} style={style} onClick={props.onClick} aria-label={props.label} aria-pressed={props.pressed}>
         {props.children}
       </button>
     )
