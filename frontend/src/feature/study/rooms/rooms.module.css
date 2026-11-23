@@ -87,3 +87,7 @@
       linear-gradient(180deg, #1d2b63 0%, #141d48 55%, #0e1434 100%);
   }
 }
+
+/* 넓은 화면에서 카드가 작아 보이지 않게 목록 칸 전체(카드·글자·검색)를 한 단계씩 키운다. */
+@media (min-width: 1400px) and (min-height: 760px) { .panel { zoom: 1.15; } }
+@media (min-width: 1700px) and (min-height: 860px) { .panel { zoom: 1.3; } }
