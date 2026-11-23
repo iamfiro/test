@@ -1,0 +1,40 @@
+.sticker {
+  position: relative;
+  display: block;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+.note {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+/* 칸 48 가운데에 스티커를 둔다(OverflowBox 가운데 정렬). */
+.slot {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  flex: none;
+}

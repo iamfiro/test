@@ -1,0 +1,42 @@
+/* 흰 글자 + Shadow(#99000000, blurRadius 8 → CSS 10.24px). */
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-shadow: 0 0 10.24px rgb(0 0 0 / 0.6);
+  letter-spacing: -0.5px;
+}
+/* titleMedium 18 w600, 흰색 80%. */
+.clockSubject {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.8);
+}
+/* displayLarge 38 w700, 자릿수 고정폭. */
+.clockTime {
+  font-size: 38px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.controls {
+  display: flex;
+  padding-top: 8px;
+}
+.gap { width: 12px; flex: none; }
+
+/* 가로 lg, 세로 sm. */
+.seatPlan {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 8px 16px;
+  letter-spacing: -0.5px;
+}
+.seatPlanTitle { font-size: 16px; font-weight: 800; color: var(--i-ink); }
+.seatPlanHint { font-size: 13px; font-weight: 400; color: var(--i-ink-soft); }

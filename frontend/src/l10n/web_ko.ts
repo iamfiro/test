@@ -5,6 +5,10 @@ export const webText = {
   authGoogleContinue: '구글 계정으로 계속 진행',
   authKakaoLogin: '카카오로 로그인',
   authLoginFailedGeneric: '로그인하지 못했어요. 잠시 후 다시 시도해주세요.',
+  // PocketTime lib/l10n/app_ko.arb (공부 시간 표시 formatStudyDuration이 쓰는 공용 문구)
+  commonDurationHours: (hours: number) => `${hours}시간`,
+  commonDurationHoursMinutes: (hours: number, minutes: number) => `${hours}시간 ${minutes}분`,
+  commonDurationMinutes: (minutes: number) => `${minutes}분`,
   // StudyVillage 전용
   loginTitle: '공부방에 들어가려면\n로그인이 필요해요',
   loginDescription: '로그인하면 다른 기기에서도\n공부 기록이 이어져요.',

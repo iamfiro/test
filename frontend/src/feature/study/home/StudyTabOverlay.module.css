@@ -1,0 +1,139 @@
+/*
+ * 원본 StudyHomePage 공부 탭 Positioned 값(AppSpacing sm 8 · md 12 · lg 16 · xl 20).
+ * topInset = MediaQuery.padding.top → env(safe-area-inset-top).
+ * _rightStep = 48 + md + 16 = 76.
+ */
+.overlay {
+  --top: env(safe-area-inset-top, 0px);
+  --bottom: env(safe-area-inset-bottom, 0px);
+  /*
+   * 원본은 extendBody라 공부 탭 본문의 아래 여백에 탭바 높이가 든다. 웹 StudyTabBar 높이에서
+   * 기기 아래 여백을 뺀 값: 위 4 + 탭(8 + 아이콘 32 + 2 + 라벨 12×1.2 + 8) + 아래 2.
+   */
+  --tab-bar: 70.4px;
+  /* 상점 버튼 top: topInset + (sm + 48) + md + 16 */
+  --shop-top: calc(var(--top) + 84px);
+  /* 랭킹 top: topInset + (sm + 48) × (상점 ? 2 : 1) + md + 16 + (상점 ? 10 + md + 16 : 0) */
+  --ranking-top-with-shop: calc(var(--top) + 178px);
+  --ranking-top-alone: calc(var(--top) + 84px);
+  /* 시점 top: topInset + _rightStep + sm */
+  --camera-top: calc(var(--top) + 84px);
+  /* _chatTop: topInset + _rightStep × (시점 버튼 ? 2 : 1) + sm */
+  --chat-top-below-camera: calc(var(--top) + 160px);
+  --chat-top-alone: calc(var(--top) + 84px);
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, var(--app-column));
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 효과음(52) + 집중 모드 닫기: top = topInset + sm, right = lg. Column(가운데 정렬). */
+.musicColumn {
+  position: absolute;
+  top: calc(var(--top) + 8px);
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+.gapSm { height: 8px; flex: none; }
+
+/* 채팅(40): top = _chatTop, right = lg. 안 읽은 수는 top -4 · right -4. */
+.chat {
+  position: absolute;
+  top: var(--chat-top);
+  right: 16px;
+  pointer-events: auto;
+}
+.unread {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  pointer-events: none;
+}
+/* 새 말: top = _chatTop, right = lg + 48 + sm, height 48. */
+.chatPeek {
+  position: absolute;
+  top: var(--chat-top);
+  right: 72px;
+  height: 48px;
+}
+.chatPeek button { pointer-events: auto; }
+
+/* 시점(칸 48): top = topInset + _rightStep + sm, right = lg. */
+.camera {
+  position: absolute;
+  top: var(--camera-top);
+  right: 16px;
+  pointer-events: auto;
+}
+/* 시점 이름: 같은 top, right = lg + 48 + sm, height 48. */
+.cameraHint {
+  position: absolute;
+  top: var(--camera-top);
+  right: 72px;
+  height: 48px;
+}
+
+/*
+ * 자리 이동 · 집중 모드: right = lg, bottom = _startButtonTop
+ * = padding.bottom(탭바 포함) + xl + 타이머 60 + xl + 12.
+ */
+.bottomButtons {
+  position: absolute;
+  right: 16px;
+  bottom: calc(var(--bottom) + var(--tab-bar) + 112px);
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
+.gapXl { width: 20px; flex: none; }
+
+/* 자리 이동 안내: top = topInset + sm, left = lg + 48 + sm, right = lg. */
+.seatPlan {
+  position: absolute;
+  top: calc(var(--top) + 8px);
+  left: 72px;
+  right: 16px;
+  pointer-events: auto;
+}
+
+/* 상점·랭킹(52): left = lg. 알약은 아래로 10 튀어나온다(Stack bottomCenter, bottom -10). */
+.shop,
+.ranking {
+  position: absolute;
+  left: 16px;
+  pointer-events: auto;
+}
+.shop { top: var(--shop-top); }
+.ranking { top: var(--ranking-top); }
+.chip {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/*
+ * 미니 타이머: left/right = lg, bottom = 기기 아래 여백 + xl, 탭바가 보이면 그 높이만큼 더
+ * (AnimatedPadding 400ms easeInOutCubic). 집중 모드·자리 이동 중엔 흐려진다(250ms).
+ */
+.miniTimer {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--bottom) + 20px + var(--tab-bar));
+  pointer-events: auto;
+  opacity: 1;
+  transition:
+    bottom 400ms cubic-bezier(0.645, 0.045, 0.355, 1),
+    opacity 250ms linear;
+}
+.miniTimerLow { bottom: calc(var(--bottom) + 20px); }
+.veiled { opacity: 0; pointer-events: none; }

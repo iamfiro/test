@@ -1,0 +1,31 @@
+/* StudyStickerChip: padding 2/7 + StadiumBorder 흰 1.5(Container가 테두리 두께를 안쪽 여백에 더한다). */
+.chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* _UnreadBadge: minWidth 20 · height 20 · 가로 5 + 흰 테두리 2, 반지름 10. */
+.unread {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  background: #e5483a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
