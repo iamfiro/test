@@ -78,7 +78,7 @@ export function StudyRoom3dView(props: {
     const id = window.setInterval(() => setDaylight(StudyRoomDaylight.now()), 60_000)
     return () => window.clearInterval(id)
   }, [])
-  useEffect(() => { renderer?.setLook(daylight.look) }, [renderer, daylight])
+  useEffect(() => { renderer?.setLook(daylight.look); renderer?.setDaylight(daylight) }, [renderer, daylight])
 
   const layout = useMemo(
     () => new StudyRoomLayout({ mapSeats: props.seatMap ?? props.scene.seats, seats: props.seatCount }),

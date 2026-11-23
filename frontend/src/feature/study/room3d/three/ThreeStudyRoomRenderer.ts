@@ -12,7 +12,9 @@ import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomLook } from '../model/
 import { logger } from '../../../../core/log/log'
 import { CharacterKit, type SeatedPerson } from './characterKit'
 import { createRetroMaterial, retroFloats, setRetroFloats, setToon, toonDefault } from './retroMaterial'
-import { ToonComposer } from './toonComposer'
+import { ToonComposer, type MoodLook } from './toonComposer'
+import { paintSky } from '../StudyRoomSky'
+import type { StudyRoomDaylight } from '../domain/daylight'
 
 const log = logger('StudyRoom3d')
 
@@ -57,6 +59,11 @@ export class ThreeStudyRoomRenderer {
   private readonly listeners = new Set<Listener>()
   private contextLost = false
   private composer: ToonComposer | null = null
+  /** 카툰 룩: 하늘을 장면 배경으로 그려 같은 후처리(심도·빛 번짐·색 보정)를 받게 한다. */
+  private readonly skyCanvas = document.createElement('canvas')
+  private skyTexture: THREE.CanvasTexture | null = null
+  private daylight: StudyRoomDaylight | null = null
+  private skyKey = ''
 
   constructor(readonly look: RoomLook = 'toon') {
     this.canvas = document.createElement('canvas')
@@ -214,6 +221,30 @@ export class ThreeStudyRoomRenderer {
     this.people = people
   }
 
+  /** 창밖 하늘(카툰 룩에서만 장면 배경으로 쓴다). */
+  setDaylight(daylight: StudyRoomDaylight) {
+    this.daylight = daylight
+    this.skyKey = ''
+  }
+
+  private updateSky(width: number, height: number) {
+    if (this.look !== 'toon' || !this.daylight) return
+    const key = `${width}x${height}:${this.daylight.hour}`
+    if (key === this.skyKey) return
+    this.skyKey = key
+    this.skyCanvas.width = width
+    this.skyCanvas.height = height
+    const ctx = this.skyCanvas.getContext('2d')
+    if (!ctx) return
+    paintSky(ctx, width, height, this.daylight)
+    if (!this.skyTexture) {
+      this.skyTexture = new THREE.CanvasTexture(this.skyCanvas)
+      this.skyTexture.colorSpace = THREE.NoColorSpace
+      this.world.background = this.skyTexture
+    }
+    this.skyTexture.needsUpdate = true
+  }
+
   setLook(look: StudyRoomLook) {
     this.timeLook = look
     const spec = this.spec
@@ -310,8 +341,15 @@ export class ThreeStudyRoomRenderer {
     this.camera.up.set(0, 1, 0)
     this.camera.lookAt(opts.camera.target)
     if (this.composer) {
+      this.updateSky(opts.width, opts.height)
       this.composer.setSize(Math.round(opts.width * pixelRatio), Math.round(opts.height * pixelRatio))
-      this.composer.render(gl, this.world, this.camera, pixelRatio)
+      // 감성 후처리: 높은 단계는 전부, 중간은 심도 없이, 낮은 단계는 외곽선만.
+      const q = opts.quality.name
+      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.025, vignette: 0.2 }
+        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.025, vignette: 0.2 }
+        : null
+      const focus = rig.eye.distanceTo(opts.camera.target)
+      this.composer.render(gl, this.world, this.camera, pixelRatio, focus, mood)
     } else {
       gl.render(this.world, this.camera)
     }
@@ -345,6 +383,7 @@ export class ThreeStudyRoomRenderer {
       m.dispose()
     }
     this.composer?.dispose()
+    this.skyTexture?.dispose()
     this.gl?.dispose()
     this.gl = null
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost)
