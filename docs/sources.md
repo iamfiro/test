@@ -24,3 +24,4 @@ PocketTime에서 가져온 코드 의미·자산·문구. 원본 커밋: PocketT
 | `frontend/src/feature/study/timer/timerStore.ts` | `timer/domain/study_timeline.dart`(구간 합) | f574f242 | 진실은 서버 세션(결정 12) |
 | `frontend/public/assets/icons/nav/study_tab_*.png` | Codex 이미지 생성(2026-11-23, 공부방은 푸른 지구 `tab_rooms_globe.png`). 화풍 참고: `icons/study_{shop,trophy,music,camera,chat}.png`, 주제 참고: PocketTime `assets/icons/nav/study_tab_*.png` | — | 512px 원본·프롬프트는 `tool/assets/tab_icons_codex/`, 200px로 줄여 씀 |
 | `frontend/src/feature/study/stats/*` | `widgets/study_stats_view.dart`, `widgets/streak_flame.dart`, `timer/domain/study_stats.dart`(진행 중 몫) | f574f242 | 의미·값 이식, 불꽃은 정적 SVG |
+| `frontend/src/feature/study/sound/*` | `sound/{model,viewmodel,application}/*.dart`, `widgets/study_sound_panel.dart`, `widgets/study_lp_player.dart` | f574f242 | 의미·값 이식(HTMLAudioElement로 재생) |

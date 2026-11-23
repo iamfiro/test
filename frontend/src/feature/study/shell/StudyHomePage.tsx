@@ -10,6 +10,8 @@ import { StudyTabOverlay, studyTabBarHidden } from '../home/StudyTabOverlay'
 import { useStudyCameraCycle } from '../home/useStudyCameraCycle'
 import { useStudyTimer } from '../timer/useStudyTimer'
 import { RoomsPage } from '../rooms/RoomsPage'
+import { SoundPanel } from '../sound/SoundPanel'
+import { useStudySound } from '../sound/useStudySound'
 import { SpaceBackground } from '../rooms/SpaceBackground'
 import { StudyStatsPage } from '../stats/StudyStatsPage'
 import { useEffect, useState } from 'react'
@@ -39,6 +41,8 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   const subjects = useSubjectEditor({ onManage: () => navigate('/subjects') })
   const chat = useChat()
   const [chatOpen, setChatOpen] = useState(false)
+  const [soundOpen, setSoundOpen] = useState(false)
+  const sound = useStudySound(state.status === 'signedIn')
   const myId = state.status === 'signedIn' ? state.me.id : null
   // 원본 `_chat != null`: 내 id가 정해지면 방(없으면 lobby) 채팅에 붙는다.
   useEffect(() => {
@@ -83,8 +87,12 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           chatUnread={chat.unread}
           chatPeek={chat.peek == null ? null : { id: chat.peek.id, nickname: chat.peek.author.nickname, body: chat.peek.body }}
           onOpenChat={() => setChatOpen(true)}
+          soundPanelOpen={soundOpen}
+          soundPlaying={sound.playing}
+          onToggleSound={() => setSoundOpen((v) => !v)}
         />
       )}
+      {tab === 'study' && <SoundPanel open={soundOpen} onClose={() => setSoundOpen(false)} />}
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view })} onSelect={(next) => navigate(paths[next])} />

@@ -1,0 +1,113 @@
+/* 원본 study_sound_panel.dart 값: 위 = 안전 영역 + 68 + 8, 양옆·아래 16, 최대 폭 560(가로 화면 720),
+   테두리 햇살 노랑 6 + 아래 턱 6, 반지름 34, 안쪽 바느질 점선 7 안쪽. 바깥 막 검정 22%. */
+.root {
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  /* 원본은 패널을 늘 낮 섬 팔레트(StudyRoomIslandPalette.day)로 그린다. palette-day에 없는 값만 더한다. */
+  --i-muted: #efe6d0; --i-paper-ledge: #e7daba; --i-on-leaf: #ffffff;
+}
+.barrier { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: rgb(0 0 0 / 0.22); opacity: 0; transition: opacity 0.25s ease; pointer-events: auto; cursor: default; }
+.panel {
+  position: absolute; left: 16px; right: 16px; top: calc(env(safe-area-inset-top) + 76px); bottom: calc(env(safe-area-inset-bottom) + 16px);
+  display: flex; justify-content: center; align-items: flex-start; pointer-events: none;
+  transform: translateY(100vh); opacity: 0; transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.2s ease;
+}
+.shown .barrier { opacity: 1; }
+.shown .panel { transform: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .panel { transform: none; transition: opacity 0.2s ease; } }
+.frame {
+  pointer-events: auto; width: min(100%, 560px); max-height: calc(100% - 6px); display: flex; padding: 6px; border-radius: 34px; background: var(--i-sun);
+  box-shadow: 0 6px 0 var(--i-sun-ledge), 0 14px 24px rgb(0 0 0 / 0.18);
+}
+.paper { position: relative; flex: 1; min-height: 0; border-radius: 28px; background: var(--i-paper); overflow: hidden; display: flex; }
+.paper::after { content: ''; position: absolute; inset: 7px; border: 2px dashed var(--i-paper-line); border-radius: 21px; pointer-events: none; }
+.content { position: relative; flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; }
+
+.close {
+  position: absolute; top: 20px; right: 16px; z-index: 2; width: 34px; height: 34px; border: 0; border-radius: 50%;
+  background: rgb(0 0 0 / 0.45); color: #fff; display: grid; place-items: center; cursor: pointer;
+}
+.header { display: flex; align-items: center; gap: 12px; padding: 18px 48px 0 0; }
+.badge { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--i-sun); color: var(--i-on-sun); box-shadow: 0 3px 0 var(--i-sun-ledge); margin-bottom: 3px; }
+.title { margin: 0; font-size: 18px; font-weight: 800; color: var(--i-ink); }
+
+.turntable { display: block; width: 100%; margin: 16px 0 0; padding: 0; border: 0; background: none; cursor: pointer; }
+.turntable:focus-visible { outline: 3px solid var(--c-accent); outline-offset: 2px; border-radius: 16px; }
+/* 받침 그림 아래 빈 여백(바닥 그림자 밑)만큼 다음 줄을 끌어올린다(원본 heightFactor 0.9). */
+.lp { position: relative; width: 100%; aspect-ratio: 1.25; margin-bottom: -8%; container-type: inline-size; }
+.layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: opacity 0.42s ease-in-out; user-select: none; }
+.lpShadow {
+  position: absolute; inset: 0; transform: translate(1.2%, 3%); background: rgb(59 42 26 / 0.18); filter: blur(2cqw);
+  clip-path: polygon(7% 41%, 22% 84%, 93% 68%, 79% 19%);
+}
+.lpDisc { position: absolute; }
+.lpSpin { position: absolute; inset: 0; transform: scaleY(0.61566); }
+.lpLabel { position: absolute; left: 32%; top: 32%; width: 36%; height: 36%; }
+.lpCenter { position: absolute; display: grid; place-items: center; pointer-events: none; }
+.lpNotes { position: absolute; width: 0; height: 0; pointer-events: none; color: var(--i-ink-soft); }
+.lpNotes span { position: absolute; left: 0; top: 0; opacity: 0; display: block; line-height: 0; }
+.playBadge {
+  width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; padding-left: 3px; box-sizing: border-box;
+  background: var(--i-sun); color: var(--i-on-sun); box-shadow: 0 4px 0 var(--i-sun-ledge), 0 6px 8px rgb(0 0 0 / 0.2);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.playBadgeHidden { transform: scale(0); transition-timing-function: cubic-bezier(0.36, 0, 0.66, -0.56); }
+
+.vinylLabel { width: 100%; height: 100%; container-type: size; }
+.vinylFace {
+  width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; box-sizing: border-box;
+  border: max(1px, 3.5cqmin) solid rgb(255 255 255 / 0.35);
+}
+.vinylFace svg { width: 50cqmin; height: 50cqmin; }
+.disc { position: relative; flex: none; }
+.discLabel { position: absolute; left: 32%; top: 32%; width: 36%; height: 36%; }
+.discSpin { animation: spin 4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .discSpin { animation: none; } }
+
+.nowPlaying { display: flex; justify-content: center; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px; border-radius: 999px;
+  background: var(--i-muted); color: var(--i-ink-soft); font-size: 13px; font-weight: 800;
+}
+.pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pillOn { background: var(--i-sun); color: var(--i-on-sun); }
+
+.controlsCol { display: flex; flex-direction: column; margin-top: 12px; }
+.shelf {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 4px; padding: 12px 4px; border-radius: 26px;
+  background: color-mix(in srgb, var(--i-muted) 55%, transparent);
+}
+.record { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: none; cursor: pointer; border-radius: 22px; font: inherit; }
+.recordDisc { position: relative; opacity: 0.6; transform: scale(0.86); transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.recordSelected { opacity: 1; transform: none; }
+.check { position: absolute; right: -2px; top: -2px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--i-leaf); color: var(--i-on-leaf); border: 2px solid var(--i-paper); box-sizing: border-box; }
+.recordName { font-size: 12px; font-weight: 800; color: var(--i-ink-soft); text-align: center; }
+.on { color: var(--i-ink); }
+
+.row { display: flex; align-items: center; gap: 8px; min-height: 48px; }
+.controlsCol > .row { margin-top: 8px; }
+.rowTitle { flex: 2; min-width: 0; font-size: 15px; font-weight: 700; color: var(--i-ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sectionTitle { margin: 16px 0 4px 4px; font-size: 15px; font-weight: 800; color: var(--i-ink-soft); }
+.ambient { padding: 4px 12px; border-radius: 24px; background: color-mix(in srgb, var(--i-muted) 55%, transparent); }
+.ambient .rowTitle { margin-right: 4px; }
+.ambientIcon { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; transition: background 0.15s; }
+
+.volume { flex: 4; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.volume input {
+  flex: 1; min-width: 0; height: 22px; margin: 0 12px; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+.volume input::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: linear-gradient(to right, var(--i-leaf) var(--fill), var(--i-paper-ledge) var(--fill)); }
+.volume input::-moz-range-track { height: 8px; border-radius: 999px; background: var(--i-paper-ledge); }
+.volume input::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--i-leaf); }
+.volume input::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -7px; border-radius: 50%; background: var(--i-sun); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); border: 0; }
+.volume input::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--i-sun); box-shadow: 0 1px 3px rgb(0 0 0 / 0.25); border: 0; }
+.volume input:focus-visible { outline: 3px solid var(--c-accent); outline-offset: 2px; border-radius: 999px; }
+.percent { width: 40px; flex: none; text-align: right; font-size: 13px; font-weight: 700; color: var(--i-ink-soft); font-variant-numeric: tabular-nums; }
+
+/* 가로로 넓은 화면: 턴테이블은 왼쪽, 음반·환경음은 오른쪽에서 따로 스크롤(원본 가로 배치, 최대 720). */
+@media (orientation: landscape) and (min-width: 700px) {
+  .frame { width: min(100%, 720px); height: 100%; }
+  .content { flex-direction: row; gap: 16px; overflow: hidden; padding-bottom: 0; }
+  .turntableCol { width: clamp(180px, 42%, 340px); flex: none; overflow-y: auto; padding-bottom: 16px; }
+  .controlsCol { flex: 1; min-width: 0; overflow-y: auto; margin-top: 76px; padding-bottom: 16px; }
+}
