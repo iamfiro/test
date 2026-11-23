@@ -1,6 +1,6 @@
 /*
  * 사용자 결정(2026-11-23): 아래에서 위로 옅어지는 검정 선형 그라데이션(연하게: 최대 0.55)을 깔고,
- * 라벨은 외곽선 없는 흰 글자. 바 폭은 화면 전체(full), 아이콘 줄만 앱 폭(--app-column) 안에 둔다.
+ * 라벨은 외곽선 없는 흰 글자. 바 폭은 화면 전체(full), 아이콘 줄은 최대 540px.
  * 어떤 페이지 색 위에서도 흰 글자가 읽히도록 그라데이션이 바 위로 24px 더 번진다(::before).
  * 높이(기기 아래 여백 제외) = 위 6 + 탭(6 + 아이콘 44 + 2 + 라벨 13×1.2 + 6) + 아래 4 = 83.6
  * → StudyTabOverlay.module.css의 --tab-bar와 같아야 한다.
@@ -25,7 +25,8 @@
   z-index: -1;
 }
 .hidden { transform: translate(-50%, 110%); }
-.row { display: flex; width: min(100%, var(--app-column)); margin: 0 auto; }
+/* 아이콘 사이 간격: 넓은 화면에서는 앱 폭(430)보다 넓게 펼친다(사용자 결정 2026-11-23, 휴대폰 폭은 그대로). */
+.row { display: flex; width: min(100%, 540px); margin: 0 auto; }
 
 .tab {
   position: relative;
