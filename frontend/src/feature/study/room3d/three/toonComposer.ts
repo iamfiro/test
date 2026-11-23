@@ -447,12 +447,17 @@ export class ToonComposer {
     const background = scene.background
     const override = scene.overrideMaterial
     scene.background = null
+    // 월드 고정 하늘 구는 법선·깊이 장면에서 뺀다(깊이 1 = 하늘 판정).
+    const skyDome = scene.getObjectByName('sky-dome')
+    const skyWasVisible = skyDome?.visible ?? false
+    if (skyDome) skyDome.visible = false
     scene.overrideMaterial = this.normalMaterial
     gl.setRenderTarget(this.normal)
     gl.clear()
     gl.render(scene, camera)
     scene.overrideMaterial = override
     scene.background = background
+    if (skyDome) skyDome.visible = skyWasVisible
 
     this.draw(gl, this.lined, this.outline.scene)
     if (!mood) {

@@ -13,7 +13,7 @@ import { logger } from '../../../../core/log/log'
 import { CharacterKit, type SeatedPerson } from './characterKit'
 import { createRetroMaterial, retroFloats, setRetroFloats, setSoft, setToon, setVivid, toonDefault } from './retroMaterial'
 import { ToonComposer, type MoodLook } from './toonComposer'
-import { paintSky } from '../StudyRoomSky'
+import { SkyDome } from './skyDome'
 import type { StudyRoomDaylight } from '../domain/daylight'
 
 const log = logger('StudyRoom3d')
@@ -61,8 +61,9 @@ export class ThreeStudyRoomRenderer {
   private contextLost = false
   private composer: ToonComposer | null = null
   /** 카툰 룩: 하늘을 장면 배경으로 그려 같은 후처리(심도·빛 번짐·색 보정)를 받게 한다. */
-  private readonly skyCanvas = document.createElement('canvas')
-  private skyTexture: THREE.CanvasTexture | null = null
+  private readonly sky = new SkyDome()
+  /** 창문이 있는 쪽(rad): 자리들이 보는 방향 중 가장 많은 것. */
+  private windowYaw = 0
   private daylight: StudyRoomDaylight | null = null
   private skyKey = ''
 
@@ -140,6 +141,14 @@ export class ThreeStudyRoomRenderer {
       this.scenery = scenery
       this.world.add(root)
       if (scenery) this.world.add(scenery)
+      // 하늘 구(월드 고정). 앱 룩은 DOM 하늘을 쓰므로 만들지 않는다. 창문은 자리들이 가장 많이 바라보는 쪽에 있다.
+      if (this.look !== 'app') {
+        this.world.add(this.sky.mesh)
+        const counts = new Map<number, number>()
+        for (const seat of scene.seats) { const k = Math.round(seat.yaw * 100) / 100; counts.set(k, (counts.get(k) ?? 0) + 1) }
+        this.windowYaw = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0
+        this.skyKey = ''
+      }
       // 셰이더를 미리 컴파일한다(원본 _probeDraw: 첫 화면에서 파이프라인 비용을 치르지 않게).
       gl.compile(this.world, this.camera)
       this.phaseValue = 'ready'
@@ -230,22 +239,12 @@ export class ThreeStudyRoomRenderer {
     this.skyKey = ''
   }
 
-  private updateSky(width: number, height: number) {
+  private updateSky() {
     if (this.look === 'app' || !this.daylight) return
-    const key = `${width}x${height}:${this.daylight.hour}`
+    const key = `${this.daylight.hour}:${this.windowYaw}`
     if (key === this.skyKey) return
     this.skyKey = key
-    this.skyCanvas.width = width
-    this.skyCanvas.height = height
-    const ctx = this.skyCanvas.getContext('2d')
-    if (!ctx) return
-    paintSky(ctx, width, height, this.daylight)
-    if (!this.skyTexture) {
-      this.skyTexture = new THREE.CanvasTexture(this.skyCanvas)
-      this.skyTexture.colorSpace = THREE.NoColorSpace
-      this.world.background = this.skyTexture
-    }
-    this.skyTexture.needsUpdate = true
+    this.sky.setDaylight(this.daylight, this.windowYaw)
   }
 
   setLook(look: StudyRoomLook) {
@@ -337,14 +336,16 @@ export class ThreeStudyRoomRenderer {
     // 원본 카메라 행렬과 같은 화면: 같은 fov·aspect로 eye에서 target을 본다(깊이 범위만 WebGL 규약).
     this.camera.fov = opts.camera.fovYDegrees
     this.camera.aspect = opts.width / opts.height
-    this.camera.near = 0.1
-    this.camera.far = 100
+    // 가까운 면을 0.3으로: 창틀·문틀·벽·그림처럼 거의 겹친 면의 깊이 경쟁(z-fighting)을 줄인다(0.1이면 정밀도가 3배 모자란다).
+    this.camera.near = 0.3
+    this.camera.far = 80
     this.camera.updateProjectionMatrix()
     this.camera.position.copy(rig.eye)
     this.camera.up.set(0, 1, 0)
     this.camera.lookAt(opts.camera.target)
     if (this.composer) {
-      this.updateSky(opts.width, opts.height)
+      this.updateSky()
+      this.sky.follow(this.camera)
       this.composer.setSize(Math.round(opts.width * pixelRatio), Math.round(opts.height * pixelRatio))
       // 감성 후처리: 높은 단계는 전부, 중간은 심도 없이, 낮은 단계는 외곽선만.
       const q = opts.quality.name
@@ -391,7 +392,7 @@ export class ThreeStudyRoomRenderer {
       m.dispose()
     }
     this.composer?.dispose()
-    this.skyTexture?.dispose()
+    this.sky.dispose()
     this.gl?.dispose()
     this.gl = null
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost)
