@@ -48,7 +48,6 @@ export function PassportArt({ recap, label }: { recap: StudyRecap; label: string
   }
   return (
     <div className={s.art} role="img" aria-label={label} onPointerMove={onMove} onPointerLeave={onLeave}>
-      <div className={s.backSheet} />
       <div className={s.tilt} ref={tilt}>
         <div className={s.passport} style={{ width: passport.width, height: passport.height }}>
           <Layer width={passport.width} height={passport.height} draw={(ctx) => drawPassportBase(ctx, recap)} className={s.passportBase} />
@@ -56,7 +55,7 @@ export function PassportArt({ recap, label }: { recap: StudyRecap; label: string
             width={postmark.width}
             height={postmark.height}
             className={s.completionStamp}
-            style={{ left: postmark.x - postmark.width / 2, top: postmark.y - postmark.height / 2, '--rot': `${postmark.rotate}deg`, '--delay': '900ms' } as CSSProperties}
+            style={{ left: postmark.x - postmark.width / 2, top: postmark.y - postmark.height / 2, '--rot': `${postmark.rotate}deg`, '--delay': '820ms' } as CSSProperties}
             draw={(ctx) => { ctx.translate(postmark.width / 2, postmark.height / 2); drawPostmark(ctx, recap) }}
           />
           <span className={s.sheen} aria-hidden="true" />

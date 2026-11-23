@@ -33,7 +33,7 @@ export const webText = {
   recapQuote: (duration: string) => `"오늘 ${duration} 공부했어요!"`,
   recapStreakRow: (days: number) => `${days}일 연속`,
   recapSubjectCount: (count: number) => `${count}과목`,
-  recapDateRow: (year: number, month: number, day: number, weekday: string) => `${year}년 ${month}월 ${day}일 (${weekday}) 공부 인증`,
+  recapDateRow: (year: number, month: number, day: number) => `${year}년 ${month}월 ${day}일 공부 인증`,
   recapGoalChip: (goal: string, percent: number) => `목표 ${goal} · ${percent}% 달성`,
   recapMoreChip: (duration: string) => `어제보다 +${duration}`,
   recapStoryHeadlineLead: '오늘',

@@ -1,102 +1,78 @@
-/* "오늘의 공부 여권": 모달 틀 없이 흐린 공부방 위에 여권만 띄운다. 문구용품 팔레트(사용자 지정 2026-11-23)는
-   이 화면 안에서만 쓴다. 들어오는 순서: 막 → 여권이 기울며 올라옴 → 과목 우표 → 완료 도장 → 저장 알약. */
+/* "오늘의 공부 인증": 모달 틀 없이 흐린 공부방 위에 자랑 문구와 카드를 띄운다. 앱 공부 화면 톤(섬 팔레트 낮 값,
+   둥근 글꼴, 섬 단추)을 쓴다. 들어오는 순서: 막 → 문구 → 카드가 기울며 올라옴 → 소인 → 저장 단추. */
 .root {
-  --ivory: #FFF8ED; --peach: #F6B5A9; --butter: #F8DFA7; --coral: #E98D86; --sage: #A8BDA4; --ink: #302D35;
-  --coral-text: #B4504A; --ink-soft: #6F6A73; --line: #E7DCC8; --stage: #FBEACB;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --spring: cubic-bezier(0.3, 1.45, 0.5, 1);
   position: fixed; inset: 0; z-index: 90; /* 탭바(20) 위, 토스트(100) 아래 */
   display: flex; align-items: center; justify-content: center;
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-  color: var(--ink); font-family: var(--font-sans);
+  font-family: var(--font-sans);
 }
+/* 막: 앱 시트 막(검정 35%)보다 조금 진하게, 방은 흐리게 남긴다. */
 .backdrop {
-  position: absolute; inset: 0; background: rgb(18 16 22 / 0.56);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  animation: fade 280ms ease-out both;
+  position: absolute; inset: 0; background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: fade 260ms ease-out both;
 }
+.floating { position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px; outline: none; }
 
-.floating {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 18px; outline: none;
-}
-.brag { text-align: center; color: #fff; animation: reveal 520ms 80ms var(--ease-out) both; }
+/* 자랑 문구: 앱 화면 제목처럼 둥근 글꼴 흰 글자 + 옅은 그늘, 시간은 햇살 알약(턱). */
+.brag { text-align: center; color: #fff; animation: reveal 480ms 60ms var(--ease-out) both; }
 .bragTitle {
-  margin: 0; font-size: clamp(22px, 3.2vw, 34px); line-height: 1.25; font-weight: 800; letter-spacing: -0.025em;
-  text-shadow: 0 2px 18px rgb(0 0 0 / 0.35); text-wrap: balance;
+  margin: 0; font-family: var(--font-round); font-size: clamp(22px, 3vw, 32px); line-height: 1.35; font-weight: 800;
+  text-shadow: 0 0 6px rgb(0 0 0 / 0.45); text-wrap: balance;
 }
 .bragTitle mark {
-  color: inherit; padding: 0 0.12em; border-radius: 4px;
-  background: linear-gradient(transparent 52%, rgb(233 141 134 / 0.85) 52%, rgb(233 141 134 / 0.85) 92%, transparent 92%);
+  display: inline-block; margin: 0 2px; padding: 2px 12px 3px; border-radius: 999px; line-height: 1.2;
+  background: var(--i-sun); color: var(--i-on-sun); text-shadow: none;
+  box-shadow: 0 4px 0 var(--i-sun-ledge);
 }
-.bragSub { margin: 8px 0 0; font-size: 14px; font-weight: 700; color: var(--butter); letter-spacing: -0.01em; }
+.bragSub {
+  margin: 10px 0 0; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 15px; font-weight: 800; text-shadow: 0 0 6px rgb(0 0 0 / 0.45);
+}
+
+/* 카드 무대: 카드(480×300)에 사방 20 여유. 창에 맞춰 --fit배. */
 .fit { position: relative; flex: none; }
-/* 닫기: 여권 오른쪽 위 모서리에 걸친다(여권은 무대 안에서 20pt 들어가 있다). */
-.close {
-  position: absolute; top: calc(var(--fit) * 20px - 18px); right: calc(var(--fit) * 20px - 18px); z-index: 3;
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-  color: var(--ink); background: var(--ivory); border: 1px solid var(--line);
-  box-shadow: 0 6px 16px rgb(16 12 20 / 0.28);
-  transition: transform 160ms var(--ease-out), background 160ms;
-  animation: reveal 360ms 700ms var(--ease-out) both;
-}
-.close:hover { background: #fff; transform: rotate(90deg); }
 .art {
   position: absolute; left: 0; top: 0; width: 520px; height: 340px; transform: scale(var(--fit, 1)); transform-origin: 0 0;
   perspective: 1100px;
 }
-.artLoading { width: 100%; height: 100%; border-radius: 18px; background: rgb(255 248 237 / 0.6); animation: breathe 1.2s ease-in-out infinite; }
-
-.backSheet {
-  position: absolute; left: 26px; top: 26px; width: 480px; height: 300px; border-radius: 18px; background: var(--peach);
-  box-shadow: 0 10px 24px rgb(48 45 53 / 0.14);
-  transform: rotate(3.2deg); animation: sheet 760ms 120ms var(--ease-out) both;
-}
+.artLoading { width: 100%; height: 100%; border-radius: 24px; background: rgb(255 250 235 / 0.25); animation: breathe 1.2s ease-in-out infinite; }
 .tilt {
   position: absolute; left: 20px; top: 20px; transform-style: preserve-3d;
   transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
   transition: transform 380ms var(--ease-out);
 }
 .passport {
-  position: relative; transform: rotate(-1.6deg);
-  filter: drop-shadow(0 14px 18px rgb(48 45 53 / 0.2)) drop-shadow(0 2px 3px rgb(48 45 53 / 0.12));
-  animation: passport 760ms 160ms var(--ease-out) both;
+  position: relative; transform: rotate(-1.5deg);
+  filter: drop-shadow(0 16px 22px rgb(0 0 0 / 0.28));
+  animation: passport 720ms 140ms var(--ease-out) both;
 }
 .passportBase { display: block; }
-.completionStamp { position: absolute; transform: rotate(var(--rot)); }
-.completionStamp { animation: stamp 520ms var(--delay) var(--spring) both; }
-/* 마우스를 올리면 아주 옅은 빛이 종이를 스친다(엠보싱·코팅 느낌). */
+.completionStamp { position: absolute; transform: rotate(var(--rot)); animation: stamp 480ms var(--delay) var(--spring) both; }
+/* 마우스를 올리면 아주 옅은 빛이 종이를 스친다. */
 .sheen {
-  position: absolute; inset: 0; border-radius: 18px; pointer-events: none; opacity: 0; mix-blend-mode: soft-light;
-  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.55) 50%, transparent 62%) no-repeat;
+  position: absolute; inset: 0 0 8px; border-radius: 24px; pointer-events: none; opacity: 0; mix-blend-mode: soft-light;
+  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.5) 50%, transparent 62%) no-repeat;
   background-size: 220% 100%; background-position: var(--shine-x, 50%) 0;
   transition: opacity 300ms;
 }
 .art:hover .sheen { opacity: 1; }
 
-.actions { display: flex; gap: 10px; animation: reveal 460ms 1500ms var(--ease-out) both; }
-.save, .share {
-  font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px;
-  border-radius: 999px; transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), background 160ms;
+/* 닫기: 카드 오른쪽 위 모서리에 걸친 섬 아이콘 단추. */
+.close {
+  position: absolute; z-index: 3; top: calc(var(--fit) * 20px - 20px); right: calc(var(--fit) * 20px - 16px);
+  animation: reveal 360ms 640ms var(--ease-out) both;
 }
-.save {
-  padding: 0 22px; border: 0; background: var(--ivory); color: var(--ink); font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.9) inset, 0 8px 20px rgb(16 12 20 / 0.3);
-}
-.save svg { color: var(--coral-text); }
-.save:hover:not(:disabled), .share:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgb(255 255 255 / 0.9) inset, 0 12px 26px rgb(16 12 20 / 0.36); }
-.save:disabled { opacity: 0.7; cursor: progress; }
-.share { width: 46px; border: 0; background: var(--ivory); color: var(--ink); box-shadow: 0 8px 20px rgb(16 12 20 / 0.3); }
-.close:focus-visible, .save:focus-visible, .share:focus-visible { outline: 2px solid var(--butter); outline-offset: 3px; }
+.actions { display: flex; align-items: center; gap: 10px; animation: reveal 420ms 1200ms var(--ease-out) both; }
 
 @keyframes fade { from { opacity: 0; } }
-@keyframes sheet { from { opacity: 0; transform: translateY(30px) rotate(0deg); } }
-@keyframes passport { from { opacity: 0; transform: translateY(34px) rotate(-5deg); } }
-@keyframes stamp { 0% { opacity: 0; transform: scale(1.9) rotate(calc(var(--rot) + 10deg)); } 60% { opacity: 1; } }
+@keyframes passport { from { opacity: 0; transform: translateY(34px) rotate(-5deg) scale(0.96); } }
+@keyframes stamp { 0% { opacity: 0; transform: scale(1.8) rotate(calc(var(--rot) + 10deg)); } 60% { opacity: 1; } }
 @keyframes reveal { from { opacity: 0; transform: translateY(8px); } }
 @keyframes breathe { 50% { opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
-  .backdrop, .brag, .backSheet, .passport, .completionStamp, .actions, .close, .artLoading { animation: none; }
-  .tilt, .close { transition: none; }
+  .backdrop, .brag, .passport, .completionStamp, .actions, .close, .artLoading { animation: none; }
+  .tilt { transition: none; }
 }
