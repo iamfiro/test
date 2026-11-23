@@ -13,7 +13,7 @@ import type { StudyTimerView } from './studyTimerView'
 import s from './StudyTabOverlay.module.css'
 
 /** 오른쪽 위 스티커 단추 한 변(원본은 40~52). 큰 화면에서 작아 보여 키웠다(사용자 결정 2026-11-23). */
-const railSize = 64
+const railSize = 52
 const icon = (name: string) => `/assets/icons/${name}`
 
 export type StudyTabOverlayProps = {
