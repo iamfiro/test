@@ -40,14 +40,35 @@ void main() {
 }
 `
 
+/** 육지 판정용: 지구 셰이더와 같은 노이즈를 경위도 격자에 그려 GPU에서 읽어 온다(CPU로 다시 계산하면 sin 정밀도가 달라 어긋난다). */
+const landHeight = 'float landHeight(vec3 d) { return fbm(d * 1.7 + vec3(3.1, 0.0, 1.7)); }'
+const landMapFragment = /* glsl */ `
+${noise}
+${landHeight}
+varying vec2 vUv;
+void main() {
+  float lon = vUv.x * 6.28318530718;
+  float lat = (vUv.y - 0.5) * 3.14159265359;
+  vec3 d = vec3(cos(lat) * cos(lon), sin(lat), cos(lat) * sin(lon));
+  gl_FragColor = vec4(clamp(landHeight(d) + 0.5, 0.0, 1.0), 0.0, 0.0, 1.0);
+}
+`
+const landMapW = 256
+const landMapH = 128
+/** 이 높이보다 높은 곳만(해안선 0.06~0.09보다 안쪽) 앉힌다. */
+const inlandHeight = 0.13
+/** 앉은 사람끼리 최소 각거리(rad). */
+const minSpacing = 0.32
+
 const earthFragment = /* glsl */ `
 ${noise}
+${landHeight}
 uniform vec3 light;
 varying vec3 vObj;
 varying vec3 vNormal;
 varying vec3 vView;
 void main() {
-  float h = fbm(vObj * 1.7 + vec3(3.1, 0.0, 1.7));
+  float h = landHeight(vObj);
   float land = smoothstep(0.06, 0.09, h);
   float ndl = dot(vNormal, light);
   // 바다: 빛 쪽은 밝은 하늘빛 파랑, 그늘 쪽은 짙은 파랑(두 단 + 부드러운 경계).
@@ -112,6 +133,41 @@ const shirts = [0xf26a2e, 0xf8d66a, 0x5dae6b, 0xe0568a, 0x8a6cf0, 0x3aa0ff, 0xff
 const hairs = [0x3b2a1e, 0x5e4a32, 0x1f1b24, 0xb9772f]
 const walkerCount = 24
 
+/** 육지 안쪽 자리들(earth 좌표의 단위 벡터). 격자를 고정 순서로 훑어 서로 minSpacing 이상 떨어진 곳만 고른다. */
+function landSpots(renderer: THREE.WebGLRenderer): THREE.Vector3[] {
+  const target = new THREE.WebGLRenderTarget(landMapW, landMapH)
+  const material = new THREE.ShaderMaterial({
+    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: landMapFragment,
+  })
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material)
+  const scene = new THREE.Scene()
+  scene.add(quad)
+  renderer.setRenderTarget(target)
+  renderer.render(scene, new THREE.Camera())
+  const pixels = new Uint8Array(landMapW * landMapH * 4)
+  renderer.readRenderTargetPixels(target, 0, 0, landMapW, landMapH, pixels)
+  renderer.setRenderTarget(null)
+  target.dispose(); material.dispose(); quad.geometry.dispose()
+
+  const spots: THREE.Vector3[] = []
+  // 격자를 큰 소수 보폭으로 건너뛰며 훑어 한쪽에 몰리지 않게 한다.
+  const total = landMapW * landMapH
+  for (let k = 0, idx = 0; k < total && spots.length < walkerCount; k++, idx = (idx + 7919) % total) {
+    const h = pixels[idx * 4]! / 255 - 0.5
+    if (h < inlandHeight) continue
+    const x = idx % landMapW
+    const y = Math.floor(idx / landMapW)
+    const lon = ((x + 0.5) / landMapW) * Math.PI * 2
+    const lat = ((y + 0.5) / landMapH - 0.5) * Math.PI
+    if (Math.abs(lat) > 1.2) continue
+    const d = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon))
+    if (spots.some((o) => o.angleTo(d) < minSpacing)) continue
+    spots.push(d)
+  }
+  return spots
+}
+
 export function StudyGlobe(props: { className?: string }) {
   const host = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -157,7 +213,7 @@ export function StudyGlobe(props: { className?: string }) {
     scene.add(outline)
 
 
-    // 공부하는 작은 유저들: 지구와 함께 돌도록 earth의 자식으로 두고, 풀밭 조각 위에서 책상에 앉아 공부한다.
+    // 공부하는 작은 유저들: 지구와 함께 돌도록 earth의 자식으로 두고, 육지 안쪽에만 책상을 놓고 앉아 공부한다.
     type Student = { body: THREE.Group; holder: THREE.Group; head: THREE.Group; phase: number }
     const disposables: { dispose(): void }[] = []
     const track = <T extends { dispose(): void }>(x: T) => { disposables.push(x); return x }
@@ -166,7 +222,6 @@ export function StudyGlobe(props: { className?: string }) {
     const legGeo = track(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 8))
     const eyeGeo = track(new THREE.SphereGeometry(0.0045, 6, 6))
     const hairGeo = track(new THREE.SphereGeometry(0.031, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.55))
-    const turfGeo = track(new THREE.CylinderGeometry(0.07, 0.075, 0.008, 24))
     const deskGeo = track(new THREE.BoxGeometry(0.08, 0.004, 0.042))
     const deskLegGeo = track(new THREE.BoxGeometry(0.004, 0.044, 0.004))
     const bookGeo = track(new THREE.BoxGeometry(0.034, 0.004, 0.024))
@@ -175,17 +230,10 @@ export function StudyGlobe(props: { className?: string }) {
     const skin = basic(0xffd9b8)
     const eyeMat = basic(0x2a2018)
     const legMat = basic(0x5e4a32)
-    const turfMat = basic(0x7fc058)
     const deskMat = basic(0xc99a5b)
     const bookMat = basic(0xfbfaf7)
     const students: Student[] = []
-    const count = walkerCount
-    const golden = Math.PI * (3 - Math.sqrt(5))
-    for (let i = 0; i < count; i++) {
-      // 피보나치 구 분포로 고르게 흩어 놓는다(새로고침해도 같은 배치).
-      const y = 1 - ((i + 0.5) / count) * 2
-      const rad = Math.sqrt(1 - y * y)
-      const p0 = new THREE.Vector3(Math.cos(golden * i) * rad, y, Math.sin(golden * i) * rad)
+    for (const [i, p0] of landSpots(renderer).entries()) {
       const ref = Math.abs(p0.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)
       const east = new THREE.Vector3().crossVectors(ref, p0).normalize()
       const north = new THREE.Vector3().crossVectors(p0, east).normalize()
@@ -198,8 +246,6 @@ export function StudyGlobe(props: { className?: string }) {
       const body = new THREE.Group()
       body.scale.setScalar(0.85)
       holder.add(body)
-      const turf = new THREE.Mesh(turfGeo, turfMat); turf.position.y = 0.002
-      const turfOutline = new THREE.Mesh(turfGeo, white); turfOutline.position.y = 0.002; turfOutline.scale.set(1.1, 1.6, 1.1)
       const shirt = basic(shirts[i % shirts.length]!)
       const torso = new THREE.Mesh(bodyGeo, shirt); torso.position.set(0, 0.042, -0.012)
       const torsoOutline = new THREE.Mesh(bodyGeo, white); torsoOutline.position.copy(torso.position); torsoOutline.scale.setScalar(1.28)
@@ -210,7 +256,7 @@ export function StudyGlobe(props: { className?: string }) {
       const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.01, 0, 0.026)
       const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.01, 0, 0.026)
       head.add(skullOutline, skull, hair, eyeL, eyeR)
-      body.add(turfOutline, turf, torsoOutline, torso, head)
+      body.add(torsoOutline, torso, head)
       // 다리는 앞으로 뻗고(앉은 자세) 책상 아래로 들어간다.
       for (const x of [-0.011, 0.011]) {
         const hip = new THREE.Group(); hip.position.set(x, 0.026, -0.012); hip.rotation.x = -Math.PI / 2
