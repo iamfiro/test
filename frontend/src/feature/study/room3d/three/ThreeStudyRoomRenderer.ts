@@ -1,0 +1,328 @@
+// 원본: lib/feature/study/room3d/infrastructure/flutter_scene/flutter_scene_study_room_renderer.dart
+// (PocketTime f574f242). flutter_scene 대신 three.js WebGL로 같은 GLB·같은 셰이더·같은 카메라를 그린다.
+// 좌표: three의 glTF는 오른손 좌표계 그대로라 원본의 Z 반전(엔진 왼손 변환)이 필요 없다.
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { StudyRoomCameraRig } from '../domain/cameraRig'
+import type { StudyRoomQuality } from '../domain/quality'
+import { StudyRoomSeatCulling } from '../domain/seatCulling'
+import type { StudyRoomCharacter } from '../model/character'
+import type { StudyRoomLayout } from '../model/layout'
+import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomLook } from '../model/scene'
+import { logger } from '../../../../core/log/log'
+import { CharacterKit, type SeatedPerson } from './characterKit'
+import { createRetroMaterial, retroFloats, setRetroFloats } from './retroMaterial'
+
+const log = logger('StudyRoom3d')
+
+export type RenderPhase = 'idle' | 'loading' | 'ready' | 'failed'
+
+/** 원본 에셋 경로(`assets/...`)를 웹 public 경로로. */
+const url = (asset: string) => `/${asset}`
+
+type Listener = () => void
+
+export class ThreeStudyRoomRenderer {
+  readonly canvas: HTMLCanvasElement
+  private gl: THREE.WebGLRenderer | null = null
+  private readonly world = new THREE.Scene()
+  private readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100)
+  private room: THREE.Object3D | null = null
+  private scenery: THREE.Object3D | null = null
+  private people: THREE.Group | null = null
+  private readonly retroMaterials: THREE.ShaderMaterial[] = []
+  /** 단면(지붕 걷기)·밤 어둡게에서 다르게 다루는 바깥(`room_outdoors…`) 재질. */
+  private readonly uncutMaterials = new Set<THREE.ShaderMaterial>()
+  private kit: CharacterKit | null = null
+  private seatPeople: (SeatedPerson | null)[] = []
+  private lastLookKey: string | null = null
+  private layout: StudyRoomLayout | null = null
+  private characters: readonly (StudyRoomCharacter | null)[] = []
+  private spec: StudyRoom3dScene | null = null
+  private timeLook: StudyRoomLook | null = null
+  private phaseValue: RenderPhase = 'idle'
+  private errorValue: unknown = null
+  private loadGeneration = 0
+  private disposed = false
+  private readonly listeners = new Set<Listener>()
+  private contextLost = false
+
+  constructor() {
+    this.canvas = document.createElement('canvas')
+    // 하늘(뒤)과 자리 칩(앞) 사이에 놓는다.
+    Object.assign(this.canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block', zIndex: '1' })
+    this.canvas.addEventListener('webglcontextlost', this.onContextLost)
+    this.canvas.addEventListener('webglcontextrestored', this.onContextRestored)
+  }
+
+  get phase() { return this.phaseValue }
+  get error() { return this.errorValue }
+  get scene() { return this.spec }
+  get drawsCharacters() { return this.phaseValue === 'ready' && this.kit != null }
+
+  subscribe(listener: Listener): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  private notify() {
+    if (this.disposed) return
+    for (const l of this.listeners) l()
+  }
+
+  private ensureGl(): THREE.WebGLRenderer {
+    if (this.gl) return this.gl
+    // 원본: MSAA 없음(저사양 GPU 비용). 투명 배경이라 뒤의 하늘 캔버스가 창으로 보인다.
+    const gl = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, alpha: true, powerPreference: 'low-power' })
+    gl.setClearColor(0x000000, 0)
+    // 셰이더가 sRGB 값을 그대로 쓴다(원본 Impeller 경로). 출력 변환·톤 매핑 없음.
+    gl.outputColorSpace = THREE.LinearSRGBColorSpace
+    gl.toneMapping = THREE.NoToneMapping
+    this.gl = gl
+    return gl
+  }
+
+  async load(scene: StudyRoom3dScene): Promise<void> {
+    const generation = ++this.loadGeneration
+    this.spec = this.timeLook ? scene.withLook(this.timeLook) : scene
+    this.phaseValue = 'loading'
+    this.errorValue = null
+    this.notify()
+    const started = performance.now()
+    try {
+      const gl = this.ensureGl()
+      const loader = new GLTFLoader()
+      const [roomGltf, charactersGltf, propsGltf, sceneryGltf] = await Promise.all([
+        loader.loadAsync(url(scene.asset)),
+        scene.characterAsset ? loader.loadAsync(url(scene.characterAsset)).catch((e) => { log.warn('characters failed', { reason: String(e) }); return null }) : null,
+        scene.propAsset ? loader.loadAsync(url(scene.propAsset)).catch((e) => { log.warn('props failed', { reason: String(e) }); return null }) : null,
+        scene.sceneryAsset ? loader.loadAsync(url(scene.sceneryAsset)).catch((e) => { log.warn('scenery failed', { reason: String(e) }); return null }) : null,
+      ])
+      if (generation !== this.loadGeneration || this.disposed) return
+      const root = roomGltf.scene
+      if (!root.getObjectByName('study_room')) throw new Error('Study room asset is missing node "study_room"')
+      this.retroMaterials.length = 0
+      this.uncutMaterials.clear()
+      this.useRetroMaterials(root, !scene.look.pixelated)
+      // 사람은 얼굴·옷이 그려진 텍스처라 선형으로 읽는다.
+      if (charactersGltf) this.useRetroMaterials(charactersGltf.scene, true)
+      if (propsGltf) this.useRetroMaterials(propsGltf.scene, true)
+      this.kit = charactersGltf ? CharacterKit.from(charactersGltf.scene, propsGltf?.scene ?? null) : null
+      let scenery: THREE.Object3D | null = null
+      if (sceneryGltf) {
+        scenery = sceneryGltf.scene
+        scenery.name = 'room_outdoors_scenery_root'
+        this.useRetroMaterials(scenery, false)
+      }
+      if (this.room) this.world.remove(this.room)
+      if (this.scenery) this.world.remove(this.scenery)
+      this.room = root
+      this.scenery = scenery
+      this.world.add(root)
+      if (scenery) this.world.add(scenery)
+      // 셰이더를 미리 컴파일한다(원본 _probeDraw: 첫 화면에서 파이프라인 비용을 치르지 않게).
+      gl.compile(this.world, this.camera)
+      this.phaseValue = 'ready'
+      this.rebuild()
+      log.info('loaded', { elapsed_ms: Math.round(performance.now() - started) })
+    } catch (e) {
+      if (generation !== this.loadGeneration || this.disposed) return
+      log.error('load failed', { reason: e instanceof Error ? e.message : String(e) })
+      this.phaseValue = 'failed'
+      this.errorValue = e
+    }
+    this.notify()
+  }
+
+  /** 언릿 재질을 질감 셰이더 재질로(텍스처별·바깥 여부별로 하나씩 공유). */
+  private useRetroMaterials(root: THREE.Object3D, smooth: boolean) {
+    const byKey = new Map<string, THREE.ShaderMaterial>()
+    const visit = (node: THREE.Object3D, outdoorsAbove: boolean) => {
+      const outdoors = outdoorsAbove || node.name.startsWith('room_outdoors')
+      if ((node as THREE.Mesh).isMesh) {
+        const mesh = node as THREE.Mesh
+        const swap = (material: THREE.Material) => {
+          const map = (material as THREE.MeshBasicMaterial).map ?? null
+          const key = `${map?.uuid ?? 'none'}:${outdoors}`
+          let retro = byKey.get(key)
+          if (!retro) {
+            retro = createRetroMaterial(map, smooth)
+            byKey.set(key, retro)
+            this.retroMaterials.push(retro)
+            if (outdoors) this.uncutMaterials.add(retro)
+          }
+          return retro
+        }
+        mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material)
+      }
+      for (const child of node.children) visit(child, outdoors)
+    }
+    visit(root, false)
+  }
+
+  setLayout(layout: StudyRoomLayout, characters: readonly (StudyRoomCharacter | null)[]) {
+    const same = layout === this.layout && characters.length === this.characters.length &&
+      characters.every((c, i) => c === this.characters[i] || (c != null && this.characters[i] != null && c.equals(this.characters[i]!)))
+    if (same) return
+    this.layout = layout
+    this.characters = characters
+    if (this.phaseValue === 'ready') {
+      this.rebuild()
+      this.notify()
+    }
+  }
+
+  private rebuild() {
+    if (this.people) this.world.remove(this.people)
+    this.people = null
+    this.seatPeople = []
+    this.lastLookKey = null
+    const layout = this.layout
+    if (!layout) return
+    const people = new THREE.Group()
+    people.name = 'study_room_people'
+    for (let seat = 0; seat < layout.seatCount; seat++) {
+      const character = seat < this.characters.length ? this.characters[seat] : null
+      let seated: SeatedPerson | null = null
+      if (character) {
+        const s = layout.seat(seat)
+        const person = this.kit?.assemble(character, s.kind) ?? null
+        if (person) {
+          person.node.position.set(s.x, s.y, s.z)
+          person.node.rotation.set(0, s.yaw, 0)
+          people.add(person.node)
+          seated = person
+        }
+      }
+      this.seatPeople.push(seated)
+    }
+    this.world.add(people)
+    this.people = people
+  }
+
+  setLook(look: StudyRoomLook) {
+    this.timeLook = look
+    const spec = this.spec
+    if (!spec || spec.look.equals(look)) return
+    this.spec = spec.withLook(look)
+    this.lastLookKey = null
+    this.notify()
+  }
+
+  private updateLook(rig: StudyRoomCameraRig, cutHeight: number) {
+    const spec = this.spec?.look
+    if (!spec || this.retroMaterials.length === 0) return
+    const focus = rig.eye.clone().sub(rig.camera.target).length()
+    const plain = retroFloats({
+      fogColor: [spec.fogColor.r, spec.fogColor.g, spec.fogColor.b],
+      fogAmount: spec.fogAmount,
+      fogNear: focus + spec.fogStart,
+      fogFar: focus + spec.fogEnd,
+      colorLevels: spec.colorLevels,
+      dither: spec.dither,
+      brightness: spec.brightness,
+      tint: [spec.tint.r, spec.tint.g, spec.tint.b],
+      // 음수면 채도를 더한다. 원본 clamp(-0.6, 1.0).
+      desaturate: Math.min(1, Math.max(-0.6, 1 - spec.saturation)),
+      cutHeight,
+      contrast: spec.contrast,
+    })
+    const key = plain.join(',')
+    if (key === this.lastLookKey) return
+    this.lastLookKey = key
+    const outdoor = spec.outdoorLight
+    const uncut = plain.slice()
+    uncut[6] = 0
+    uncut[12] = plain[12]! * outdoor.r
+    uncut[13] = plain[13]! * outdoor.g
+    uncut[14] = plain[14]! * outdoor.b
+    for (const m of this.retroMaterials) setRetroFloats(m, this.uncutMaterials.has(m) ? uncut : plain)
+  }
+
+  /**
+   * 한 장면을 그린다. 원본 _ScenePainter.paint: 보이는 자리 사람만 그 시각 자세로, 품질 단계 해상도로.
+   * 돌려주는 값은 그린 사람 수와 걸린 시간(ms).
+   */
+  render(opts: {
+    camera: StudyRoomCamera
+    width: number
+    height: number
+    devicePixelRatio: number
+    motionSeconds: number
+    quality: StudyRoomQuality
+    hiddenSeat: number | null
+    cutHeight: number
+  }): { drawn: number; ms: number } | null {
+    const gl = this.gl
+    const spec = this.spec
+    if (this.phaseValue !== 'ready' || !gl || !spec || opts.width <= 0 || opts.height <= 0 || this.contextLost) return null
+    const started = performance.now()
+    const size = { width: opts.width, height: opts.height }
+    const rig = new StudyRoomCameraRig(opts.camera, size)
+    let drawn = 0
+    const layout = this.layout
+    if (layout && layout.seatCount === this.seatPeople.length) {
+      const visible = StudyRoomSeatCulling.visibleSeats(layout, rig)
+      this.seatPeople.forEach((person, seat) => {
+        if (!person) return
+        const shown = visible[seat] === true && seat !== opts.hiddenSeat
+        person.node.visible = shown
+        if (!shown) return
+        person.pose(opts.motionSeconds)
+        drawn++
+      })
+    }
+    this.updateLook(rig, opts.cutHeight)
+    // 내부 해상도: 부드러운 장면은 가로가 smoothWidth를 넘지 않게(기기보다 크게는 그리지 않음).
+    const pixelRatio = spec.look.pixelated
+      ? opts.devicePixelRatio / Math.max(1, Math.round((opts.width * opts.devicePixelRatio) / opts.quality.pixelWidth))
+      : Math.min(opts.devicePixelRatio, opts.quality.smoothWidth / opts.width)
+    if (gl.getPixelRatio() !== pixelRatio) gl.setPixelRatio(pixelRatio)
+    const canvasSize = gl.getSize(new THREE.Vector2())
+    if (canvasSize.x !== opts.width || canvasSize.y !== opts.height) gl.setSize(opts.width, opts.height, false)
+    this.canvas.style.imageRendering = spec.look.pixelated ? 'pixelated' : 'auto'
+    // 원본 카메라 행렬과 같은 화면: 같은 fov·aspect로 eye에서 target을 본다(깊이 범위만 WebGL 규약).
+    this.camera.fov = opts.camera.fovYDegrees
+    this.camera.aspect = opts.width / opts.height
+    this.camera.near = 0.1
+    this.camera.far = 100
+    this.camera.updateProjectionMatrix()
+    this.camera.position.copy(rig.eye)
+    this.camera.up.set(0, 1, 0)
+    this.camera.lookAt(opts.camera.target)
+    gl.render(this.world, this.camera)
+    return { drawn, ms: performance.now() - started }
+  }
+
+  private onContextLost = (e: Event) => {
+    e.preventDefault()
+    this.contextLost = true
+    log.warn('webgl context lost')
+  }
+
+  private onContextRestored = () => {
+    this.contextLost = false
+    log.info('webgl context restored')
+    // 텍스처·셰이더는 three가 다시 올린다. 질감 값만 다시 넘긴다.
+    this.lastLookKey = null
+    this.notify()
+  }
+
+  dispose() {
+    this.disposed = true
+    this.loadGeneration++
+    this.listeners.clear()
+    this.world.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh) mesh.geometry.dispose()
+    })
+    for (const m of this.retroMaterials) {
+      ;(m.uniforms.base_color_texture?.value as THREE.Texture | undefined)?.dispose()
+      m.dispose()
+    }
+    this.gl?.dispose()
+    this.gl = null
+    this.canvas.removeEventListener('webglcontextlost', this.onContextLost)
+    this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored)
+  }
+}

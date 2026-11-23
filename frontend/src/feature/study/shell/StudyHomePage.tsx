@@ -4,6 +4,7 @@ import { t } from '../../../l10n/t'
 import { IslandBackground } from '../../../core/ui/IslandBackground'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
 import { StudyTabBar, type StudyTab } from './StudyTabBar'
+import { StudyRoomStage } from '../room3d/StudyRoomStage'
 import s from './StudyHomePage.module.css'
 
 const titles: Record<StudyTab, () => string> = {
@@ -24,7 +25,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'stats' && <IslandBackground ground="lake" />}
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
       {tab === 'outfit' && <div className={s.paper} />}
-      {tab === 'study' && <div className={s.scenePlaceholder} />}
+      {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode="thirdPerson" topInset={68} /></div>}
       <header className={s.header}>
         <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(-1)} /></span>
         <h1 className={s.title}>{titles[tab]()}</h1>

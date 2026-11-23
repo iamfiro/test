@@ -1,6 +1,6 @@
 .page { position: relative; min-height: 100%; }
 .paper { position: fixed; inset: 0; background: var(--i-paper); }
-.scenePlaceholder { position: fixed; inset: 0; background: #e9a98a; }
+.stage { position: fixed; inset: 0; }
 .header {
   position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 50%; transform: translateX(-50%);
   width: min(100%, var(--app-column)); padding: 0 16px; display: flex; align-items: center; z-index: 10;
