@@ -1,0 +1,106 @@
+/* 값 출처: PocketTime lib/core/theme/{palette/colors,tokens,typography}.dart,
+   lib/feature/study/room/widgets/study_room_island.dart (f574f242). 눈대중 값 금지. */
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+
+@font-face {
+  font-family: 'TmoneyRoundWind';
+  src: url('/fonts/TmoneyRoundWindExtraBold.otf') format('opentype');
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  /* AppColors (light) */
+  --c-primary: #1a1a1a;
+  --c-accent: #ff6427;
+  --c-accent-surface: rgb(251 233 224);
+  --c-on-accent-surface: #b83e0e;
+  --c-background: #ffffff;
+  --c-surface: #f5f5f5;
+  --c-home-surface: #f4f4f8;
+  --c-border: rgb(231 231 231);
+  --c-error: #ff3b30;
+  --c-success: #34c759;
+  --c-text-secondary: rgb(106 106 106);
+  --c-text-light: rgb(161 161 161);
+  --c-soft-fill: #ededf2;
+
+  /* StudyRoomIslandPalette._day */
+  --i-grass: #e8945a;
+  --i-grass-pattern: #d9824a;
+  --i-meadow: #f7e7b0;
+  --i-meadow-pattern: #ebcf7f;
+  --i-lake: #609baf;
+  --i-lake-pattern: #528ba0;
+  --i-paper: #fffaeb;
+  --i-paper-ledge: #e7daba;
+  --i-paper-line: #e9dfc6;
+  --i-ink: #5e4a32;
+  --i-ink-soft: #9a8667;
+  --i-ground-ink: var(--i-ink);
+  --i-leaf: #5dae6b;
+  --i-on-leaf: #ffffff;
+  --i-studying: #f26a2e;
+  --i-on-studying: #ffffff;
+  --i-sun: #f8d66a;
+  --i-on-sun: #5e4a32;
+  --i-sun-ledge: #d9b246;
+  --i-muted: #efe6d0;
+  --i-danger: #d2584a;
+  --i-disabled-face: #e3e3e6;
+  --i-disabled-ledge: #cdcdd1;
+  --i-disabled-ink: #9b9ba1;
+
+  /* StudyTabBar */
+  --tab-schedule: #7faf61;
+  --tab-dark-label: #3a3a3a;
+
+  /* AppSpacing */
+  --s-xxs: 2px; --s-xs: 4px; --s-sm: 8px; --s-md: 12px; --s-lg: 16px;
+  --s-xl: 20px; --s-xxl: 24px; --s-xxxl: 32px;
+  /* AppRadius */
+  --r-xs: 6px; --r-sm: 10px; --r-tile: 12px; --r-md: 14px; --r-panel: 16px;
+  --r-lg: 18px; --r-card: 28px; --r-button: 16px;
+  /* AppSizes */
+  --size-button-small: 40px;
+  /* AppMotion */
+  --motion-fast: 150ms;
+  --motion-press: 100ms;
+
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-round: 'TmoneyRoundWind', var(--font-sans);
+  /* 넓은 화면 결정 5a: 앱 UI와 2D 화면의 최대 폭 */
+  --app-column: 430px;
+}
+
+/* 앱이 다크 테마일 때 쓰는 StudyRoomIslandPalette._night */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-primary: #e0e0e0;
+    --c-text-secondary: #aeaeb2;
+    --c-text-light: #8e8e93;
+    --c-on-accent-surface: #ff8f66;
+    --i-grass: #3a2519; --i-grass-pattern: #573624;
+    --i-meadow: #2e2919; --i-meadow-pattern: #443b22;
+    --i-lake: #1d2f36; --i-lake-pattern: #2a424b;
+    --i-paper: #2f2b25; --i-paper-ledge: #1a1814; --i-paper-line: #433d33;
+    --i-ink: #f3e7cc; --i-ink-soft: #b9a98a;
+    --i-leaf: #79c487; --i-on-leaf: #15261a;
+    --i-studying: #ff8a55; --i-on-studying: #2a160b;
+    --i-sun: #e4c25a; --i-on-sun: #3a2e1c; --i-sun-ledge: #a9893a;
+    --i-muted: #3b362e; --i-danger: #f08a7c;
+    --i-disabled-face: #3a3a3c; --i-disabled-ledge: #28282a; --i-disabled-ink: #8e8e93;
+  }
+}
+
+/* StudyRoomIslandPalette.onLake */
+.palette-on-lake { --i-leaf: #3e8da6; --i-on-leaf: #ffffff; --i-ground-ink: #ffffff; }
+@media (prefers-color-scheme: dark) {
+  .palette-on-lake { --i-leaf: #6db8cf; --i-on-leaf: #0f2229; --i-ground-ink: var(--i-ink); }
+}
+/* StudyRoomIslandPalette.day: 늘 낮 색(3D 방 위 버튼) */
+.palette-day {
+  --i-paper: #fffaeb; --i-paper-ledge: #e7daba; --i-paper-line: #e9dfc6;
+  --i-ink: #5e4a32; --i-ink-soft: #9a8667; --i-sun: #f8d66a; --i-on-sun: #5e4a32; --i-sun-ledge: #d9b246;
+  --i-leaf: #5dae6b; --i-on-leaf: #ffffff; --i-studying: #f26a2e; --i-on-studying: #ffffff;
+}

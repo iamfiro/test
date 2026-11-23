@@ -1,0 +1,24 @@
+/* 원본: PocketTime LoginPage + {Apple,Google,Kakao}LoginButton (높이 58, 알약/22 모서리, 간격 10) */
+.page { min-height: 100%; background: var(--c-background); color: var(--c-primary); display: flex; justify-content: center; }
+.column { width: min(100%, var(--app-column)); display: flex; flex-direction: column; padding: 24px 24px calc(20px + env(safe-area-inset-bottom)); }
+.scene { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 240px; }
+.sceneImage { width: 100%; max-width: 320px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-card); }
+.title { margin: 24px 0 8px; font-size: 24px; font-weight: 700; white-space: pre-line; line-height: 1.35; }
+.description { margin: 0 0 24px; font-size: 16px; color: var(--c-text-secondary); white-space: pre-line; line-height: 1.5; }
+.error { margin: 0 0 12px; color: var(--c-error); font-size: 14px; }
+.actions { display: flex; flex-direction: column; gap: 10px; }
+.button {
+  height: 58px; width: 100%; border: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  gap: 8px; font-size: 17px; font-weight: 500; cursor: pointer; text-decoration: none;
+}
+.neutral { background: var(--c-surface); color: var(--c-primary); }
+.dev { background: var(--c-primary); color: var(--c-background); font-weight: 600; }
+.kakao { background: #fee500; color: #000; border-radius: 22px; font-weight: 600; }
+.appleIcon { filter: none; }
+@media (prefers-color-scheme: dark) {
+  .page { background: #0d0d0d; }
+  .neutral { background: #1c1c1e; }
+  .appleIcon { filter: invert(1); }
+}
+.spinner { width: 24px; height: 24px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; opacity: 0.5; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

@@ -1,0 +1,285 @@
+{
+  "@@locale": "ko",
+  "todoPageTitle": "할 일",
+  "@todoPageTitle": {
+    "description": "할 일 페이지 타이틀"
+  },
+  "todoAddButton": "할 일 추가",
+  "@todoAddButton": {
+    "description": "할 일 추가 버튼"
+  },
+  "todoSectionToday": "오늘",
+  "@todoSectionToday": {
+    "description": "오늘 마감(지난 것 포함) 섹션 제목"
+  },
+  "todoSectionUpcoming": "예정",
+  "@todoSectionUpcoming": {
+    "description": "내일 이후 마감 섹션 제목"
+  },
+  "todoSectionNoDate": "날짜 없음",
+  "@todoSectionNoDate": {
+    "description": "마감일 없는 섹션 제목, 마감일 선택지의 '없음'"
+  },
+  "todoSectionCompleted": "완료",
+  "@todoSectionCompleted": {
+    "description": "완료 섹션 제목"
+  },
+  "todoCompletedRetention": "완료한 지 7일이 지나면 목록에서 보이지 않아요.",
+  "@todoCompletedRetention": {
+    "description": "완료 섹션 아래 보존 안내"
+  },
+  "todoEmptyTitle": "할 일이 없어요",
+  "@todoEmptyTitle": {
+    "description": "빈 상태 제목"
+  },
+  "todoEmptySubtitle": "숙제나 준비물처럼 챙길 일을 적어 두세요.",
+  "@todoEmptySubtitle": {
+    "description": "빈 상태 설명"
+  },
+  "todoLoadFailed": "할 일을 불러오지 못했어요",
+  "@todoLoadFailed": {
+    "description": "캐시 없이 첫 조회가 실패했을 때"
+  },
+  "todoDueToday": "오늘",
+  "@todoDueToday": {
+    "description": "마감 칩: 오늘"
+  },
+  "todoDueTomorrow": "내일",
+  "@todoDueTomorrow": {
+    "description": "마감 칩: 내일"
+  },
+  "todoDueYesterday": "어제",
+  "@todoDueYesterday": {
+    "description": "마감 칩: 어제"
+  },
+  "todoDueMonthDay": "{month}월 {day}일",
+  "@todoDueMonthDay": {
+    "description": "마감 칩: 올해 날짜",
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "todoDueYearMonthDay": "{year}년 {month}월 {day}일",
+  "@todoDueYearMonthDay": {
+    "description": "마감 칩: 다른 해 날짜",
+    "placeholders": {
+      "year": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "todoCompleteAction": "완료로 표시",
+  "@todoCompleteAction": {
+    "description": "체크 버튼 접근성 라벨(미완료 상태)"
+  },
+  "todoReopenAction": "완료 취소",
+  "@todoReopenAction": {
+    "description": "체크 버튼 접근성 라벨(완료 상태)"
+  },
+  "todoDeleted": "할 일을 삭제했어요",
+  "@todoDeleted": {
+    "description": "삭제 후 되돌리기 토스트"
+  },
+  "todoUndo": "되돌리기",
+  "@todoUndo": {
+    "description": "삭제 되돌리기 액션"
+  },
+  "todoSaveFailed": "저장하지 못했어요. 다시 시도해주세요.",
+  "@todoSaveFailed": {
+    "description": "기기 저장 실패"
+  },
+  "todoServerVersionKept": "다른 기기에서 먼저 바꾼 내용으로 맞췄어요",
+  "@todoServerVersionKept": {
+    "description": "충돌 시 서버 상태를 채택했을 때"
+  },
+  "todoChangeNotSaved": "서버에 저장하지 못한 변경이 있어요",
+  "@todoChangeNotSaved": {
+    "description": "서버가 거절한 변경이 있는 항목의 부제"
+  },
+  "todoDiscardChange": "저장 못 한 변경 버리기",
+  "@todoDiscardChange": {
+    "description": "항목 메뉴: 거절된 변경 버리기"
+  },
+  "todoNewTitle": "할 일 추가",
+  "@todoNewTitle": {
+    "description": "추가 화면 타이틀"
+  },
+  "todoEditTitle": "할 일 수정",
+  "@todoEditTitle": {
+    "description": "수정 화면 타이틀"
+  },
+  "todoTitleLabel": "할 일",
+  "@todoTitleLabel": {
+    "description": "제목 입력 라벨"
+  },
+  "todoTitleHint": "예: 수학 익힘책 30쪽",
+  "@todoTitleHint": {
+    "description": "제목 입력 힌트"
+  },
+  "todoNoteLabel": "메모",
+  "@todoNoteLabel": {
+    "description": "메모 입력 라벨"
+  },
+  "todoNoteHint": "자세한 내용",
+  "@todoNoteHint": {
+    "description": "메모 입력 힌트"
+  },
+  "todoDueDateLabel": "마감일",
+  "@todoDueDateLabel": {
+    "description": "마감일 행"
+  },
+  "todoDueTimeLabel": "마감 시각",
+  "@todoDueTimeLabel": {
+    "description": "마감 시각 행"
+  },
+  "todoReminderLabel": "알림",
+  "@todoReminderLabel": {
+    "description": "알림 행"
+  },
+  "todoSubjectLabel": "과목",
+  "@todoSubjectLabel": {
+    "description": "과목 연결 행"
+  },
+  "todoNone": "없음",
+  "@todoNone": {
+    "description": "선택 안 함 값"
+  },
+  "todoDateToday": "오늘",
+  "@todoDateToday": {
+    "description": "마감일 선택지"
+  },
+  "todoDateTomorrow": "내일",
+  "@todoDateTomorrow": {
+    "description": "마감일 선택지"
+  },
+  "todoDatePick": "날짜 고르기",
+  "@todoDatePick": {
+    "description": "마감일 선택지"
+  },
+  "todoTimePick": "시각 고르기",
+  "@todoTimePick": {
+    "description": "마감 시각 선택지"
+  },
+  "todoTimeNone": "시각 없음",
+  "@todoTimeNone": {
+    "description": "마감 시각 선택지"
+  },
+  "todoTimePickerTitle": "마감 시각",
+  "@todoTimePickerTitle": {
+    "description": "시간 선택기 제목"
+  },
+  "todoReminderSheetTitle": "언제 알림을 받을까요?",
+  "@todoReminderSheetTitle": {
+    "description": "알림 선택 시트 제목"
+  },
+  "todoReminderSheetNeedsTime": "마감 시각을 정하면 마감 10분 전, 1시간 전에도 받을 수 있어요.",
+  "@todoReminderSheetNeedsTime": {
+    "description": "마감 시각이 없을 때 시트 설명"
+  },
+  "todoReminderOff": "알림 없음",
+  "@todoReminderOff": {
+    "description": "알림 선택지"
+  },
+  "todoReminderAtDue": "마감 시각에",
+  "@todoReminderAtDue": {
+    "description": "알림 선택지"
+  },
+  "todoReminder10Min": "마감 10분 전",
+  "@todoReminder10Min": {
+    "description": "알림 선택지"
+  },
+  "todoReminder1Hour": "마감 1시간 전",
+  "@todoReminder1Hour": {
+    "description": "알림 선택지"
+  },
+  "todoReminderEveningBefore": "전날 저녁 9시",
+  "@todoReminderEveningBefore": {
+    "description": "알림 선택지"
+  },
+  "todoReminderCustom": "날짜와 시각 직접 고르기",
+  "@todoReminderCustom": {
+    "description": "알림 선택지"
+  },
+  "todoReminderTimeTitle": "알림 시각",
+  "@todoReminderTimeTitle": {
+    "description": "직접 정하기 시간 선택기 제목"
+  },
+  "todoReminderInPast": "이미 지난 시각이에요. 다른 시각을 골라주세요.",
+  "@todoReminderInPast": {
+    "description": "알림 시각이 과거일 때"
+  },
+  "todoReminderPermissionNeeded": "알림을 받으려면 기기 설정에서 알림을 허용해주세요.",
+  "@todoReminderPermissionNeeded": {
+    "description": "알림 권한이 없을 때"
+  },
+  "todoSubjectSheetTitle": "과목 연결",
+  "@todoSubjectSheetTitle": {
+    "description": "과목 선택 시트 제목"
+  },
+  "todoSubjectSheetDescription": "이번 주 시간표에 있는 과목이에요.",
+  "@todoSubjectSheetDescription": {
+    "description": "과목 선택 시트 설명"
+  },
+  "todoSubjectNone": "연결 안 함",
+  "@todoSubjectNone": {
+    "description": "과목 선택지"
+  },
+  "todoLimitTitle": "무료로는 할 일을 {count}개까지 둘 수 있어요",
+  "@todoLimitTitle": {
+    "description": "무료 개수 제한 시트 제목",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "todoReminderLimitTitle": "무료로는 알림을 {count}개까지 켤 수 있어요",
+  "@todoReminderLimitTitle": {
+    "description": "무료 알림 제한 시트 제목",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "todoLimitDescription": "완료하거나 삭제하면 다시 추가할 수 있어요. 프리미엄에는 개수 제한이 없어요.",
+  "@todoLimitDescription": {
+    "description": "무료 제한 시트 설명"
+  },
+  "todoLimitPremiumButton": "프리미엄 알아보기",
+  "@todoLimitPremiumButton": {
+    "description": "무료 제한 시트 버튼"
+  },
+  "todoHomeButtonLabel": "할 일, 오늘 {count}개 남음",
+  "@todoHomeButtonLabel": {
+    "description": "홈 할 일 버튼 접근성 라벨(배지 있을 때)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "todoReminderSheetDue": "마감은 {due}이에요.",
+  "@todoReminderSheetDue": {
+    "placeholders": {
+      "due": {
+        "type": "String"
+      }
+    }
+  },
+  "todoReminderPassed": "이미 지난 시각이에요",
+  "todoReminderTurnOff": "알림 끄기",
+  "todoReminderCustomTitle": "알림 받을 날짜와 시각",
+  "todoReminderCustomConfirm": "이 시각에 알림 받기"
+}

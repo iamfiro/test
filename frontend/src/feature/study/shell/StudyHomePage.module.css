@@ -1,0 +1,12 @@
+.page { position: relative; min-height: 100%; }
+.paper { position: fixed; inset: 0; background: var(--i-paper); }
+.scenePlaceholder { position: fixed; inset: 0; background: #e9a98a; }
+.header {
+  position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 50%; transform: translateX(-50%);
+  width: min(100%, var(--app-column)); padding: 0 16px; display: flex; align-items: center; z-index: 10;
+}
+.side { width: 43px; flex: none; }
+.title {
+  flex: 1; margin: 0; text-align: center; font-family: var(--font-round); font-size: 18px; font-weight: 800;
+  color: #fff; text-shadow: 0 0 6px rgb(0 0 0 / 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
