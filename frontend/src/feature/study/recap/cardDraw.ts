@@ -130,8 +130,8 @@ function drawTicket(ctx: CanvasRenderingContext2D, assets: CardAssets, cx: numbe
   ctx.shadowColor = 'transparent'
   // 띠 아래 빈 몸통(왼쪽 약 4분의 3) 가운데에 서비스 이름 두 줄.
   const mid = -w / 2 + w * 0.4
-  text(ctx, 'STUDY', mid, 1, { font: `800 10.5px ${fonts.round}`, color: c.title, align: 'center', spacing: 1.2 })
-  text(ctx, 'VILLAGE', mid, 14, { font: `800 10.5px ${fonts.round}`, color: c.ink, align: 'center', spacing: 1.2 })
+  text(ctx, 'STUDY', mid, -3, { font: `800 10.5px ${fonts.round}`, color: c.title, align: 'center', spacing: 1.2 })
+  text(ctx, 'VILLAGE', mid, 9, { font: `800 10.5px ${fonts.round}`, color: c.ink, align: 'center', spacing: 1.2 })
   ctx.restore()
   const pw = 18
   ctx.save()
