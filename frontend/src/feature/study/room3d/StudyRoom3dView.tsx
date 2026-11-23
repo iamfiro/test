@@ -250,7 +250,6 @@ export function StudyRoom3dView(props: {
   }
 
   if (phase === 'failed') return <>{props.placeholder}</>
-  const topInset = props.topInset ?? 0
   return (
     <div
       ref={host}
@@ -272,10 +271,6 @@ export function StudyRoom3dView(props: {
             )
           })}
         </div>
-      )}
-      {topInset > 0 && (
-        // 자리 칩이 헤더 뒤로 지나간다. 위를 어둡게 눌러 헤더 글자가 묻히지 않게 한다.
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: topInset + 24, pointerEvents: 'none', zIndex: 3, background: 'linear-gradient(to bottom, rgb(0 0 0 / 0.5), rgb(0 0 0 / 0))' }} />
       )}
     </div>
   )
