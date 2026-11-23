@@ -3,7 +3,7 @@ import { IconMinimize } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
 import type { StudyRoomCameraMode } from '../room3d/domain/seatCamera'
-import { StickerButton, StickerSlot } from './StickerButton'
+import { StickerButton } from './StickerButton'
 import { StickerChip, UnreadBadge } from './badges'
 import { CameraHint, ChatPeek, type ChatPeekMessage } from './bubbles'
 import { SeatPlanHeader } from './focus'
@@ -14,6 +14,8 @@ import s from './StudyTabOverlay.module.css'
 
 /** 오른쪽 위 스티커 단추 한 변(원본은 40~52). 큰 화면에서 작아 보여 키웠다(사용자 결정 2026-11-23). */
 const railSize = 52
+/** 카메라·자리 이동·집중 모드: 타이머 위 오른쪽 아래 줄(사용자 결정 2026-11-23). */
+const bottomSize = 56
 const icon = (name: string) => `/assets/icons/${name}`
 
 export type StudyTabOverlayProps = {
@@ -106,17 +108,6 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
             )}
           </div>
         )}
-        {roomButtons && showsCameraButton && (
-          <div className={s.railRow}>
-            <CameraHint label={props.cameraHint == null ? null : cameraLabel(props.cameraHint)} />
-            <StickerButton
-              asset={icon('study_camera.png')}
-              size={railSize}
-              label={t('studyRoomCameraChange', { mode: cameraLabel(props.cameraMode) })}
-              onClick={props.onCycleCamera}
-            />
-          </div>
-        )}
         {roomButtons && chatAvailable && (
           <div className={s.railRow}>
             <ChatPeek message={props.chatPeek ?? null} onOpen={props.onOpenChat} />
@@ -142,25 +133,35 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
         '--ranking-top': shop ? 'var(--ranking-top-with-shop)' : 'var(--ranking-top-alone)',
       } as CSSProperties}
     >
-      {roomButtons && (showsSeatMove || showsFocusButton) && (
+      {roomButtons && (showsCameraButton || showsSeatMove || showsFocusButton) && (
         <div className={s.bottomButtons}>
+          {showsCameraButton && (
+            <>
+              <CameraHint label={props.cameraHint == null ? null : cameraLabel(props.cameraHint)} />
+              <StickerButton
+                asset={icon('study_camera.png')}
+                size={bottomSize}
+                label={t('studyRoomCameraChange', { mode: cameraLabel(props.cameraMode) })}
+                onClick={props.onCycleCamera}
+              />
+            </>
+          )}
           {showsSeatMove && (
             <>
-              <StickerSlot>
-                <StickerButton asset={icon('study_seat.png')} size={40} label={t('studySeatMove')} onClick={props.onOpenSeatPlan} />
-              </StickerSlot>
-              {showsFocusButton && <span className={s.gapXl} />}
+              {showsCameraButton && <span className={s.gapXl} />}
+              <StickerButton asset={icon('study_seat.png')} size={bottomSize} label={t('studySeatMove')} onClick={props.onOpenSeatPlan} />
             </>
           )}
           {showsFocusButton && (
-            <StickerSlot>
+            <>
+              {(showsCameraButton || showsSeatMove) && <span className={s.gapXl} />}
               <StickerButton
                 asset={icon('study_focus.png')}
-                size={40}
+                size={bottomSize}
                 label={t('studyFocusModeOpen')}
                 onClick={onSetFocusMode ? () => onSetFocusMode(true) : undefined}
               />
-            </StickerSlot>
+            </>
           )}
         </div>
       )}

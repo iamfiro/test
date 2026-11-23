@@ -92,7 +92,7 @@
   align-items: center;
   pointer-events: auto;
 }
-.gapXl { width: 20px; flex: none; }
+.gapXl { width: 24px; flex: none; }
 
 /* 자리 이동 안내: top = topInset + sm, left = lg + 48 + sm, right = lg. */
 .seatPlan {
