@@ -15,7 +15,7 @@ import s from './StudyTabOverlay.module.css'
 /** 오른쪽 위 스티커 단추 한 변(원본은 40~52). 큰 화면에서 작아 보여 키웠다(사용자 결정 2026-11-23). */
 const railSize = 52
 /** 카메라·자리 이동·집중 모드: 타이머 위 오른쪽 아래 줄(사용자 결정 2026-11-23). */
-const bottomSize = 56
+const bottomSize = 52
 const icon = (name: string) => `/assets/icons/${name}`
 
 export type StudyTabOverlayProps = {
@@ -138,34 +138,33 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
             </span>
           </div>
         )}
+        {roomButtons && showsCameraButton && (
+          <div className={s.railRow}>
+            <CameraHint label={props.cameraHint == null ? null : cameraLabel(props.cameraHint)} />
+            <StickerButton
+              asset={icon('study_camera.png')}
+              size={railSize}
+              label={t('studyRoomCameraChange', { mode: cameraLabel(props.cameraMode) })}
+              onClick={props.onCycleCamera}
+            />
+          </div>
+        )}
       </div>
     <div
       className={`${s.overlay} palette-day`}
       style={{
       } as CSSProperties}
     >
-      {roomButtons && (showsCameraButton || showsSeatMove || showsFocusButton) && (
+      {roomButtons && (showsSeatMove || showsFocusButton) && (
         <div className={s.bottomButtons}>
-          {showsCameraButton && (
-            <>
-              <CameraHint label={props.cameraHint == null ? null : cameraLabel(props.cameraHint)} />
-              <StickerButton
-                asset={icon('study_camera.png')}
-                size={bottomSize}
-                label={t('studyRoomCameraChange', { mode: cameraLabel(props.cameraMode) })}
-                onClick={props.onCycleCamera}
-              />
-            </>
-          )}
           {showsSeatMove && (
             <>
-              {showsCameraButton && <span className={s.gapXl} />}
               <StickerButton asset={icon('study_seat.png')} size={bottomSize} label={t('studySeatMove')} onClick={props.onOpenSeatPlan} />
             </>
           )}
           {showsFocusButton && (
             <>
-              {(showsCameraButton || showsSeatMove) && <span className={s.gapXl} />}
+              {showsSeatMove && <span className={s.gapXl} />}
               <StickerButton
                 asset={icon('study_focus.png')}
                 size={bottomSize}
