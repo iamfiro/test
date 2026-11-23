@@ -9,3 +9,4 @@ coverage/
 *.log
 server/var/
 frontend/src/core/api/schema.d.ts
+!.env.test

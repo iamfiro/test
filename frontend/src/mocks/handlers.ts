@@ -1,11 +1,8 @@
 // 개발 빌드 전용 목. OpenAPI 계약(server/docs/api/openapi.yaml) 모양만 흉내 낸다. 서버 의미는 계산하지 않는다.
 import { http, HttpResponse } from 'msw/http'
 import type { components } from '../core/api/schema'
-
-const API = import.meta.env.VITE_API_ORIGIN
-const meta = () => ({ requestId: `mock_${Math.random().toString(36).slice(2, 10)}`, timestamp: new Date().toISOString() })
-const ok = <T,>(data: T, status = 200) => HttpResponse.json({ data, error: null, meta: meta() }, { status })
-const fail = (status: number, code: string, message: string) => HttpResponse.json({ data: null, error: { code, message }, meta: meta() }, { status })
+import { API, fail, ok } from './util'
+import { timerHandlers } from './timer'
 
 type Session = components['schemas']['Session']
 let signedIn = sessionStorageFlag()
@@ -26,4 +23,5 @@ export const handlers = [
   http.post(`${API}/auth/login/dev`, () => { setSignedIn(true); return ok(session()) }),
   http.post(`${API}/auth/logout`, () => { setSignedIn(false); return new HttpResponse(null, { status: 204 }) }),
   http.get(`${API}/users/me/profile`, () => ok({ profile: me.profile })),
+  ...timerHandlers,
 ]
