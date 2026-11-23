@@ -1,0 +1,30 @@
+
+study_room.glb
+  triangles 25828, textures 2048x2048, 1024x1024 (image/jpeg, image/jpeg), file 3.13 MB, materials 2, meshes 3
+  ok   triangles ≤ 45000
+  ok   textures ≤ 2048²
+  ok   file ≤ 4.5 MB
+  ok   materials unlit, opaque
+  ok   flipped faces: 0
+  ok   node study_room
+  ok   study_room/room_shell
+  ok   study_room/room_props
+  ok   study_room/room_outdoors
+  ok   seat_00–seat_32 present (33 in cafeSeats, missing 0)
+  ok   seat position max diff 0.05 cm (≤ 1 cm)
+  ok   seat yaw max diff 0.0000 rad (≤ 0.01)
+
+study_room_v2.glb
+  triangles 44800, textures 2048x2048, 2048x2048 (image/jpeg, image/jpeg), file 3.84 MB, materials 2, meshes 3
+  ok   triangles ≤ 45000
+  ok   textures ≤ 2048²
+  ok   file ≤ 4.5 MB
+  ok   materials unlit, opaque
+  ok   flipped faces: 0
+  ok   node study_room
+  ok   study_room/room_shell
+  ok   study_room/room_props
+  ok   study_room/room_outdoors
+  ok   seat_00–seat_32 present (33 in cafeSeats, missing 0)
+  ok   seat position max diff 0.00 cm (≤ 1 cm)
+  ok   seat yaw max diff 0.0000 rad (≤ 0.01)
