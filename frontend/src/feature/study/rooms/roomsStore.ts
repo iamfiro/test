@@ -1,5 +1,6 @@
 // 공부방 목록. 조회는 캐시 우선: 같은 조건(scope·q)의 마지막 응답을 바로 보이고 뒤에서 다시 읽는다.
 // 검색은 서버가 거른다(계약 listStudyRooms의 q). 화면은 거르지 않는다.
+// 추천(recommended)도 서버가 고르고 정렬한다. 내 태그가 바뀌면 revision이 올라 다시 읽는다.
 import { useEffect, useState } from 'react'
 import { api, errorOf } from '../../../core/api/client'
 import type { components } from '../../../core/api/schema'
@@ -7,11 +8,12 @@ import { logger } from '../../../core/log/log'
 
 const log = logger('StudyRooms')
 export type Room = components['schemas']['Room']
-type Scope = 'mine' | 'all'
+type Scope = 'mine' | 'all' | 'recommended'
 
 const cache = new Map<string, Room[]>()
 
-export function useRooms(scope: Scope, q: string) {
+export function useRooms(scope: Scope, q: string, opts: { enabled?: boolean; revision?: number } = {}) {
+  const enabled = opts.enabled ?? true
   const query = q.trim()
   const key = `${scope}:${query}`
   const [rooms, setRooms] = useState<Room[] | null>(() => cache.get(key) ?? null)
@@ -21,6 +23,7 @@ export function useRooms(scope: Scope, q: string) {
   useEffect(() => {
     setRooms(cache.get(key) ?? null)
     setFailed(false)
+    if (!enabled) return
     let alive = true
     // 입력 중에는 250ms 멈춘 뒤에만 서버에 묻는다.
     const id = window.setTimeout(async () => {
@@ -35,7 +38,7 @@ export function useRooms(scope: Scope, q: string) {
       setRooms(res.data.data.rooms)
     }, query ? 250 : 0)
     return () => { alive = false; window.clearTimeout(id) }
-  }, [key, scope, query, reload])
+  }, [key, scope, query, reload, enabled, opts.revision])
 
   return { rooms, failed, retry: () => setReload((n) => n + 1) }
 }

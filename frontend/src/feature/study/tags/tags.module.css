@@ -1,0 +1,53 @@
+/* 내 공부 태그 시트: 과목 고르기·새 과목 시트(subject.module.css)의 제목·칩·입력칸 값을 그대로 쓴다. */
+.sheet { display: flex; flex-direction: column; padding: 22px 24px 24px; }
+.title { margin: 0; font-size: 22px; font-weight: 800; color: var(--i-ink); }
+.description { margin: 6px 0 16px; font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--i-ink-soft); }
+
+.picked { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.pickedTag {
+  display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px 0 12px;
+  border: 0; border-radius: 999px; background: var(--i-leaf); color: var(--i-on-leaf);
+  font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+}
+
+.input {
+  width: 100%; height: 48px; padding: 0 20px; border: 0; border-radius: 999px;
+  background: var(--i-muted); color: var(--i-ink); font: inherit; font-size: 16px; font-weight: 700;
+  letter-spacing: inherit; outline: none;
+}
+.input::placeholder { color: var(--i-ink-soft); font-weight: 600; }
+.input:focus-visible { box-shadow: 0 0 0 2px var(--i-paper-ledge); }
+
+.results { margin-top: 8px; max-height: 40dvh; overflow-y: auto; padding: 4px 2px 8px; }
+.results[aria-busy] { opacity: 0.7; }
+.groupLabel { margin: 14px 0 10px 4px; font-size: 14px; font-weight: 800; color: var(--i-ink-soft); }
+.chips { display: flex; flex-wrap: wrap; gap: 12px 10px; }
+.empty {
+  display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 20px 0 8px;
+  font-size: 14px; font-weight: 700; color: var(--i-ink-soft); text-align: center;
+}
+.empty p { margin: 0; }
+
+.chipSlot { display: inline-flex; max-width: 100%; }
+.chipSlot .chipSurface { width: auto; max-width: 100%; }
+.chip { display: flex; align-items: center; min-height: 46px; padding: 0 18px 0 10px; gap: 8px; }
+.chipDot {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+}
+.chipDotOn { background: var(--i-leaf); color: var(--i-on-leaf); }
+.chipDotPlain { background: var(--i-paper); color: var(--i-ink); }
+.chipName { font-size: 15px; font-weight: 800; color: var(--i-ink); white-space: nowrap; }
+
+.action { margin-top: 16px; }
+
+/* 공부방 목록 위 추천 칸(밤하늘 위). */
+.recHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px 12px; }
+.recTitleRow { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.recTitle { margin: 0; font-family: var(--font-round); font-size: 22px; font-weight: 800; color: #fff; text-shadow: 0 2px 0 rgb(0 0 0 / 0.12); }
+.recTags { display: flex; flex-wrap: wrap; gap: 6px; }
+.recTag { padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / 0.16); color: #fff; font-size: 13px; font-weight: 800; }
+.recEmpty { margin: 0 4px; font-size: 14px; font-weight: 700; color: rgb(255 255 255 / 0.72); }
+.recSection { margin-bottom: 28px; }
+.prompt { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px 20px 20px; }
+.promptText { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.45; color: var(--i-ink); white-space: pre-line; }

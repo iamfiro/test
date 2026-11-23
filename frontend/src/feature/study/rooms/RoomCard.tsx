@@ -15,6 +15,7 @@ export function RoomCard({ room, onOpen }: { room: Room; onOpen: (room: Room) =>
       <div className={s.cardBody}>
         <p className={s.name}>{room.name}</p>
         {room.description && <p className={s.description}>{room.description}</p>}
+        {room.tags.length > 0 && <p className={s.tags}>{room.tags.map((tag) => `#${tag.name}`).join(' ')}</p>}
         <div className={s.footer}>
           <span className={s.people}>{t('studyRoomPeople', { count: room.member_count, capacity: room.capacity })}</span>
           {room.is_host && <span className={s.host}>{t('studyRoomHost')}</span>}

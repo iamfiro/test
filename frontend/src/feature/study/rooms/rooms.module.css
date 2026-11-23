@@ -60,6 +60,7 @@
   margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--i-ink-soft);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.8em;
 }
+.tags { margin: 6px 0 0; font-size: 12px; font-weight: 800; color: var(--i-leaf); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 2px dashed var(--i-paper-line); }
 .people { font-size: 13px; font-weight: 700; color: var(--i-ink-soft); }
 .host { padding: 3px 9px; border-radius: 999px; background: var(--i-sun); color: var(--i-on-sun); font-size: 12px; font-weight: 800; }
