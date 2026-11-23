@@ -47,6 +47,10 @@ const stickerUrls = {
   paperclip: '/assets/study_recap/paperclip.webp',
   tape: '/assets/study_recap/tape.webp',
   arrow: '/assets/study_recap/doodle_arrow.webp',
+  star: '/assets/study_recap/doodle_star.webp',
+  note: '/assets/study_recap/doodle_note.webp',
+  flower: '/assets/study_recap/doodle_flower.webp',
+  sparkle: '/assets/study_recap/doodle_sparkle.webp',
 } as const
 export type CardAssets = Record<keyof typeof stickerUrls, HTMLImageElement>
 
@@ -83,15 +87,20 @@ function dateText(studyDate: string): string {
 
 export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets): void {
   // 규칙 셋(사용자 피드백 2026-11-24 "중구난방"): 글꼴은 숫자=둥근 글꼴, 라벨·메모=손글씨 둘만. 색은 데이터=잉크 갈색,
-  // 손글씨·장식=청록, 강조=숫자 밑 햇살 형광펜 셋만. 장식은 뜻이 있는 것(테이프·티켓 클립·폴라로이드 카메라·화살표·
-  // 순위 트로피)만. 위 칸(사진 + 연속·순위)과 아래 칸(이번 공부·공부일 + 폴라로이드)을 손그림 구분선으로 나눈다.
+  // 손글씨·장식=청록(낙서의 반짝이만 햇살 노랑), 강조=숫자 밑 햇살 형광펜. 큰 장식은 뜻이 있는 것(테이프·티켓 클립·
+  // 폴라로이드 카메라·화살표·순위 트로피)만, 자잘한 낙서는 정해 둔 빈자리에 작게. 위 칸(사진 + 연속·순위)과 아래 칸(이번 공부·공부일 + 폴라로이드)을 손그림 구분선으로 나눈다.
   ctx.drawImage(assets.clipboard, 0, 0, sheet.width, sheet.height)
   titleDuration(ctx, recap.todaySeconds, 152, 114, 244)
   drawTicket(ctx, assets, 334, 86)
   drawPortrait(ctx, recap, assets)
   drawTopRows(ctx, recap, assets)
   handDash(ctx, 32, 368, 336, 3)
-  drawBottomRows(ctx, recap)
+  // 자잘한 손그림(사용자 요청 2026-11-24 "자잘한 표현은 남겨"): 청록·노랑 낙서만, 정해 둔 빈자리에 작게.
+  doodle(ctx, assets.sparkle, 292, 134, 24, 0)
+  doodle(ctx, assets.star, 356, 316, 18, 14)
+  doodle(ctx, assets.note, 224, 356, 20, -10)
+  doodle(ctx, assets.sparkle, 46, 520, 18, 0)
+  drawBottomRows(ctx, recap, assets)
   drawPolaroid(ctx, recap, assets)
 }
 
@@ -138,15 +147,17 @@ function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: 
   ctx.drawImage(assets.arrow, -13, -13, 26, 26)
   ctx.restore()
   text(ctx, webText.recapMe, cx + 46, by + 28, { font: `700 21px ${fonts.hand}`, color: c.title })
+  doodle(ctx, assets.flower, cx + 80, by + 20, 16, 10)
 }
 
-type Row = { label: string; draw: (x: number, base: number, maxW: number) => void }
+type Row = { label: string; icon: HTMLImageElement; draw: (x: number, base: number, maxW: number) => void }
 
-/** 큰 항목 한 묶음: 손글씨 라벨(청록, 위) → 값(둥근 글꼴 크게, 아래) → 손으로 그은 점선. */
+/** 큰 항목 한 묶음: 작은 낙서 + 손글씨 라벨(청록, 위) → 값(둥근 글꼴 크게, 아래) → 손으로 그은 점선. */
 function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, right: number, startY: number, rowH: number) {
   list.forEach((r, i) => {
     const y = startY + i * rowH
-    text(ctx, r.label, x, y + 15, { font: `700 18px ${fonts.hand}`, color: c.title })
+    ctx.drawImage(r.icon, x - 1, y + 1, 16, 16)
+    text(ctx, r.label, x + 18, y + 15, { font: `700 18px ${fonts.hand}`, color: c.title })
     const base = y + rowH - 16
     r.draw(x, base, right - x)
     handDash(ctx, x, right, base + 9, i * 7 + Math.round(startY))
@@ -172,14 +183,14 @@ function handDash(ctx: CanvasRenderingContext2D, x0: number, x1: number, y: numb
 function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
   const big = `800 28px ${fonts.round}`
   const list: Row[] = [
-    { label: webText.recapFields.streak, draw: (x, b) => {
+    { label: webText.recapFields.streak, icon: assets.star, draw: (x, b) => {
       flame(ctx, x, b - 25, 28, recap.streakDays > 0)
       highlight(ctx, t('studyStatsStreakValue', { count: recap.streakDays }), x + 30, b, big, recap.streakDays > 0 ? c.ink : c.inkSoft)
     } },
   ]
   if (recap.rank) {
     const rank = recap.rank
-    list.push({ label: webText.recapFields.rank, draw: (x, b) => {
+    list.push({ label: webText.recapFields.rank, icon: assets.flower, draw: (x, b) => {
       ctx.drawImage(assets.trophy, x - 2, b - 28, 30, 30)
       const num = `${rank.position}${webText.recapRankUnit}`
       highlight(ctx, num, x + 30, b, big)
@@ -189,11 +200,11 @@ function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: C
   rows(ctx, list, 200, 372, 132, 72)
 }
 
-function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
   const font = `800 24px ${fonts.round}`
   const list: Row[] = [
-    { label: webText.recapFields.session, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
-    { label: webText.recapFields.date, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
+    { label: webText.recapFields.session, icon: assets.note, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
+    { label: webText.recapFields.date, icon: assets.sparkle, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
   ]
   rows(ctx, list, 32, 236, 356, 72)
 }
@@ -314,6 +325,14 @@ function sticker(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: numbe
   ctx.save()
   ctx.translate(cx, cy); ctx.rotate((deg * Math.PI) / 180)
   ctx.shadowColor = 'rgba(90,55,20,0.25)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3
+  ctx.drawImage(img, -size / 2, -size / 2, size, size)
+  ctx.restore()
+}
+
+/** 손그림 낙서를 기울여 얹는다(그림자 없음: 종이에 그린 것). */
+function doodle(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, size: number, deg: number) {
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate((deg * Math.PI) / 180)
   ctx.drawImage(img, -size / 2, -size / 2, size, size)
   ctx.restore()
 }
