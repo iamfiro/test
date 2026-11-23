@@ -73,6 +73,9 @@ export const StudyRoomSeatCamera = {
    * 웹 전용(공부 요약 카드 사진): 앉은 사람을 책상 너머 앞에서 조금 내려다보며 상반신을 담는다.
    * 카메라 yaw를 자리 yaw 그대로 두면(다른 시점은 +180) 사람 얼굴 쪽에서 본다.
    */
+  /** 사진 카메라에서 사람까지 거리(m). 이보다 0.75m 넘게 앞(카메라 쪽)에 있는 벽은 가까운 면으로 잘라 낸다. */
+  portraitDistance: 2.4,
+
   portrait(seat: StudyRoomSeat, size: StudyRoomSize, s = { pitch: 10, fov: 30, distance: 2.4, height: 0.52 }): StudyRoomCamera {
     const aspect = size.width / size.height;
     return new StudyRoomCamera({

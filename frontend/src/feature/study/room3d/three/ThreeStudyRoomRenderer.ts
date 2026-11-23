@@ -300,6 +300,8 @@ export class ThreeStudyRoomRenderer {
     quality: StudyRoomQuality
     hiddenSeat: number | null
     cutHeight: number
+    /** 가까운 면(m). 공부 카드 사진처럼 카메라와 사람 사이 벽을 잘라 내야 할 때만 넘긴다. 없으면 0.3. */
+    nearPlane?: number
   }): { drawn: number; ms: number } | null {
     const gl = this.gl
     const spec = this.spec
@@ -337,7 +339,7 @@ export class ThreeStudyRoomRenderer {
     this.camera.fov = opts.camera.fovYDegrees
     this.camera.aspect = opts.width / opts.height
     // 가까운 면을 0.3으로: 창틀·문틀·벽·그림처럼 거의 겹친 면의 깊이 경쟁(z-fighting)을 줄인다(0.1이면 정밀도가 3배 모자란다).
-    this.camera.near = 0.3
+    this.camera.near = opts.nearPlane ?? 0.3
     this.camera.far = 80
     this.camera.updateProjectionMatrix()
     this.camera.position.copy(rig.eye)
