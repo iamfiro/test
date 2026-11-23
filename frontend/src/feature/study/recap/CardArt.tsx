@@ -3,7 +3,7 @@
 // 홀로그램 포일(사용자 결정 2026-11-23, 레인보우 레어 카드 레퍼런스): 무지개 포일·빛 띠·반짝이·에칭 줄·빛 반사를
 // CSS 레이어로 카드 얼굴 위에 겹치고, 포인터(없으면 천천히 도는 가상 빛)에 따라 카드가 기울며 포일이 흐른다.
 import { useEffect, useRef, type CSSProperties, type PointerEvent } from 'react'
-import { cardLayout, drawCard, type CardAssets, type CardLayout } from './cardDraw'
+import { cardLayout, drawCardBase, drawPlates, type CardAssets, type CardLayout } from './cardDraw'
 import type { StudyRecap } from './studyRecap'
 import s from './recap.module.css'
 
@@ -98,17 +98,23 @@ export function CardArt({ recap, assets, label }: { recap: StudyRecap; assets: C
     <div className={s.art} role="img" aria-label={label} onPointerMove={onMove} onPointerLeave={onLeave} onPointerUp={onLeave} style={{ width: box.width, height: box.height }}>
       <div className={s.tilt} ref={tilt} style={{ left: stage.left, top: stage.top }}>
         <div className={s.card} style={{ width: L.width, height: L.height }}>
-          <Layer width={L.width} height={L.height} draw={(ctx) => drawCard(ctx, recap, assets)} className={s.cardBase} />
+          <Layer width={L.width} height={L.height} draw={(ctx) => drawCardBase(ctx, recap)} className={s.cardBase} />
           <span className={s.foil} aria-hidden="true" style={{ '--glitter': `url(${glitter()})` } as CSSProperties}>
-            <span className={s.rainbow} />
-            <span className={s.paperGlitter} />
-            {/* 강한 빛(빛 띠·반짝이·반사)은 사진 칸에만: 글자가 하얗게 뜨지 않게. */}
-            <span className={s.photoFoil} style={{ left: L.photo.x, top: L.photo.y - 16, width: L.photo.width, height: L.photo.height }}>
+            {/* 테두리만: 진한 무지개와 반짝이(사진 칸은 비운다). */}
+            <span className={s.frameFoil}>
+              <span className={s.rainbow} />
+              <span className={s.paperGlitter} />
+            </span>
+            {/* 강한 빛(빛 띠·반짝이·반사)은 사진 칸에만. */}
+            <span className={s.photoFoil} style={{ left: L.photo.x, top: L.photo.y, width: L.photo.width, height: L.photo.height, borderRadius: L.photo.radius }}>
+              <span className={`${s.rainbow} ${s.rainbowSoft}`} />
               <span className={s.shine} />
               <span className={s.glitter} />
               <span className={s.glare} />
             </span>
           </span>
+          {/* 명판은 포일 위: 글자가 포일에 덮이지 않는다. */}
+          <Layer width={L.width} height={L.height} draw={(ctx) => drawPlates(ctx, recap, assets)} className={s.plates} />
         </div>
       </div>
     </div>
