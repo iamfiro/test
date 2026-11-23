@@ -3,7 +3,9 @@ dist/
 coverage/
 .env
 .env.*
+!.env.development
 !.env.example
 .DS_Store
 *.log
 server/var/
+frontend/src/core/api/schema.d.ts
