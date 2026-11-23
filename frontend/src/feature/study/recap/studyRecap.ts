@@ -19,8 +19,10 @@ export type StudyRecap = {
   subjects: { subject: string | null; seconds: number }[]
   /** 지금 방에서 오늘 공부 시간 순위. 서버 랭킹(계획 5단계)이 없어 실제 흐름에서는 null이고 카드에서 칸을 숨긴다. */
   rank: { position: number; total: number } | null
-  /** 3D 방에서 찍은 내 자리 사진. 방을 그릴 수 없었으면 null(빈 사진 칸에 문장(紋章)을 그린다). */
+  /** 3D 방에서 앞에서 찍은 내 얼굴(프로필 사진). 방을 그릴 수 없었으면 null(빈 사진 칸). */
   photo: HTMLCanvasElement | null
+  /** 3인칭으로 찍은 내 자리와 방(폴라로이드). 없으면 null. */
+  scenePhoto: HTMLCanvasElement | null
 }
 
 export function buildRecap(input: {
@@ -29,6 +31,7 @@ export function buildRecap(input: {
   settings: StudySettings | null
   nickname: string
   photo: HTMLCanvasElement | null
+  scenePhoto: HTMLCanvasElement | null
 }): StudyRecap {
   const { stats, record, settings } = input
   const hex = record.id.replace(/-/g, '').toUpperCase()
@@ -43,6 +46,7 @@ export function buildRecap(input: {
     streakDays: stats.streak_days,
     subjects: [...stats.today_by_subject].sort((a, b) => b.seconds - a.seconds),
     photo: input.photo,
+    scenePhoto: input.scenePhoto,
     // 방 순위는 서버가 판정한다(presence 인정 시간). 랭킹 API가 생기기 전까지 비워 둔다.
     rank: null,
   }

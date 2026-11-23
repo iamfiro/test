@@ -1,25 +1,26 @@
-// "오늘의 공부" 카드: 스토리에 올려 오늘 공부한 결과를 자랑하는 세로 카드 한 장. 비주얼 중심(사용자 결정 2026-11-23):
-// 트레이딩 카드처럼 무지개 포일 테두리 안을 3D 방에서 찍은 내 자리 사진이 꽉 채우고, 그 위에 종이 명판을 얹는다.
-//   위 명판: 오늘 공부한 시간(가장 크게) + 목표/어제 대비 알약
-//   아래 칸 두 개: 연속 공부(불꽃 + n일), 이 방 오늘 순위(트로피 + n등, 햇살 칸 — 서버 값이 있을 때만)
-// 그리는 순서는 세 겹이다: 본체(테두리·사진·필름 날짜) → 홀로그램 포일 → 명판(포일 위라 글자가 또렷하다).
-// 화면은 본체·명판을 캔버스 레이어로, 포일은 움직이는 CSS 레이어로 겹치고, 저장 이미지(인스타그램 스토리 1080×1920)는
-// 같은 함수로 시계 무늬 호수 위에 합친다(포일은 한 순간으로 굽는다).
-// 톤은 앱 공부 화면: 섬 팔레트 낮 값(tokens.css), 크림 종이와 턱, 둥근 글꼴, 햇살 노랑 강조, 앱 트로피 스티커 아트.
+// "오늘의 공부" 시트: 스토리에 올려 오늘 공부한 결과를 자랑하는 클립보드 프로필 시트 한 장.
+// 구성은 사용자가 준 클립보드 프로필 레퍼런스(2026-11-23)를 따른다: 나무 판 + 금속 집게, 크림 종이, 큰 제목, 마스킹
+// 테이프로 붙인 내 사진("나!" 화살표), 오른쪽 항목 줄(이름·공부 시간·연속 공부·방 순위·목표), 아래 항목 줄(과목·이번 공부·
+// 공부일), 폴라로이드(오늘의 공부방), 티켓 스티커와 클립, 앱 스티커. 레퍼런스의 캐릭터·로고·문구는 쓰지 않는다.
+// 톤은 앱 공부 화면: 섬 팔레트 낮 값(tokens.css), 둥근 글꼴, 햇살 노랑 강조, 앱 스티커 아트(원본 PocketTime
+// assets/icons/study_*.png). 화면과 저장 이미지(인스타그램 스토리 1080×1920)는 같은 함수로 그린다.
 // 다크 모드에서 저장해도 같은 이미지가 나오도록 값은 낮 팔레트로 고정한다.
 import { paintClockField } from '../../../core/ui/IslandBackground'
+import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
 import { formatStudyDuration } from '../home/studyFormat'
 import { flameShape } from '../stats/StreakFlame'
 import { goalReached, type StudyRecap } from './studyRecap'
 
-/** 섬 팔레트 낮 값(tokens.css :root·.palette-day). */
+/** 섬 팔레트 낮 값(tokens.css :root·.palette-day)과 판·집게 색. */
 const c = {
-  paper: '#fffaeb', ledge: '#e7daba', line: '#e9dfc6', muted: '#efe6d0', mutedLedge: '#d9cba8',
-  ink: '#5e4a32', inkSoft: '#9a8667',
-  lake: '#609baf', lakePattern: '#528ba0',
+  paper: '#fffaeb', paperLine: '#f3e9d2', muted: '#efe6d0',
+  ink: '#5e4a32', inkSoft: '#9a8667', dash: '#d9c9a6',
+  lake: '#609baf', lakePattern: '#528ba0', title: '#3e8da6',
   sun: '#f8d66a', sunLedge: '#d9b246', onSun: '#5e4a32',
-  white: '#ffffff',
+  board: '#d8a46a', boardLedge: '#b5814a', boardEdge: '#e8bd86',
+  metal: '#a4a7ad', metalDark: '#7d8087', metalLight: '#d3d5d9',
+  tape: 'rgba(150,205,228,0.78)', white: '#ffffff',
 } as const
 
 const fonts = {
@@ -28,300 +29,296 @@ const fonts = {
   mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
 } as const
 
-/** 카드(트레이딩 카드 2:3). 아래 10은 종이 턱. */
-const face = { width: 368, height: 552, radius: 28, ledge: 10, frame: 12 } as const
-/** 사진 칸 = 테두리 안 전부. 3D 방은 이 비율로 찍는다. */
-export const photoSize = { width: face.width - face.frame * 2, height: face.height - face.frame * 2 } as const
-const plate = { inset: 14, radius: 22, ledge: 4 } as const
-const tile = { height: 92, gap: 10 } as const
-/** 순위 칸 트로피: 앱 스티커 아트(원본 PocketTime assets/icons/study_trophy.png, 공부 화면 트로피 단추). */
-const trophyUrl = '/assets/icons/study_trophy.png'
+/** 시트(논리 pt). 위 14는 집게가 판 위로 솟는 자리, 아래 8은 판 턱. */
+const top = 14
+const board = { width: 400, height: 540, radius: 24, ledge: 8 } as const
+export const sheet = { width: board.width, height: top + board.height + board.ledge } as const
+const paper = { x: 18, y: top + 32, width: board.width - 36, height: board.height - 50, radius: 14 } as const
+/** 프로필 사진(정면)과 폴라로이드(전경) 크기. 3D 방은 이 비율로 찍는다. */
+export const portraitSize = { width: 136, height: 148 } as const
+export const sceneSize = { width: 98, height: 98 } as const
 
-export type CardAssets = { trophy: HTMLImageElement }
+const stickerUrls = {
+  trophy: '/assets/icons/study_trophy.png',
+  focus: '/assets/icons/study_focus.png',
+  music: '/assets/icons/study_music.png',
+  camera: '/assets/icons/study_camera.png',
+} as const
+export type CardAssets = Record<keyof typeof stickerUrls, HTMLImageElement>
 
-type Rect = { x: number; y: number; width: number; height: number }
-export type CardLayout = {
-  width: number
-  height: number
-  photo: Rect & { radius: number }
-  top: Rect
-  pill: Rect | null
-  tiles: Rect
-  date: { x: number; y: number }
-}
-
-export function cardLayout(recap: StudyRecap): CardLayout {
-  const art = { x: face.frame, y: face.frame, width: photoSize.width, height: photoSize.height, radius: 18 }
-  const inner = { x: art.x + plate.inset, width: art.width - plate.inset * 2 }
-  const top = { x: inner.x, y: art.y + plate.inset, width: inner.width, height: 106 }
-  const pill = sideLabel(recap) ? { x: 0, y: top.y + top.height - 4, width: 0, height: 30 } : null
-  const tiles = { x: inner.x, y: art.y + art.height - plate.inset - plate.ledge - tile.height, width: inner.width, height: tile.height }
-  return {
-    width: face.width,
-    height: face.height + face.ledge,
-    photo: art,
-    top,
-    pill,
-    tiles,
-    date: { x: art.x + art.width - 16, y: tiles.y - 14 },
-  }
-}
-
-/** 글꼴과 트로피 그림을 미리 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
+/** 글꼴과 스티커 그림을 미리 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
 export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
   const sample = [
-    webText.recapTimeLabel, webText.recapStreakLabel, webText.recapStreakUnit, webText.recapRankLabel, webText.recapRankUnit,
-    recap.rank ? webText.recapRankTotal(recap.rank.total) : '', sideLabel(recap) ?? '',
-    formatStudyDuration(recap.todaySeconds), webText.recapBrand, '0123456789.·+/시간분일등명',
+    webText.recapSheetTitle, webText.recapSheetBrand, webText.recapMe, webText.recapScene, recap.nickname, goalText(recap) ?? '',
+    ...Object.values(webText.recapFields), ...recap.subjects.map((s) => s.subject ?? t('studySubjectNone')),
+    formatStudyDuration(recap.todaySeconds), formatStudyDuration(recap.sessionSeconds), webText.recapBrand,
+    '0123456789.·+/%!()시간분일등명과목월화수목금토일', t('studySubjectNone'),
   ].join('')
-  const trophy = new Promise<HTMLImageElement>((resolve, reject) => {
+  const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`trophy load failed: ${trophyUrl}`))
-    img.src = trophyUrl
+    img.onerror = () => reject(new Error(`sticker load failed: ${src}`))
+    img.src = src
   })
-  const [img] = await Promise.all([
-    trophy,
+  const [trophy, focus, music, camera] = await Promise.all([
+    load(stickerUrls.trophy), load(stickerUrls.focus), load(stickerUrls.music), load(stickerUrls.camera),
     document.fonts.load(`800 16px ${fonts.round}`, sample),
     ...[600, 700, 800].map((w) => document.fonts.load(`${w} 16px ${fonts.sans}`, sample)),
-  ])
-  return { trophy: img }
+  ] as const)
+  return { trophy, focus, music, camera }
 }
 
-/** 시간 아래 알약: 목표를 채웠으면 "목표 달성", 못 채웠으면 "목표의 n%", 목표가 없고 어제보다 더 했으면 "어제보다 +n". */
-function sideLabel(recap: StudyRecap): string | null {
-  if (goalReached(recap)) return webText.recapGoalReached
-  if (recap.goalSeconds != null && recap.goalSeconds > 0) {
-    return webText.recapGoalPercent(Math.floor((recap.todaySeconds * 100) / recap.goalSeconds))
-  }
+/** 목표 줄: 채웠으면 "달성!", 못 채웠으면 "n%", 목표가 없고 어제보다 더 했으면 "어제보다 +n". 아니면 줄을 뺀다. */
+function goalText(recap: StudyRecap): string | null {
+  if (goalReached(recap)) return webText.recapGoalDone
+  if (recap.goalSeconds != null && recap.goalSeconds > 0) return webText.recapGoalPercentShort(Math.floor((recap.todaySeconds * 100) / recap.goalSeconds))
   const diff = recap.todaySeconds - recap.yesterdaySeconds
   if (diff > 0 && Math.trunc(diff / 60) > 0) return webText.recapMoreChip(formatStudyDuration(diff))
   return null
 }
 
-// ── 1겹: 본체(테두리·사진·필름 날짜) ──
+const weekdays = ['월', '화', '수', '목', '금', '토', '일']
+function dateText(studyDate: string): string {
+  const [y, m, d] = studyDate.split('-').map(Number) as [number, number, number]
+  return `${y}.${String(m).padStart(2, '0')}.${String(d).padStart(2, '0')} (${weekdays[(new Date(y, m - 1, d).getDay() + 6) % 7]})`
+}
 
-export function drawCardBase(ctx: CanvasRenderingContext2D, recap: StudyRecap): void {
-  const L = cardLayout(recap)
-  const W = face.width
-  const H = face.height
-  // 종이 턱 + 크림 테두리(포일이 이 위에 무지개를 입힌다).
-  ctx.fillStyle = c.ledge
-  ctx.beginPath(); ctx.roundRect(0, face.ledge, W, H, face.radius); ctx.fill()
+// ── 시트 ──
+
+export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets): void {
+  drawBoard(ctx)
+  drawPaper(ctx)
+  drawClip(ctx)
+
+  // 제목: 둥근 글꼴 호수 청록 + 흰 테두리, 아래 미세 글자.
+  const tx = board.width / 2 - 40
+  ctx.save()
+  ctx.font = `800 30px ${fonts.round}`
+  ctx.textAlign = 'center'
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = 6; ctx.strokeStyle = c.white
+  ctx.strokeText(webText.recapSheetTitle, tx, top + 82)
+  ctx.fillStyle = c.title
+  ctx.fillText(webText.recapSheetTitle, tx, top + 82)
+  ctx.restore()
+  text(ctx, `${webText.recapSheetBrand} · ${dateText(recap.studyDate)}`, tx, top + 100, { font: `700 8.5px ${fonts.mono}`, color: c.inkSoft, align: 'center', spacing: 0.8 })
+
+  drawTicket(ctx, recap, 322, top + 76)
+  drawPortrait(ctx, recap)
+  drawTopRows(ctx, recap)
+  sticker(ctx, assets.music, 64, top + 330, 46, -14)
+  if (recap.rank) sticker(ctx, assets.trophy, 192, top + 330, 40, 10)
+  else sticker(ctx, assets.focus, 192, top + 332, 36, 10)
+  drawBottomRows(ctx, recap)
+  drawPolaroid(ctx, recap, assets)
+}
+
+function drawBoard(ctx: CanvasRenderingContext2D) {
+  const y = top
+  ctx.fillStyle = c.boardLedge
+  ctx.beginPath(); ctx.roundRect(0, y + board.ledge, board.width, board.height, board.radius); ctx.fill()
+  ctx.fillStyle = c.board
+  ctx.beginPath(); ctx.roundRect(0, y, board.width, board.height, board.radius); ctx.fill()
+  // 판 가장자리 밝은 선과 나뭇결 몇 줄.
+  ctx.save()
+  ctx.beginPath(); ctx.roundRect(0, y, board.width, board.height, board.radius); ctx.clip()
+  ctx.strokeStyle = c.boardEdge; ctx.lineWidth = 3
+  ctx.beginPath(); ctx.roundRect(4, y + 4, board.width - 8, board.height - 8, board.radius - 4); ctx.stroke()
+  ctx.strokeStyle = 'rgba(150,100,55,0.18)'; ctx.lineWidth = 1
+  for (let i = 0; i < 7; i++) {
+    const gy = y + 60 + i * 74
+    ctx.beginPath(); ctx.moveTo(0, gy)
+    ctx.bezierCurveTo(120, gy - 6, 260, gy + 8, board.width, gy - 2); ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function drawPaper(ctx: CanvasRenderingContext2D) {
+  const { x, y, width: w, height: h, radius } = paper
+  ctx.save()
+  ctx.shadowColor = 'rgba(90,55,20,0.28)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3
   ctx.fillStyle = c.paper
-  ctx.beginPath(); ctx.roundRect(0, 0, W, H, face.radius); ctx.fill()
-
-  // 사진: 테두리 안을 꽉 채운다. 사진이 없으면 시계 무늬 호수.
-  const { x, y, width: w, height: h, radius } = L.photo
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, radius); ctx.fill()
+  ctx.restore()
+  // 옅은 모눈.
   ctx.save()
   ctx.beginPath(); ctx.roundRect(x, y, w, h, radius); ctx.clip()
-  if (recap.photo) {
-    const img = recap.photo
-    const s = Math.max(w / img.width, h / img.height)
-    ctx.drawImage(img, x + (w - img.width * s) / 2, y + (h - img.height * s) / 2, img.width * s, img.height * s)
-  } else {
-    ctx.save(); ctx.translate(x, y); paintClockField(ctx, w, h, c.lake, c.lakePattern, true); ctx.restore()
-  }
-  ctx.restore()
-  // 사진 가장자리 안쪽 얇은 선(인쇄된 창 느낌).
-  ctx.save()
-  ctx.strokeStyle = 'rgba(94,74,50,0.25)'; ctx.lineWidth = 1.2
-  ctx.beginPath(); ctx.roundRect(x + 0.6, y + 0.6, w - 1.2, h - 1.2, radius); ctx.stroke()
-  ctx.restore()
-
-  // 필름 날짜(사진 오른쪽, 아래 칸 위).
-  const [yy, mm, dd] = recap.studyDate.split('-')
-  const stamp = `'${yy!.slice(2)} ${mm} ${dd}`
-  ctx.save()
-  ctx.font = `800 18px ${fonts.mono}`
-  ctx.letterSpacing = '2px'
-  ctx.textAlign = 'right'
-  ctx.fillStyle = 'rgba(40,20,10,0.45)'
-  ctx.fillText(stamp, L.date.x + 1, L.date.y + 1.5)
-  ctx.shadowColor = 'rgba(255,120,40,0.9)'; ctx.shadowBlur = 8
-  ctx.fillStyle = '#ff9a4a'
-  ctx.fillText(stamp, L.date.x, L.date.y)
+  ctx.strokeStyle = c.paperLine; ctx.lineWidth = 0.8
+  for (let gx = x + 18; gx < x + w; gx += 18) { ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx, y + h); ctx.stroke() }
+  for (let gy = y + 18; gy < y + h; gy += 18) { ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + w, gy); ctx.stroke() }
   ctx.restore()
 }
 
-// ── 3겹: 명판(포일 위) ──
+/** 금속 집게: 판에 붙은 받침 + 둥근 손잡이 + 리벳. 평평한 면 세 단으로 입체를 낸다. */
+function drawClip(ctx: CanvasRenderingContext2D) {
+  const cx = board.width / 2
+  ctx.save()
+  ctx.shadowColor = 'rgba(60,40,20,0.3)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3
+  ctx.fillStyle = c.metalDark
+  ctx.beginPath(); ctx.roundRect(cx - 74, top + 6, 148, 40, 10); ctx.fill()
+  ctx.restore()
+  ctx.fillStyle = c.metal
+  ctx.beginPath(); ctx.roundRect(cx - 74, top + 4, 148, 36, 10); ctx.fill()
+  // 손잡이(판 위로 솟음).
+  ctx.fillStyle = c.metalDark
+  ctx.beginPath(); ctx.roundRect(cx - 50, 2, 100, 24, 12); ctx.fill()
+  ctx.fillStyle = c.metalLight
+  ctx.beginPath(); ctx.roundRect(cx - 50, 0, 100, 21, 11); ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.beginPath(); ctx.roundRect(cx - 40, 4, 80, 4, 2); ctx.fill()
+  // 받침 위 밝은 띠와 리벳.
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'
+  ctx.beginPath(); ctx.roundRect(cx - 66, top + 24, 132, 4, 2); ctx.fill()
+  for (const rx of [cx - 60, cx + 60]) {
+    ctx.fillStyle = c.metalDark; ctx.beginPath(); ctx.arc(rx, top + 30, 4.5, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = c.metalLight; ctx.beginPath(); ctx.arc(rx - 1, top + 29, 2, 0, Math.PI * 2); ctx.fill()
+  }
+}
 
-export function drawPlates(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets): void {
-  const L = cardLayout(recap)
-  const panel = (r: Rect, color: string, ledge: string, radius: number = plate.radius) => {
+/** 티켓 스티커(서비스 이름·바코드)와 그 위에 꽂힌 클립. */
+function drawTicket(ctx: CanvasRenderingContext2D, recap: StudyRecap, cx: number, cy: number) {
+  const w = 104
+  const h = 50
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate((8 * Math.PI) / 180)
+  // 반달 홈은 같은 캔버스의 아래 그림을 지우지 않도록 따로 그린 티켓에서 판다.
+  const m = ctx.getTransform()
+  const scale = Math.hypot(m.a, m.b) || 1
+  const ticket = document.createElement('canvas')
+  ticket.width = Math.ceil(w * scale); ticket.height = Math.ceil(h * scale)
+  const tc = ticket.getContext('2d')!
+  tc.setTransform(scale, 0, 0, scale, 0, 0)
+  tc.fillStyle = '#f6edd5'
+  tc.beginPath(); tc.roundRect(0, 0, w, h, 6); tc.fill()
+  tc.globalCompositeOperation = 'destination-out'
+  for (const sx of [0, w]) { tc.beginPath(); tc.arc(sx, h / 2, 5, 0, Math.PI * 2); tc.fill() }
+  ctx.save()
+  ctx.shadowColor = 'rgba(90,55,20,0.22)'; ctx.shadowBlur = 5; ctx.shadowOffsetY = 2
+  ctx.drawImage(ticket, -w / 2, -h / 2, w, h)
+  ctx.restore()
+  ctx.strokeStyle = 'rgba(154,134,103,0.6)'; ctx.lineWidth = 1; ctx.setLineDash([2, 2])
+  ctx.beginPath(); ctx.roundRect(-w / 2 + 8, -h / 2 + 4, w - 16, h - 8, 4); ctx.stroke()
+  ctx.setLineDash([])
+  clockIcon(ctx, -w / 2 + 20, -2, 8, c.ink, 1.8)
+  text(ctx, 'STUDY', -w / 2 + 33, -6, { font: `800 9px ${fonts.mono}`, color: c.ink, spacing: 0.6 })
+  text(ctx, 'VILLAGE', -w / 2 + 33, 5, { font: `800 9px ${fonts.mono}`, color: c.ink, spacing: 0.6 })
+  // 바코드: 기록 날짜 숫자로 굵기를 정한다.
+  const digits = recap.studyDate.replace(/-/g, '')
+  let bx = -w / 2 + 33
+  for (let i = 0; i < 18 && bx < w / 2 - 12; i++) {
+    const bw = 0.8 + (Number(digits[i % digits.length]) % 3) * 0.6
+    ctx.fillStyle = c.ink
+    ctx.fillRect(bx, 10, bw, 8)
+    bx += bw + 1.4
+  }
+  ctx.restore()
+  paperclip(ctx, cx + 40, cy - 26, 12)
+}
+
+/** 프로필 사진: 흰 테두리, 마스킹 테이프, "나!" 화살표. */
+function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+  const fw = portraitSize.width + 12
+  const fh = portraitSize.height + 12
+  const cx = 34 + fw / 2
+  const cy = top + 122 + fh / 2
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate((-3 * Math.PI) / 180)
+  ctx.save()
+  ctx.shadowColor = 'rgba(90,55,20,0.25)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3
+  ctx.fillStyle = c.white
+  ctx.fillRect(-fw / 2, -fh / 2, fw, fh)
+  ctx.restore()
+  photo(ctx, recap.photo, -portraitSize.width / 2, -portraitSize.height / 2, portraitSize.width, portraitSize.height)
+  tape(ctx, -fw / 2 + 10, -fh / 2 + 4, -38, 64)
+  ctx.restore()
+  // "나!" 와 휜 화살표.
+  text(ctx, webText.recapMe, cx + 40, top + 112, { font: `800 15px ${fonts.round}`, color: c.title })
+  ctx.save()
+  ctx.strokeStyle = c.title; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
+  ctx.beginPath(); ctx.moveTo(cx + 36, top + 108); ctx.quadraticCurveTo(cx + 18, top + 104, cx + 12, top + 124); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx + 8, top + 118); ctx.lineTo(cx + 12, top + 125); ctx.lineTo(cx + 18, top + 120); ctx.stroke()
+  ctx.restore()
+}
+
+type Row = { label: string; draw: (x: number, base: number, maxW: number) => void }
+
+/** 항목 줄 한 묶음: 라벨(굵은 갈색) + 값 + 점선 밑줄. */
+function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, valueX: number, right: number, startY: number, rowH: number) {
+  list.forEach((r, i) => {
+    const base = startY + i * rowH + rowH - 12
+    text(ctx, r.label, x, base, { font: `800 12px ${fonts.sans}`, color: c.inkSoft })
+    r.draw(valueX, base, right - valueX)
     ctx.save()
-    ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4
-    ctx.fillStyle = ledge
-    ctx.beginPath(); ctx.roundRect(r.x, r.y + plate.ledge, r.width, r.height, radius); ctx.fill()
+    ctx.strokeStyle = c.dash; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3])
+    ctx.beginPath(); ctx.moveTo(x, base + 8); ctx.lineTo(right, base + 8); ctx.stroke()
     ctx.restore()
-    ctx.fillStyle = color
-    ctx.beginPath(); ctx.roundRect(r.x, r.y, r.width, r.height, radius); ctx.fill()
-  }
+  })
+}
 
-  // 위 명판: 오늘 공부한 시간.
-  panel(L.top, c.paper, c.ledge)
-  const mid = L.top.x + L.top.width / 2
-  text(ctx, webText.recapTimeLabel, mid, L.top.y + 28, { font: `800 14px ${fonts.sans}`, color: c.inkSoft, align: 'center' })
-  drawDuration(ctx, recap.todaySeconds, mid, L.top.y + 88, L.top.width - 28)
-
-  // 명판 아래에 걸친 알약.
-  const side = sideLabel(recap)
-  if (side && L.pill) {
-    const reached = goalReached(recap)
-    const font = `800 14px ${fonts.sans}`
-    const w = measure(ctx, side, font) + 32
-    const x = mid - w / 2
-    const y = L.pill.y
-    ctx.fillStyle = reached ? c.sunLedge : c.mutedLedge
-    ctx.beginPath(); ctx.roundRect(x, y + 3, w, L.pill.height, L.pill.height / 2); ctx.fill()
-    ctx.fillStyle = reached ? c.sun : c.muted
-    ctx.beginPath(); ctx.roundRect(x, y, w, L.pill.height, L.pill.height / 2); ctx.fill()
-    text(ctx, side, mid, y + 20, { font, color: reached ? c.onSun : c.ink, align: 'center' })
-  }
-
-  // 아래 칸: 연속 공부 · 방 순위. 순위가 없으면 연속 칸이 꽉 찬다.
-  const w = recap.rank ? (L.tiles.width - tile.gap) / 2 : L.tiles.width
-  const lit = recap.streakDays > 0
-  const streak = { x: L.tiles.x, y: L.tiles.y, width: w, height: tile.height }
-  panel(streak, c.paper, c.ledge, 20)
-  stat(ctx, streak, webText.recapStreakLabel, (ix, iy) => flame(ctx, ix + 2, iy - 2, 36, lit), String(recap.streakDays), webText.recapStreakUnit, lit ? c.ink : c.inkSoft, c.inkSoft)
+function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+  const goal = goalText(recap)
+  const list: Row[] = [
+    { label: webText.recapFields.name, draw: (x, b, w) => text(ctx, ellipsize(ctx, recap.nickname, `800 16px ${fonts.round}`, w), x, b, { font: `800 16px ${fonts.round}`, color: c.ink }) },
+    { label: webText.recapFields.time, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.todaySeconds), x, b, `800 19px ${fonts.round}`) },
+    { label: webText.recapFields.streak, draw: (x, b) => {
+      flame(ctx, x, b - 16, 18, recap.streakDays > 0)
+      text(ctx, t('studyStatsStreakValue', { count: recap.streakDays }), x + 20, b, { font: `800 17px ${fonts.round}`, color: recap.streakDays > 0 ? c.ink : c.inkSoft })
+    } },
+  ]
   if (recap.rank) {
-    const rank = { x: L.tiles.x + w + tile.gap, y: L.tiles.y, width: w, height: tile.height }
-    panel(rank, c.sun, c.sunLedge, 20)
-    stat(ctx, rank, webText.recapRankLabel, (ix, iy) => { ctx.drawImage(assets.trophy, ix - 2, iy - 4, 38, 38) },
-      String(recap.rank.position), webText.recapRankUnit, c.onSun, 'rgba(94,74,50,0.72)', webText.recapRankTotal(recap.rank.total))
+    const rank = recap.rank
+    list.push({ label: webText.recapFields.rank, draw: (x, b) => {
+      const num = `${rank.position}${webText.recapRankUnit}`
+      highlight(ctx, num, x, b, `800 19px ${fonts.round}`)
+      text(ctx, webText.recapRankTotal(rank.total), x + measure(ctx, num, `800 19px ${fonts.round}`) + 6, b, { font: `700 11.5px ${fonts.sans}`, color: c.inkSoft })
+    } })
   }
+  if (goal) {
+    list.push({ label: webText.recapFields.goal, draw: (x, b) => {
+      if (goalReached(recap)) {
+        const font = `800 12.5px ${fonts.sans}`
+        const w = measure(ctx, goal, font) + 20
+        ctx.fillStyle = c.sunLedge; ctx.beginPath(); ctx.roundRect(x, b - 15 + 2, w, 20, 10); ctx.fill()
+        ctx.fillStyle = c.sun; ctx.beginPath(); ctx.roundRect(x, b - 15, w, 20, 10); ctx.fill()
+        text(ctx, goal, x + 10, b - 1, { font, color: c.onSun })
+      } else {
+        text(ctx, goal, x, b, { font: `800 14px ${fonts.round}`, color: c.ink })
+      }
+    } })
+  }
+  rows(ctx, list, 200, 262, 372, top + 124, 36)
 }
 
-/** 칸 안: 라벨(위 가운데) + 아이콘 + 큰 숫자 + 단위(+ 꼬리). */
-function stat(ctx: CanvasRenderingContext2D, r: Rect, label: string, icon: (ix: number, iy: number) => void, num: string, unit: string, ink: string, soft: string, tail?: string) {
-  text(ctx, label, r.x + r.width / 2, r.y + 26, { font: `800 13px ${fonts.sans}`, color: soft, align: 'center' })
-  const numFont = `800 40px ${fonts.round}`
-  const unitFont = `800 17px ${fonts.round}`
-  const tailFont = `800 12.5px ${fonts.sans}`
-  const iconW = 34
-  const tailW = tail ? 5 + measure(ctx, tail, tailFont) : 0
-  const total = iconW + 6 + measure(ctx, num, numFont) + 3 + measure(ctx, unit, unitFont) + tailW
-  let cx = r.x + (r.width - total) / 2
-  const base = r.y + 74
-  icon(cx, base - 32)
-  cx += iconW + 6
-  text(ctx, num, cx, base, { font: numFont, color: ink })
-  cx += measure(ctx, num, numFont) + 3
-  text(ctx, unit, cx, base, { font: unitFont, color: soft })
-  if (tail) text(ctx, tail, cx + measure(ctx, unit, unitFont) + 5, base, { font: tailFont, color: soft })
+function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
+  const names = recap.subjects.map((s) => s.subject ?? t('studySubjectNone'))
+  const valueFont = `800 13.5px ${fonts.round}`
+  const plain = (value: string) => (x: number, b: number, w: number) => text(ctx, ellipsize(ctx, value, valueFont, w), x, b, { font: valueFont, color: c.ink })
+  const list: Row[] = [
+    { label: webText.recapFields.topSubject, draw: plain(names[0] ?? t('studySubjectNone')) },
+    { label: webText.recapFields.subjects, draw: plain(names.length > 0 ? `${webText.recapSubjectCount(names.length)} · ${names.join(', ')}` : t('studySubjectNone')) },
+    { label: webText.recapFields.session, draw: plain(formatStudyDuration(recap.sessionSeconds)) },
+    { label: webText.recapFields.date, draw: plain(dateText(recap.studyDate)) },
+  ]
+  rows(ctx, list, 34, 122, 250, top + 356, 34)
 }
 
-/** "6시간 25분": 숫자는 크게, 단위는 작게, 숫자 아래 절반에 햇살 형광펜. */
-function drawDuration(ctx: CanvasRenderingContext2D, seconds: number, mid: number, baseline: number, maxWidth: number) {
-  const parts = formatStudyDuration(seconds).match(/\d+|\D+/g) ?? []
-  let big = 64
-  const layout = () => parts.map((p) => {
-    const digit = /\d/.test(p)
-    const value = digit ? p : p.trim()
-    const font = digit ? `800 ${big}px ${fonts.round}` : `800 ${Math.round(big * 0.38)}px ${fonts.round}`
-    return { value, digit, font, width: measure(ctx, value, font) }
-  })
-  let items = layout()
-  const gap = (i: number) => (i === 0 ? 0 : items[i]!.digit ? 12 : 4)
-  const total = () => items.reduce((sum, it, i) => sum + it.width + gap(i), 0)
-  while (total() > maxWidth && big > 36) { big -= 2; items = layout() }
-  let x = mid - total() / 2
-  items.forEach((it, i) => {
-    x += gap(i)
-    if (it.digit) {
-      ctx.fillStyle = c.sun
-      ctx.beginPath(); ctx.roundRect(x - 4, baseline - big * 0.34, it.width + 8, big * 0.38, big * 0.12); ctx.fill()
-      text(ctx, it.value, x, baseline, { font: it.font, color: c.ink })
-    } else {
-      text(ctx, it.value, x, baseline, { font: it.font, color: c.inkSoft })
-    }
-    x += it.width
-  })
-}
-
-// ── 2겹: 홀로그램 포일(저장 이미지용) ──
-
-/**
- * 화면의 CSS 포일(recap.module.css .foil)을 한 순간(빛이 왼쪽 위)으로 굳혀 입힌다:
- * 테두리에 진한 곱하기 무지개 + 반짝이, 사진에는 옅은 무지개 → 사진 칸에만 닷지 빛 띠·반짝이·에칭 줄·빛 반사.
- */
-export function drawFoil(ctx: CanvasRenderingContext2D, recap: StudyRecap): void {
-  const L = cardLayout(recap)
-  const W = face.width
-  const H = face.height
+/** 폴라로이드: 3인칭으로 본 오늘의 공부방, 아래 여백에 글씨, 카메라 스티커. */
+function drawPolaroid(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
+  const w = sceneSize.width + 14
+  const h = sceneSize.height + 40
+  const cx = 318
+  const cy = top + 440
   ctx.save()
-  ctx.beginPath(); ctx.roundRect(0, 0, W, H, face.radius); ctx.clip()
-  const angle = ((115 - 90) * Math.PI) / 180
-  const dx = Math.cos(angle)
-  const dy = Math.sin(angle)
-  const along = (cx: number, cy: number, span: number) =>
-    ctx.createLinearGradient(cx - dx * span / 2, cy - dy * span / 2, cx + dx * span / 2, cy + dy * span / 2)
-
-  const hues = [[0, 78], [40, 75], [70, 72], [150, 75], [195, 75], [250, 80], [310, 80], [360, 78]] as const
-  const rainbow = along(W / 2, H / 2, W * Math.abs(dx) + H * Math.abs(dy))
-  for (let k = 0; k < 2; k++) hues.forEach(([h, l], i) => rainbow.addColorStop(Math.min(1, (k * 7 + i) / 15), `hsl(${h} 95% ${l}%)`))
-  const { x: px, y: py, width: pw, height: ph, radius } = L.photo
-  // 테두리(사진 칸을 뺀 고리)에는 진하게, 사진 위에는 옅게.
-  ctx.globalCompositeOperation = 'multiply'
-  ctx.fillStyle = rainbow
+  ctx.translate(cx, cy); ctx.rotate((6 * Math.PI) / 180)
   ctx.save()
-  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.roundRect(px, py, pw, ph, radius); ctx.clip('evenodd')
-  ctx.globalAlpha = 0.7
-  ctx.fillRect(0, 0, W, H)
+  ctx.shadowColor = 'rgba(90,55,20,0.28)'; ctx.shadowBlur = 9; ctx.shadowOffsetY = 4
+  ctx.fillStyle = c.white
+  ctx.fillRect(-w / 2, -h / 2, w, h)
   ctx.restore()
-  ctx.globalAlpha = 0.22
-  ctx.fillRect(px, py, pw, ph)
-
-  ctx.globalCompositeOperation = 'overlay'
-  ctx.globalAlpha = 1
-  let a = 1234567
-  const rand = () => { a = (a * 1103515245 + 12345) >>> 0; return a / 4294967296 }
-  const specks = (x0: number, y0: number, w: number, h: number, count: number, alpha: number) => {
-    for (let i = 0; i < count; i++) {
-      const r = rand() < 0.9 ? 0.25 + rand() * 0.3 : 0.5 + rand() * 0.6
-      ctx.fillStyle = `hsla(${Math.floor(rand() * 360)}, 100%, ${85 + rand() * 15}%, ${(0.35 + rand() * 0.65) * alpha})`
-      ctx.beginPath(); ctx.arc(x0 + rand() * w, y0 + rand() * h, r, 0, Math.PI * 2); ctx.fill()
-    }
-  }
-  ctx.save()
-  ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.roundRect(px, py, pw, ph, radius); ctx.clip('evenodd')
-  specks(0, 0, W, H, 1400, 0.6)
+  photo(ctx, recap.scenePhoto, -sceneSize.width / 2, -h / 2 + 7, sceneSize.width, sceneSize.height)
+  text(ctx, webText.recapScene, 0, h / 2 - 12, { font: `800 11.5px ${fonts.round}`, color: c.inkSoft, align: 'center' })
   ctx.restore()
-
-  ctx.save()
-  ctx.beginPath(); ctx.roundRect(px, py, pw, ph, radius); ctx.clip()
-  const band = along(px + pw / 2, py + ph / 2, pw * Math.abs(dx) + ph * Math.abs(dy))
-  band.addColorStop(0, 'rgba(255,255,255,0)')
-  band.addColorStop(0.2, 'rgba(255,255,255,0)')
-  band.addColorStop(0.3, 'hsla(50,100%,80%,0.75)')
-  band.addColorStop(0.35, 'hsla(180,100%,82%,0.8)')
-  band.addColorStop(0.4, 'hsla(290,100%,86%,0.75)')
-  band.addColorStop(0.5, 'rgba(255,255,255,0)')
-  band.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.globalCompositeOperation = 'color-dodge'
-  ctx.globalAlpha = 0.4
-  ctx.fillStyle = band
-  ctx.fillRect(px, py, pw, ph)
-  ctx.globalCompositeOperation = 'overlay'
-  ctx.globalAlpha = 1
-  specks(px, py, pw, ph, 1200, 0.5)
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 0.5
-  const run = ph / Math.tan((62 * Math.PI) / 180)
-  for (let x = px - run; x < px + pw; x += 4 / Math.sin((62 * Math.PI) / 180)) {
-    ctx.beginPath(); ctx.moveTo(x, py + ph); ctx.lineTo(x + run, py); ctx.stroke()
-  }
-  const gx = px + pw * 0.3
-  const gy = py + ph * 0.3
-  const glare = ctx.createRadialGradient(gx, gy, 0, gx, gy, Math.hypot(pw, ph) * 0.62)
-  glare.addColorStop(0, 'rgba(255,255,255,0.7)')
-  glare.addColorStop(0.5, 'rgba(255,255,255,0.15)')
-  glare.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.globalCompositeOperation = 'soft-light'
-  ctx.fillStyle = glare
-  ctx.fillRect(px, py, pw, ph)
-  ctx.restore()
-  ctx.restore()
+  sticker(ctx, assets.camera, cx + 46, cy - 62, 40, 14)
 }
 
 // ── 저장 이미지(스토리) ──
@@ -336,28 +333,19 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap, assets: 
   if (!ctx) throw new Error('canvas 2d context unavailable')
   ctx.setTransform(scale, 0, 0, scale, 0, 0)
   ctx.imageSmoothingQuality = 'high'
-
   // 바탕: 시계 무늬 호수(앱 통계 화면 바탕).
   paintClockField(ctx, W, H, c.lake, c.lakePattern, true)
-
-  // 카드: 아래 날짜·이름 자리를 남기고 가운데, 살짝 기울여 그림자와 함께.
-  const L = cardLayout(recap)
-  const k = Math.min(1, (H - 170) / L.height)
-  const cx = W / 2
-  const cy = (H - 70) / 2 + 10
+  // 시트: 폭에 맞춰 가운데, 살짝 기울여 그림자와 함께.
+  const k = Math.min((W - 32) / sheet.width, (H - 170) / sheet.height)
   ctx.save()
-  ctx.translate(cx, cy); ctx.scale(k, k); ctx.rotate((-1.5 * Math.PI) / 180); ctx.translate(-L.width / 2, -L.height / 2)
-  const layerCanvas = layer(L.width, L.height, scale, (cc) => { drawCardBase(cc, recap); drawFoil(cc, recap); drawPlates(cc, recap, assets) })
+  ctx.translate(W / 2, (H - 70) / 2 + 10); ctx.scale(k, k); ctx.rotate((-1.5 * Math.PI) / 180); ctx.translate(-sheet.width / 2, -sheet.height / 2)
+  const base = layer(sheet.width, sheet.height, scale, (cc) => drawSheet(cc, recap, assets))
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.26)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 14
-  ctx.drawImage(layerCanvas, 0, 0, L.width, L.height)
+  ctx.drawImage(base, 0, 0, sheet.width, sheet.height)
   ctx.restore()
   ctx.restore()
-
-  // 아래: 날짜 · 서비스 이름.
-  const [y, m, d] = recap.studyDate.split('-')
-  text(ctx, `${y}.${m}.${d}`, W / 2, H - 52, { font: `700 12px ${fonts.mono}`, color: c.white, align: 'center', shadow: true })
-  text(ctx, webText.recapBrand, W / 2, H - 30, { font: `800 15px ${fonts.round}`, color: c.white, align: 'center', shadow: true })
+  text(ctx, webText.recapBrand, W / 2, H - 34, { font: `800 15px ${fonts.round}`, color: c.white, align: 'center', shadow: true })
 }
 
 /** 논리 크기 w×h를 scale배 캔버스에 그린다. */
@@ -373,7 +361,73 @@ export function layer(w: number, h: number, scale: number, draw: (ctx: CanvasRen
   return canvas
 }
 
-// ── 도우미 ──
+// ── 조각 도우미 ──
+
+/** 사진을 칸에 꽉 채운다(가운데 기준 잘라 냄). 사진이 없으면 시계 무늬 칸. */
+function photo(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement | null, x: number, y: number, w: number, h: number) {
+  ctx.save()
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip()
+  if (img) {
+    const s = Math.max(w / img.width, h / img.height)
+    ctx.drawImage(img, x + (w - img.width * s) / 2, y + (h - img.height * s) / 2, img.width * s, img.height * s)
+  } else {
+    ctx.translate(x, y); paintClockField(ctx, w, h, c.muted, c.dash, true)
+  }
+  ctx.restore()
+}
+
+/** 숫자에 햇살 형광펜을 긋고 쓴다. */
+function highlight(ctx: CanvasRenderingContext2D, value: string, x: number, base: number, font: string) {
+  const w = measure(ctx, value, font)
+  ctx.fillStyle = c.sun
+  ctx.beginPath(); ctx.roundRect(x - 3, base - 8, w + 6, 9, 4); ctx.fill()
+  text(ctx, value, x, base, { font, color: c.ink })
+}
+
+function sticker(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, size: number, deg: number) {
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate((deg * Math.PI) / 180)
+  ctx.shadowColor = 'rgba(90,55,20,0.25)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3
+  ctx.drawImage(img, -size / 2, -size / 2, size, size)
+  ctx.restore()
+}
+
+function tape(ctx: CanvasRenderingContext2D, cx: number, cy: number, deg: number, w: number) {
+  const h = 20
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate((deg * Math.PI) / 180)
+  ctx.fillStyle = c.tape
+  ctx.beginPath()
+  ctx.moveTo(-w / 2, -h / 2)
+  for (let i = 0; i <= 4; i++) ctx.lineTo(-w / 2 + (i % 2 ? 2.5 : 0), -h / 2 + (h * i) / 4)
+  for (let i = 4; i >= 0; i--) ctx.lineTo(w / 2 - (i % 2 ? 2.5 : 0), -h / 2 + (h * i) / 4)
+  ctx.closePath(); ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'
+  ctx.fillRect(-w / 2 + 5, -h / 2 + 3, w - 10, 3)
+  ctx.restore()
+}
+
+function paperclip(ctx: CanvasRenderingContext2D, x: number, y: number, deg: number) {
+  ctx.save()
+  ctx.translate(x, y); ctx.rotate((deg * Math.PI) / 180)
+  const path = new Path2D('M3 34 V7 a4.5 4.5 0 0 1 9 0 V38 a6 6 0 0 1 -12 0 V11 a3 3 0 0 1 6 0 V33')
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.strokeStyle = 'rgba(60,40,20,0.25)'; ctx.lineWidth = 2.6
+  ctx.save(); ctx.translate(1, 1.4); ctx.stroke(path); ctx.restore()
+  ctx.strokeStyle = c.metal; ctx.lineWidth = 2.2
+  ctx.stroke(path)
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.8
+  ctx.save(); ctx.translate(-0.5, -0.5); ctx.stroke(path); ctx.restore()
+  ctx.restore()
+}
+
+function clockIcon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, width: number) {
+  ctx.save()
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - r * 0.55); ctx.moveTo(x, y); ctx.lineTo(x + r * 0.45, y + r * 0.2); ctx.stroke()
+  ctx.restore()
+}
 
 /** 앱 연속 공부 불꽃(StreakFlame) 모양 그대로. */
 function flame(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, lit: boolean) {
@@ -390,12 +444,13 @@ function flame(ctx: CanvasRenderingContext2D, x: number, y: number, size: number
 }
 
 /** shadow: 호수 위 흰 글자에 앱 제목처럼 옅은 그늘. */
-function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, o: { font: string; color: string; align?: CanvasTextAlign; shadow?: boolean }) {
+function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, o: { font: string; color: string; align?: CanvasTextAlign; spacing?: number; shadow?: boolean }) {
   ctx.save()
   ctx.font = o.font
   ctx.fillStyle = o.color
   ctx.textAlign = o.align ?? 'left'
   ctx.textBaseline = 'alphabetic'
+  if (o.spacing) ctx.letterSpacing = `${o.spacing}px`
   if (o.shadow) { ctx.shadowColor = 'rgba(40,70,82,0.45)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1 }
   ctx.fillText(value, x, y)
   ctx.restore()
@@ -406,4 +461,11 @@ function measure(ctx: CanvasRenderingContext2D, value: string, font: string): nu
   const w = ctx.measureText(value).width
   ctx.restore()
   return w
+}
+
+function ellipsize(ctx: CanvasRenderingContext2D, value: string, font: string, max: number): string {
+  if (measure(ctx, value, font) <= max) return value
+  let out = value
+  while (out.length > 1 && measure(ctx, `${out}…`, font) > max) out = out.slice(0, -1)
+  return `${out}…`
 }

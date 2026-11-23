@@ -1,5 +1,5 @@
 // 공부를 끝낸 뒤 흐린 공부방 위에 뜨는 "오늘의 공부" 카드(앱에 없는 화면, 사용자 결정 2026-11-23).
-// 카드 한 장과 그 아래 섬 단추(이미지 저장 · 공유(지원 시) · 닫기)만 둔다. 저장 이미지는 같은 카드를 호수 위에 놓은 스토리.
+// 시트 한 장과 그 아래 섬 단추(이미지 저장 · 공유(지원 시) · 닫기)만 둔다. 저장 이미지는 같은 시트를 호수 위에 놓은 스토리.
 // 접근성: dialog·aria-modal, 열리면 대화상자로 포커스, Tab은 안에서만 돈다, Esc·바깥으로 닫고 닫히면 원래 자리로 돌린다.
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconDownload, IconShare2, IconX } from '@tabler/icons-react'
@@ -9,7 +9,7 @@ import { IslandButton } from '../../../core/ui/IslandButton'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
 import { logger } from '../../../core/log/log'
 import { formatStudyDuration } from '../home/studyFormat'
-import { cardLayout, drawStory, loadCardAssets, type CardAssets } from './cardDraw'
+import { drawStory, loadCardAssets, type CardAssets } from './cardDraw'
 import { CardArt, stageSize } from './CardArt'
 import type { StudyRecap } from './studyRecap'
 import s from './recap.module.css'
@@ -52,7 +52,7 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
   }, [recap])
 
   // 카드를 창에 맞춘다: 좌우 16 여백, 아래로는 단추 자리(약 110)를 남긴다.
-  const box = stageSize(cardLayout(recap))
+  const box = stageSize
   useEffect(() => {
     const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / box.width, (window.innerHeight - 110) / box.height))
     measure()

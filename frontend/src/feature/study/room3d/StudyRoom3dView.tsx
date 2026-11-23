@@ -297,12 +297,13 @@ export function StudyRoom3dView(props: {
     const onQuality = () => { scheduler.invalidateCamera(); schedule() }
     quality?.addListener(onQuality)
     const unsubscribeRenderer = renderer.subscribe(() => { scheduler.invalidateCamera(); schedule() })
-    // 공부 카드 사진: 내 자리를 앞에서 한 번 찍고, 같은 순간 원래 화면을 다시 그려 깜빡임을 없앤다.
-    const unregisterSnapshot = registerRoomSnapshot((width, height) => {
+    // 공부 카드 사진: 내 자리를 앞(portrait) 또는 3인칭(scene)으로 한 번 찍고, 같은 순간 원래 화면을 다시 그려 깜빡임을 없앤다.
+    const unregisterSnapshot = registerRoomSnapshot((width, height, kind) => {
       if (viewerSeat >= layout.seatCount) return null
       const shot = { width, height }
+      const seat = layout.seat(viewerSeat)
       const result = renderer.render({
-        camera: StudyRoomSeatCamera.portrait(layout.seat(viewerSeat), shot),
+        camera: kind === 'portrait' ? StudyRoomSeatCamera.portrait(seat, shot) : StudyRoomSeatCamera.of('thirdPerson', seat, shot),
         width, height,
         devicePixelRatio: 2,
         motionSeconds: lastFrame?.motionSeconds ?? 0,
@@ -311,7 +312,7 @@ export function StudyRoom3dView(props: {
         cutHeight: 0,
         // 책상이 벽을 보는 자리에서는 카메라가 벽 너머에 놓인다. 사람 앞 0.75m(책상·소품)까지만 남기고 그보다
         // 카메라 쪽은 잘라 내 벽 없이 얼굴을 찍는다.
-        nearPlane: StudyRoomSeatCamera.portraitDistance - 0.75,
+        nearPlane: kind === 'portrait' ? StudyRoomSeatCamera.portraitDistance - 0.75 : undefined,
       })
       if (!result) return null
       const out = document.createElement('canvas')

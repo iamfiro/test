@@ -7,7 +7,7 @@
 import { useEffect } from 'react'
 import { logger } from '../../../core/log/log'
 import { takeRoomSnapshot } from '../room3d/roomSnapshot'
-import { photoSize } from './cardDraw'
+import { portraitSize, sceneSize } from './cardDraw'
 import type { StudyRecap } from './studyRecap'
 
 const log = logger('RecapDemo')
@@ -15,10 +15,10 @@ const log = logger('RecapDemo')
 type Variant = 'goal' | 'more' | 'plain'
 const variants: readonly Variant[] = ['goal', 'more', 'plain']
 
-function sample(variant: Variant, nickname: string, photo: HTMLCanvasElement | null): StudyRecap {
+function sample(variant: Variant, nickname: string, photo: HTMLCanvasElement | null, scenePhoto: HTMLCanvasElement | null): StudyRecap {
   const today = new Date()
   const studyDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  const base = { nickname, studyDate, serial: 'SV-DEMO-0001', sessionSeconds: 5400, photo }
+  const base = { nickname, studyDate, serial: 'SV-DEMO-0001', sessionSeconds: 5400, photo, scenePhoto }
   // 방 순위는 서버 랭킹 API가 생기기 전이라 표본에서만 채운다(카드 모양 확인용).
   switch (variant) {
     case 'goal':
@@ -43,11 +43,12 @@ export function useRecapDemo(nickname: string | null, show: (recap: StudyRecap) 
     const started = performance.now()
     let timer = 0
     const tryShow = () => {
-      const photo = takeRoomSnapshot(photoSize.width * 1.25, photoSize.height * 1.25)
+      const photo = takeRoomSnapshot(portraitSize.width * 1.25, portraitSize.height * 1.25, 'portrait')
+      const scenePhoto = takeRoomSnapshot(sceneSize.width * 1.25, sceneSize.height * 1.25, 'scene')
       // 방이 아직 안 그려졌으면 최대 15초까지 기다리고, 그래도 없으면 사진 칸 없이 띄운다.
       if (!photo && performance.now() - started < 15_000) { timer = window.setTimeout(tryShow, 300); return }
       log.debug('recap demo shown', { variant, photo: photo != null, elapsed_ms: Math.round(performance.now() - started) })
-      show(sample(variant, nickname, photo))
+      show(sample(variant, nickname, photo, scenePhoto))
     }
     // 방이 막 그려진 순간엔 캐릭터가 아직 자리에 없을 수 있어 첫 촬영은 조금 늦춘다.
     timer = window.setTimeout(tryShow, 2500)
