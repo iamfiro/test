@@ -111,5 +111,5 @@ export function useStudyTimer(nickname: string | null) {
     } catch (e) { failed(e) }
   }
 
-  return { view, onTogglePause, onFinish, recap, closeRecap: () => setRecap(null) }
+  return { view, onTogglePause, onFinish, recap, showRecap: setRecap, closeRecap: () => setRecap(null) }
 }

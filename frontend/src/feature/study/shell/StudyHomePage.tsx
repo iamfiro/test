@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSubjectEditor } from '../subject/useSubjectEditor'
 import { ChatSheet } from '../chat/ChatSheet'
 import { StudyRecapModal } from '../recap/StudyRecapModal'
+import { useRecapDemo } from '../recap/useRecapDemo'
 import { chatStore, useChat } from '../chat/chatStore'
 import s from './StudyHomePage.module.css'
 
@@ -41,6 +42,8 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   // 원본 기본 시점(initialRoomCamera = thirdPerson). 누를 때마다 다음 시점, 이름은 1600ms.
   const camera = useStudyCameraCycle('thirdPerson')
   const timer = useStudyTimer(state.status === 'signedIn' ? state.me.profile.nickname : null)
+  // 개발 전용: /?recap=goal|more|plain 으로 공부 인증 카드를 늘 띄워 본다(useRecapDemo).
+  useRecapDemo(tab === 'study' && state.status === 'signedIn' ? state.me.profile.nickname : null, timer.showRecap)
   const subjects = useSubjectEditor({ onManage: () => navigate('/subjects') })
   const chat = useChat()
   const [chatOpen, setChatOpen] = useState(false)
