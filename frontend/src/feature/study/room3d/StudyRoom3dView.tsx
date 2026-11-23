@@ -9,7 +9,7 @@ import { StudyRoomDirector } from './domain/director'
 import { StudyRoomQuality } from './domain/quality'
 import type { StudyRoomQualityController } from './domain/qualityController'
 import { StudyRoomRenderScheduler } from './domain/renderScheduler'
-import type { StudyRoomCameraMode } from './domain/seatCamera'
+import { StudyRoomSeatCamera, type StudyRoomCameraMode } from './domain/seatCamera'
 import { StudyRoomCharacter } from './model/character'
 import { colorToHex } from './model/color'
 import { StudyRoomLayout } from './model/layout'
@@ -24,13 +24,19 @@ export type SeatPlacement = {
   pixelsPerMeter: number
 }
 
-type Frame = { modeBlend: number; motionSeconds: number; orbit: number; cameraSeconds: number }
+type Frame = { modeBlend: number; zoom: number; motionSeconds: number; orbit: number; cameraSeconds: number }
+/** 다가간 자리 위·아래 위젯 위치(px). above는 아래 끝, below는 위 끝. landscape면 양옆. */
+type ZoomSpots = { t: number; landscape: boolean; above: { x: number; y: number }; below: { x: number; y: number } } | null
 
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 /** 끌기 1px당 도는 각도. */
 const orbitPerPixel = 0.35
 /** 시점 바꾸기 시간(공부하며 보는 화면이라 천천히). */
 const modeMs = 1600
+/** 집중 모드로 다가가기·물러나기 시간. */
+const zoomMs = 650
+/** 다가갔을 때 화면 세로에 꼭 담겨야 하는 장면 높이(m): 머리 위부터 책상 앞까지. */
+const zoomSpanMeters = 1.7
 
 export function StudyRoom3dView(props: {
   scene: StudyRoom3dScene
@@ -45,6 +51,10 @@ export function StudyRoom3dView(props: {
   seatBuilder: (placement: SeatPlacement) => ReactNode | null
   placeholder: ReactNode
   onSeatTap?: (seat: number) => void
+  /** 집중 모드: 이 자리로 다가가 머리 위에 zoomAbove, 책상 아래에 zoomBelow를 둔다. */
+  zoomSeat?: number | null
+  zoomAbove?: ReactNode
+  zoomBelow?: ReactNode
 }) {
   const host = useRef<HTMLDivElement>(null)
   // 렌더러는 마운트마다 새로 만들고 해제한다(StrictMode의 두 번 실행에도 안전).
@@ -52,6 +62,7 @@ export function StudyRoom3dView(props: {
   const [phase, setPhase] = useState<ThreeStudyRoomRenderer['phase']>('idle')
   const [daylight, setDaylight] = useState(() => StudyRoomDaylight.now())
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const [zoomSpots, setZoomSpots] = useState<ZoomSpots>(null)
   const [placements, setPlacements] = useState<{ list: SeatPlacement[]; built: { p: SeatPlacement; node: ReactNode }[] }>({ list: [], built: [] })
   const viewerSeat = props.viewerSeat ?? 0
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
@@ -97,6 +108,10 @@ export function StudyRoom3dView(props: {
     motionMs: 0,
     motionMeasuredAt: null as number | null,
     lastFrame: null as Frame | null,
+    zoomFrom: props.zoomSeat != null ? 1 : 0,
+    zoomTo: props.zoomSeat != null ? 1 : 0,
+    zoomStarted: null as number | null,
+    zoomedSeat: props.zoomSeat ?? null,
   })
   const scheduler = useMemo(() => new StudyRoomRenderScheduler({ capHz: StudyRoomQuality.high.renderHz, motionFps: StudyRoomQuality.high.motionFps }), [])
   const latest = useRef(props)
@@ -114,6 +129,19 @@ export function StudyRoom3dView(props: {
     scheduler.invalidateCamera()
     kick.current()
   }, [props.cameraMode, reduceMotion, scheduler])
+
+  // 집중 모드: 650ms에 걸쳐 다가가고 물러난다(물러날 때는 마지막 자리를 기억한다).
+  useEffect(() => {
+    const s = state.current
+    const to = props.zoomSeat != null ? 1 : 0
+    if (props.zoomSeat != null) s.zoomedSeat = props.zoomSeat
+    if (s.zoomTo === to) return
+    s.zoomFrom = currentZoom(s, performance.now())
+    s.zoomTo = to
+    s.zoomStarted = reduceMotion ? null : performance.now()
+    scheduler.invalidateCamera()
+    kick.current()
+  }, [props.zoomSeat, reduceMotion, scheduler])
 
   useEffect(() => {
     if (!renderer || phase !== 'ready' || size.width === 0) return
@@ -168,6 +196,11 @@ export function StudyRoom3dView(props: {
         if (t >= 1) s.modeStarted = null
         scheduler.invalidateCamera()
       }
+      const zoom = easeInOutCubic(currentZoom(s, now))
+      if (s.zoomStarted != null) {
+        if (now - s.zoomStarted >= zoomMs) s.zoomStarted = null
+        scheduler.invalidateCamera()
+      }
       if (scheduler.needsRender(s.motionMs)) {
         const wait = scheduler.untilCapAllows(now)
         if (wait > 0) {
@@ -175,19 +208,24 @@ export function StudyRoom3dView(props: {
           return
         }
         const motionFrame = scheduler.motionFrameAt(s.motionMs)
-        const frame: Frame = { modeBlend, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, cameraSeconds: s.cameraSeconds }
+        const frame: Frame = { modeBlend, zoom, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, cameraSeconds: s.cameraSeconds }
         draw(frame, now)
         scheduler.didRender({ frameTimeMs: now, motionFrame })
       }
-      if (s.modeStarted != null || StudyRoomDirector.moves(s.mode)) { schedule(); return }
+      if (s.modeStarted != null || s.zoomStarted != null || StudyRoomDirector.moves(s.mode)) { schedule(); return }
       const next = scheduler.untilNextMotionFrame(s.motionMs)
       if (next != null) wake = window.setTimeout(schedule, next)
     }
 
     const draw = (frame: Frame, now: number) => {
       const p = latest.current
-      const camera = cameraFor(p.scene, layout, size, frame, state.current.fromMode, state.current.mode, viewerSeat)
-      const hiddenSeat = hiddenSeatOf(frame, state.current.fromMode, state.current.mode, viewerSeat)
+      const zoomSeat = state.current.zoomedSeat != null && state.current.zoomedSeat < layout.seatCount ? state.current.zoomedSeat : null
+      const base = cameraFor(p.scene, layout, size, frame, state.current.fromMode, state.current.mode, viewerSeat)
+      const camera = frame.zoom === 0 || zoomSeat == null
+        ? base
+        : StudyRoomSeatCamera.lerp(base, focusCamera(layout.seat(zoomSeat), size, p.topInset ?? 0), frame.zoom)
+      const hiddenSeat = frame.zoom > 0 ? null : hiddenSeatOf(frame, state.current.fromMode, state.current.mode, viewerSeat)
+      setZoomSpots(zoomSeat == null || frame.zoom === 0 ? null : zoomSpotsOf(layout, zoomSeat, camera, size, frame.zoom))
       const result = renderer.render({
         camera,
         width: size.width,
@@ -272,7 +310,76 @@ export function StudyRoom3dView(props: {
           })}
         </div>
       )}
+      {phase === 'ready' && zoomSpots && (
+        <ZoomOverlays spots={zoomSpots} above={props.zoomAbove} below={props.zoomBelow} />
+      )}
     </div>
+  )
+}
+
+/** 다가간 정도(0–1, 곡선 전). */
+function currentZoom(s: { zoomFrom: number; zoomTo: number; zoomStarted: number | null }, now: number): number {
+  if (s.zoomStarted == null) return s.zoomTo
+  const t = Math.min(1, (now - s.zoomStarted) / zoomMs)
+  return s.zoomFrom + (s.zoomTo - s.zoomFrom) * t
+}
+
+const isLandscape = (size: { width: number; height: number }) => size.width > size.height
+
+/**
+ * 집중 모드 구도(원본 _focusCamera): 머리 위 시점에서 더 다가가, 사람·책상과 위아래 위젯이 화면을
+ * 벗어나지 않게 한다. 세로 화면은 위·아래 위젯 자리(280)까지, 가로 화면은 여백(32)만 비운다.
+ */
+function focusCamera(seat: StudyRoomSeat, size: { width: number; height: number }, topInset: number): StudyRoomCamera {
+  const top = StudyRoomSeatCamera.focusBase(seat, size)
+  const focus = seat.anchor.add(new Vector3(0, 0.3, 0)).add(seat.facing.multiplyScalar(0.3))
+  const reserve = topInset + (isLandscape(size) ? 32 : 280)
+  const room = Math.max(1, size.height - reserve)
+  const needed = (zoomSpanMeters * size.height) / room
+  const height = new StudyRoomCameraRig(top, size).visibleHeight
+  const width = top.viewWidth * Math.min(1.4, Math.max(0.5, needed / height))
+  return top.copyWith({ target: focus, viewWidth: width })
+}
+
+/** 원본 _zoomOverlays 위치: 세로는 머리 위·책상 아래, 가로는 사람 왼쪽·오른쪽. */
+function zoomSpotsOf(layout: StudyRoomLayout, seatIndex: number, camera: StudyRoomCamera, size: { width: number; height: number }, t: number): ZoomSpots {
+  const rig = new StudyRoomCameraRig(camera, size)
+  const seat = layout.seat(seatIndex)
+  const anchor = seat.anchor
+  const head = rig.project(anchor.clone().add(new Vector3(0, StudyRoomCharacter.headTopMeters - 0.2, 0)))
+  const desk = rig.project(layout.deskFront(seatIndex).add(seat.facing.multiplyScalar(0.2)))
+  if (!head || !desk) return null
+  const crown = rig.project(anchor.clone().add(new Vector3(0, StudyRoomCharacter.headTopMeters + 0.1, 0)).add(seat.facing.multiplyScalar(0.34))) ?? head
+  if (isLandscape(size)) {
+    const body = rig.project(anchor.clone().add(new Vector3(0, 0.45, 0)))
+    const side = rig.project(anchor.clone().add(new Vector3(0.6, 0.45, 0)))
+    if (body && side) {
+      const half = Math.abs(side.x - body.x)
+      return { t, landscape: true, above: { x: body.x - half - 16, y: body.y }, below: { x: body.x + half + 16, y: body.y } }
+    }
+  }
+  return { t, landscape: false, above: { x: size.width / 2, y: crown.y }, below: { x: size.width / 2, y: Math.max(desk.y, head.y + 140) } }
+}
+
+/** 거의 다 다가갔을 때 나타나고, 물러날 때는 먼저 사라진다. 다 다가가기 전에는 누를 수 없다. */
+function ZoomOverlays(props: { spots: NonNullable<ZoomSpots>; above?: ReactNode; below?: ReactNode }) {
+  const { spots } = props
+  const opacity = Math.min(1, Math.max(0, (spots.t - 0.5) / 0.5))
+  const live = spots.t >= 1
+  const common = { position: 'absolute' as const, opacity, pointerEvents: live ? ('auto' as const) : ('none' as const), zIndex: 4 }
+  if (spots.landscape) {
+    return (
+      <>
+        {props.above && <div style={{ ...common, right: `calc(100% - ${spots.above.x}px)`, top: spots.above.y, transform: 'translateY(-50%)' }}>{props.above}</div>}
+        {props.below && <div style={{ ...common, left: spots.below.x, top: spots.below.y, transform: 'translateY(-50%)' }}>{props.below}</div>}
+      </>
+    )
+  }
+  return (
+    <>
+      {props.above && <div style={{ ...common, left: 0, right: 0, bottom: `calc(100% - ${spots.above.y}px)`, display: 'flex', justifyContent: 'center' }}>{props.above}</div>}
+      {props.below && <div style={{ ...common, left: 0, right: 0, top: spots.below.y, display: 'flex', justifyContent: 'center' }}>{props.below}</div>}
+    </>
   )
 }
 

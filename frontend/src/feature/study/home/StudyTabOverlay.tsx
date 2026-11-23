@@ -110,14 +110,16 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
               label={props.soundPlaying ? t('studySoundPlayingLabel') : t('studySoundTitle')}
               onClick={props.onToggleSound}
             />
-            {showFocus && focusMode && (
-              <IslandIconButton
-                icon={IconMinimize}
-                label={t('studyFocusModeClose')}
-                // 원본은 늘 누를 수 있는 단추다(비활성 모양 없음).
-                onClick={() => onSetFocusMode?.(false)}
-              />
-            )}
+          </div>
+        )}
+        {showFocus && focusMode && (
+          <div className={s.railRow}>
+            <IslandIconButton
+              icon={IconMinimize}
+              label={t('studyFocusModeClose')}
+              // 원본은 늘 누를 수 있는 단추다(비활성 모양 없음). 음악 단추 바로 아래.
+              onClick={() => onSetFocusMode?.(false)}
+            />
           </div>
         )}
         {roomButtons && chatAvailable && (

@@ -12,9 +12,11 @@ import { useStudyTimer } from '../timer/useStudyTimer'
 import { RoomsPage } from '../rooms/RoomsPage'
 import { SoundPanel } from '../sound/SoundPanel'
 import { useStudySound } from '../sound/useStudySound'
+import { FocusClock, FocusControls } from '../home/focus'
+import { useTimer } from '../timer/timerStore'
 import { SpaceBackground } from '../rooms/SpaceBackground'
 import { StudyStatsPage } from '../stats/StudyStatsPage'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSubjectEditor } from '../subject/useSubjectEditor'
 import { ChatSheet } from '../chat/ChatSheet'
 import { chatStore, useChat } from '../chat/chatStore'
@@ -43,6 +45,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [soundOpen, setSoundOpen] = useState(false)
   const sound = useStudySound(state.status === 'signedIn')
+  const focus = useFocusMode(tab === 'study', () => setSoundOpen(false))
   const myId = state.status === 'signedIn' ? state.me.id : null
   // 원본 `_chat != null`: 내 id가 정해지면 방(없으면 lobby) 채팅에 붙는다.
   useEffect(() => {
@@ -57,7 +60,14 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'stats' && <IslandBackground ground="lake" />}
       {tab === 'stats' && <StudyStatsPage />}
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
-      {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode={camera.mode} topInset={68} /></div>}
+      {tab === 'study' && <div className={s.stage}><StudyRoomStage
+            cameraMode={camera.mode}
+            topInset={68}
+            focus={focus.on ? {
+              above: <FocusClock timer={timer.view} portrait={window.innerHeight >= window.innerWidth} />,
+              below: <FocusControls timer={timer.view} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />,
+            } : null}
+          /></div>}
       {/* 뒤로 버튼은 공부 탭을 뺀 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 공부 탭은 3D 방이
           전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
       {tab !== 'study' && (
@@ -90,6 +100,8 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           chatPeek={chat.peek == null ? null : { id: chat.peek.id, nickname: chat.peek.author.nickname, body: chat.peek.body }}
           onOpenChat={() => setChatOpen(true)}
           soundPanelOpen={soundOpen}
+          focusMode={focus.on}
+          onSetFocusMode={focus.set}
           soundPlaying={sound.playing}
           onToggleSound={() => setSoundOpen((v) => !v)}
         />
@@ -97,7 +109,45 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'study' && <SoundPanel open={soundOpen} onClose={() => setSoundOpen(false)} />}
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
-      <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view })} onSelect={(next) => navigate(paths[next])} />
+      <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )
+}
+
+/**
+ * 집중 모드(원본 _setFocusMode·_closeFocusWhenEnded·_load): 켜면 사운드 패널을 닫고 화면이 꺼지지 않게
+ * 하며, 남아 있던 세션을 처음 읽으면 바로 켠다. 켠 뒤 시작한 세션이 끝나면 저절로 나온다. Esc로 나온다.
+ */
+function useFocusMode(active: boolean, onEnter: () => void) {
+  const [on, setOn] = useState(false)
+  const { session, loaded } = useTimer()
+  const hadSession = useRef(false)
+  const restored = useRef(false)
+  const set = (next: boolean) => {
+    setOn(next)
+    hadSession.current = next && session != null
+    if (next) onEnter()
+  }
+  useEffect(() => {
+    if (!loaded || restored.current) return
+    restored.current = true
+    if (session != null && active) set(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded])
+  useEffect(() => {
+    if (!on) return
+    if (session != null) { hadSession.current = true; return }
+    if (hadSession.current) setOn(false)
+  }, [on, session])
+  useEffect(() => {
+    if (!on) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOn(false) }
+    window.addEventListener('keydown', onKey)
+    // 원본 StudyScreenAwake: 집중하는 동안 화면을 켜 둔다(지원하는 브라우저에서만).
+    let lock: { release(): Promise<void> } | null = null
+    const nav = navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<{ release(): Promise<void> }> } }
+    void nav.wakeLock?.request('screen').then((l) => { lock = l }).catch(() => {})
+    return () => { window.removeEventListener('keydown', onKey); void lock?.release().catch(() => {}) }
+  }, [on])
+  return { on: on && active, set }
 }
