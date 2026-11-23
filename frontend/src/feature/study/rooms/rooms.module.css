@@ -1,5 +1,12 @@
 /* 넓은 화면: 왼쪽에 화면 가장자리에 반쯤 걸친 지구, 오른쪽에 목록. 좁은 화면: 지구가 위에 반쯤 보이고 아래 목록. */
-.page { position: fixed; inset: 0; overflow: hidden; }
+.page {
+  position: fixed; inset: 0; overflow: hidden;
+  /* 밤하늘 위에서는 노란 기를 뺀 중성 아이보리 종이(사용자 결정 2026-11-23). 이 페이지 안에서만 바꾼다. */
+  --i-paper: #fbfaf7;
+  --i-paper-ledge: #dfdcd5;
+  --i-paper-line: #e5e2dc;
+  --i-muted: #ecebe7;
+}
 .globe {
   position: absolute;
   width: min(118vh, 92vw);
