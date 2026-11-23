@@ -29,6 +29,7 @@ export const webText = {
   statsLoading: '통계를 불러오는 중이에요',
   // 공부를 끝낸 뒤 "오늘의 공부" 시트(앱에 없는 화면, 사용자 결정 2026-11-23).
   recapMe: '나!',
+  recapTimeSuffix: '공부',
   recapWatermark: 'STUDY',
   recapScene: '오늘의 공부방',
   recapFields: {

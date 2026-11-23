@@ -36,7 +36,7 @@ const fonts = {
   mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
 } as const
 
-/** 시트(논리 pt) = 클립보드 일러스트(1200×1686)를 3분의 1로. 종이는 x 17–382, y 56–534, 집게는 y 81까지 내려온다. */
+/** 시트(논리 pt) = 클립보드 일러스트(1200×1686)를 3분의 1로. 종이는 x 16–384, y 32–540, 집게는 y 59까지 내려온다. */
 export const sheet = { width: 400, height: 562 } as const
 /** 프로필 사진(정면)과 폴라로이드(전경) 크기. 3D 방은 이 비율로 찍는다. */
 export const portraitSize = { width: 136, height: 148 } as const
@@ -64,7 +64,7 @@ export type CardAssets = Record<keyof typeof stickerUrls, HTMLImageElement>
 /** 글꼴과 스티커 그림을 미리 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
 export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
   const sample = [
-    webText.recapMe, webText.recapScene, ...Object.values(webText.recapFields),
+    webText.recapMe, webText.recapTimeSuffix, webText.recapScene, ...Object.values(webText.recapFields),
     formatStudyDuration(recap.todaySeconds), formatStudyDuration(recap.sessionSeconds), webText.recapBrand,
     '0123456789.·/!()시간분일등명월화수목금토일STUDY',
   ].join('')
@@ -100,23 +100,23 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   ctx.font = `800 112px ${fonts.round}`
   ctx.textAlign = 'center'
   ctx.fillStyle = c.watermark
-  ctx.fillText(webText.recapWatermark, 200, 360)
+  ctx.fillText(webText.recapWatermark, 200, 338)
   ctx.restore()
 
   // 제목 자리: 오늘 공부한 시간을 가장 크게(둥근 글꼴 호수 청록 + 흰 테두리, 숫자 크게·단위 작게). 집게 아래.
-  titleDuration(ctx, recap.todaySeconds, 150, 136, 230)
+  titleDuration(ctx, recap.todaySeconds, 152, 114, 244)
 
-  drawTicket(ctx, assets, 332, 108)
+  drawTicket(ctx, assets, 334, 86)
   drawPortrait(ctx, recap, assets)
   drawTopRows(ctx, recap, assets)
-  sticker(ctx, assets.music, 62, 372, 46, -14)
-  if (recap.rank) sticker(ctx, assets.trophy, 196, 372, 42, 10)
-  else sticker(ctx, assets.focus, 196, 374, 38, 10)
+  sticker(ctx, assets.music, 62, 350, 46, -14)
+  if (recap.rank) sticker(ctx, assets.trophy, 196, 350, 42, 10)
+  else sticker(ctx, assets.focus, 196, 352, 38, 10)
   // 빈자리 손그림 낙서.
-  doodle(ctx, assets.sparkle, 272, 92, 30, 0)
-  doodle(ctx, assets.note, 112, 366, 24, -8)
-  doodle(ctx, assets.star, 236, 360, 22, 12)
-  doodle(ctx, assets.scribble, 232, 526, 30, -4)
+  doodle(ctx, assets.sparkle, 292, 134, 26, 0)
+  doodle(ctx, assets.note, 112, 344, 24, -8)
+  doodle(ctx, assets.star, 236, 338, 22, 12)
+  doodle(ctx, assets.scribble, 232, 514, 30, -4)
   drawBottomRows(ctx, recap, assets)
   drawPolaroid(ctx, recap, assets)
 }
@@ -146,7 +146,7 @@ function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: 
   const fw = portraitSize.width + 12
   const fh = portraitSize.height + 12
   const cx = 34 + fw / 2
-  const cy = 152 + fh / 2
+  const cy = 132 + fh / 2
   ctx.save()
   ctx.translate(cx, cy); ctx.rotate((-3 * Math.PI) / 180)
   ctx.save()
@@ -213,7 +213,7 @@ function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: C
       text(ctx, webText.recapRankTotal(rank.total), x + measure(ctx, num, big) + 8, b, { font: `700 17px ${fonts.hand}`, color: c.inkSoft })
     } })
   }
-  rows(ctx, list, 200, 370, 150, 64)
+  rows(ctx, list, 200, 372, 128, 64)
 }
 
 function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
@@ -222,15 +222,15 @@ function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets
     { label: webText.recapFields.session, icon: assets.note, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
     { label: webText.recapFields.date, icon: assets.flower, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
   ]
-  rows(ctx, list, 32, 248, 398, 64)
+  rows(ctx, list, 32, 248, 380, 66)
 }
 
 /** 폴라로이드: 3인칭으로 본 오늘의 공부방, 아래 여백에 글씨, 카메라 스티커. */
 function drawPolaroid(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
   const w = sceneSize.width + 14
   const h = sceneSize.height + 40
-  const cx = 316
-  const cy = 458
+  const cx = 318
+  const cy = 442
   ctx.save()
   ctx.translate(cx, cy); ctx.rotate((6 * Math.PI) / 180)
   ctx.save()
@@ -299,9 +299,10 @@ function photo(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement | null, x: 
   ctx.restore()
 }
 
-/** 제목 자리 공부 시간: 숫자는 크게, 단위는 작게, 흰 테두리. 폭을 넘으면 함께 줄인다. */
+/** 제목 자리 공부 시간: 숫자는 크게, 단위와 "공부"는 작게, 흰 테두리. 폭을 넘으면 함께 줄인다. */
 function titleDuration(ctx: CanvasRenderingContext2D, seconds: number, mid: number, base: number, maxWidth: number) {
-  const parts = formatStudyDuration(seconds).match(/\d+|\D+/g) ?? []
+  // "6시간 25분 공부": 무슨 시간인지 보이게 끝에 작게 "공부"를 붙인다.
+  const parts = [...(formatStudyDuration(seconds).match(/\d+|\D+/g) ?? []), ` ${webText.recapTimeSuffix}`]
   let big = 60
   const layout = () => parts.map((p) => {
     const digit = /\d/.test(p)
@@ -309,7 +310,7 @@ function titleDuration(ctx: CanvasRenderingContext2D, seconds: number, mid: numb
     return { value, font: digit ? `800 ${big}px ${fonts.round}` : `800 ${Math.round(big * 0.42)}px ${fonts.round}`, digit }
   }).map((it) => ({ ...it, width: measure(ctx, it.value, it.font) }))
   let items = layout()
-  const gap = (i: number) => (i === 0 ? 0 : items[i]!.digit ? 8 : 3)
+  const gap = (i: number) => (i === 0 ? 0 : i === items.length - 1 ? 9 : items[i]!.digit ? 8 : 3)
   const total = () => items.reduce((sum, it, i) => sum + it.width + gap(i), 0)
   while (total() > maxWidth && big > 28) { big -= 2; items = layout() }
   let x = mid - total() / 2
