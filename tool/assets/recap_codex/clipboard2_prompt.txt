@@ -1,0 +1,10 @@
+Use the image_generation tool to redraw the attached clipboard illustration (reference_clipboard.png) and save it as clipboard.png in the current folder. Keep exactly the same art style, colors, wood texture, silver clip design, cream gridded paper and soft shadows — only change the proportions as described.
+
+Output: 1200x1686 px PNG with a truly transparent background outside the board (rounded board corners ~70px).
+
+Change: there is too much brown wood visible above the paper. Make the top wood margin much thinner:
+- The board still fills the whole canvas edge to edge.
+- The cream paper starts only about 70px below the top edge of the board (instead of ~168px), about 52px from the left/right edges, and ends about 60px above the bottom edge.
+- The silver binder clip stays at top center, about 480px wide, its lever with the hole sticking up so its top is about 6px from the top edge, and the clip body overlapping the top of the paper, ending about 190px from the top.
+- Keep the paper plain and empty (only the faint grid). No text, no letters, no characters.
+Save as clipboard.png in the current working folder.
