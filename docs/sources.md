@@ -28,3 +28,4 @@ PocketTime에서 가져온 코드 의미·자산·문구. 원본 커밋: PocketT
 | `frontend/src/feature/study/stats/*` | `widgets/study_stats_view.dart`, `widgets/streak_flame.dart`, `timer/domain/study_stats.dart`(진행 중 몫) | f574f242 | 의미·값 이식, 불꽃은 정적 SVG |
 | `frontend/src/feature/study/sound/*` | `sound/{model,viewmodel,application}/*.dart`, `widgets/study_sound_panel.dart`, `widgets/study_lp_player.dart` | f574f242 | 의미·값 이식(HTMLAudioElement로 재생) |
 | `frontend/src/feature/study/room3d/SeatPlanMarker.tsx`, `StudyRoom3dView.tsx`(planView·planCamera·rise), `StudyRoomStage.tsx`(자리 순서·이동) | `room3d/widgets/study_seat_plan.dart`, `room3d/widgets/study_room_3d_view.dart`(_planCamera·_rise·_planSeats), `page/study_home_page.dart`(_seatOrder·_takenSeats·_moveSeat) | f574f242 | 의미·값 이식 |
+| `frontend/public/assets/brand/study_with_me.webp` | 사용자 제공 이미지(2026-11-23, 흰색 "Study With Me" 레터링). 투명 여백을 잘라 900px 폭으로 줄임 | — | 공부 탭 맨 위 가운데 로고 |

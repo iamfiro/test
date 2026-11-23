@@ -81,6 +81,8 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           /></div>}
       {/* 뒤로 버튼은 공부 탭을 뺀 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 공부 탭은 3D 방이
           전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
+      {/* 공부 탭 맨 위 가운데 로고(사용자 제공 이미지 2026-11-23). 3D 방 위에 떠 있어 누를 수 없다. */}
+      {tab === 'study' && !focus.on && !seatPlanOpen && <img className={s.logo} src="/assets/brand/study_with_me.webp" alt="Study With Me" draggable={false} />}
       {/* 자리 이동 중에는 뒤로 버튼이 위에서 보기만 닫고 내 자리로 내려온다(원본 _studyBackButton). */}
       {tab === 'study' && seatPlanOpen && (
         <header className={`${s.header} ${s.headerCorner}`}>
