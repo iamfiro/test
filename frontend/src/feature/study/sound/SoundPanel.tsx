@@ -35,8 +35,9 @@ export function SoundPanel(props: { open: boolean; onClose: () => void }) {
   useEffect(() => {
     if (props.open) {
       setMounted(true)
-      const id = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)))
-      return () => cancelAnimationFrame(id)
+      // 한 프레임 뒤에 켜야 올라오는 움직임이 보인다. rAF는 가려진 탭에서 멈추므로 타이머로 미룬다.
+      const id = window.setTimeout(() => setShown(true), 20)
+      return () => window.clearTimeout(id)
     }
     setShown(false)
     const id = window.setTimeout(() => setMounted(false), 260)
