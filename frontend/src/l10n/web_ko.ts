@@ -34,7 +34,7 @@ export const webText = {
   recapFields: {
     streak: '연속 공부',
     rank: '방 순위',
-    session: '이번 공부',
+    session: '이번 세션',
     date: '공부일',
   },
   recapRankUnit: '등',
