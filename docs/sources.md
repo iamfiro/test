@@ -22,4 +22,4 @@ PocketTime에서 가져온 코드 의미·자산·문구. 원본 커밋: PocketT
 | `frontend/src/feature/study/room3d/three/{ThreeStudyRoomRenderer,characterKit}.ts` | `infrastructure/flutter_scene/flutter_scene_{study_room_renderer,character_kit}.dart` | f574f242 | flutter_scene → three.js |
 | `frontend/src/feature/study/room3d/{StudyRoom3dView,StudyRoomSky}.tsx`, `skyStars.json` | `widgets/study_room_3d_view.dart`, `widgets/study_room_sky.dart` | f574f242 | 별 위치는 Dart `Random`으로 뽑은 값 |
 | `frontend/src/feature/study/timer/timerStore.ts` | `timer/domain/study_timeline.dart`(구간 합) | f574f242 | 진실은 서버 세션(결정 12) |
-| `frontend/public/assets/icons/nav/study_tab_*.png` | Codex 이미지 생성(2026-11-23). 화풍 참고: `icons/study_{shop,trophy,music,camera,chat}.png`, 주제 참고: PocketTime `assets/icons/nav/study_tab_*.png` | — | 512px 원본·프롬프트는 `tool/assets/tab_icons_codex/`, 200px로 줄여 씀 |
+| `frontend/public/assets/icons/nav/study_tab_*.png` | Codex 이미지 생성(2026-11-23, 공부방은 푸른 지구 `tab_rooms_globe.png`). 화풍 참고: `icons/study_{shop,trophy,music,camera,chat}.png`, 주제 참고: PocketTime `assets/icons/nav/study_tab_*.png` | — | 512px 원본·프롬프트는 `tool/assets/tab_icons_codex/`, 200px로 줄여 씀 |

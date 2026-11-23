@@ -1,0 +1,14 @@
+Generate 1 new app icon image with your image generation tool and save it as a PNG file in the current working directory.
+
+Purpose: the "study rooms" tab icon in the bottom tab bar of a cozy study web app. It sits at 44x44 CSS px next to the other attached tab icons.
+
+STYLE REFERENCE = all attached images (study_shop, study_trophy, study_music, study_camera, study_chat, tab_study, tab_schedule, tab_stats, tab_outfit). Match them exactly: small 3D-ish cute sticker object, soft glossy shading with gentle highlights and darker sides, rounded chunky shape, saturated colors, a clean white sticker outline around the whole object (same thickness as the attached tab icons), slight soft drop shadow, slight 3/4 perspective.
+
+SUBJECT: a cute blue planet Earth globe (glossy blue oceans with a soft highlight, rounded green continents, maybe one or two small white clouds), round and chunky. No stand, no text.
+
+Requirements:
+- 512x512 PNG, fully transparent background (real alpha, no checkerboard, no background color).
+- One object, centered, filling about 86% of the canvas, same visual weight as the attached tab icons.
+- No text, letters or numbers.
+
+Save exactly: tab_rooms_globe.png. After saving, print its pixel size.
