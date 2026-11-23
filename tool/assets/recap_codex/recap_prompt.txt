@@ -1,0 +1,11 @@
+Use the image_generation tool to create 4 separate PNG illustrations for a cozy study app's "today's study" share sheet, and save them in the current folder with exactly these file names. Style for all: hand-drawn cute illustration like a polished mobile game / stationery sticker art, matching the attached reference stickers (study_trophy.png, study_camera.png): soft flat colors with gentle painted shading and highlights, subtle paper/grain texture, slightly warm palette (cream #fffaeb, warm wood tan, soft gray metal), clean outlines in a darker shade of each color (no black outlines). No text, no letters, no numbers, no logos, no characters, no emoji. Front view, no perspective tilt.
+
+1) clipboard.png — 1200x1686 px, transparent background (PNG alpha) outside the board. A portrait wooden clipboard that fills the whole canvas edge to edge (rounded corners ~70px), warm honey-tan wood with subtle grain and a slightly darker bottom edge thickness (like a toy-like ledge). A sheet of cream paper (#fffaeb) with a very faint light grid is clipped on it: paper starts about 54px from left/right edges, about 140px from the top, and about 60px from the bottom, with soft rounded corners and a soft drop shadow. A big shiny silver metal binder clip at top center, about 450px wide, overlapping the top of the board and the top of the paper, its lever sticking up near the very top. Keep the paper area plain and empty (only faint grid) because text will be drawn on it later.
+
+2) ticket.png — 420x220 px, transparent background. A retro admission ticket sticker in cream/beige paper with two semicircle notches on the left and right edges, a thin dashed inner border, a small simple clock symbol on the left part, and a small barcode drawn along the bottom right. Leave the middle-right area blank for text. Slight white sticker border around it.
+
+3) paperclip.png — 160x360 px, transparent background. A single silver paperclip standing vertically, shiny metal with highlights.
+
+4) tape.png — 360x110 px, transparent background. A horizontal strip of translucent light-blue washi masking tape with torn zigzag ends and subtle paper fiber texture, semi-transparent (alpha around 75%).
+
+Save the 4 files directly as clipboard.png, ticket.png, paperclip.png, tape.png in the current working folder. Make sure the backgrounds are truly transparent PNG.
