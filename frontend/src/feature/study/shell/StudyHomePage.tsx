@@ -133,7 +133,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       )}
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
-      {timer.recap && <StudyRecapModal recap={timer.recap} onClose={timer.closeRecap} onOpenStats={() => { timer.closeRecap(); navigate(paths.stats) }} />}
+      {timer.recap && <StudyRecapModal recap={timer.recap} onClose={timer.closeRecap} />}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on, seatPlanOpen })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )

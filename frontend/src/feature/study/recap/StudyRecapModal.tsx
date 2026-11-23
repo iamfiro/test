@@ -1,9 +1,8 @@
-// 공부를 끝낸 뒤 공부방 위에 뜨는 "오늘의 공부 여권" 모달(앱에 없는 화면, 사용자 지정 2026-11-23).
-// 위는 여권 아트(가로), 아래는 제목·숫자·오늘의 기록·행동. 넓은 화면은 아래를 두 단으로, 좁은 화면은 한 줄로 쌓는다.
+// 공부를 끝낸 뒤 공부방 위에 뜨는 "오늘의 공부 여권"(앱에 없는 화면, 사용자 지정 2026-11-23).
+// 모달 틀 없이 흐린 공부방 위에 가로 여권만 띄운다. 닫기는 여권 모서리, 저장·공유는 여권 아래 작은 알약 하나.
 // 접근성: dialog·aria-modal, 열리면 대화상자로 포커스, Tab은 안에서만 돈다, Esc·바깥으로 닫고 닫히면 원래 자리로 돌린다.
-import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconDownload, IconShare2, IconX } from '@tabler/icons-react'
-import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
 import { useToast } from '../../../core/ui/Toast'
 import { logger } from '../../../core/log/log'
@@ -15,21 +14,22 @@ import s from './recap.module.css'
 
 const log = logger('StudyRecap')
 
-/** 오늘의 기록 목록에 쓰는 과목 줄 수. 나머지는 "그 외 n과목" 한 줄. */
-const ledgerRows = 4
+/** 여권 무대(여권 + 뒤 종이 여백) 논리 크기. */
+const artW = passport.width + 40
+const artH = passport.height + 40
+/** 넓은 화면에서 키우는 상한. */
+const maxFit = 1.45
 
 type Story = { url: string; file: File; canShare: boolean }
 
-export function StudyRecapModal({ recap, onClose, onOpenStats }: { recap: StudyRecap; onClose: () => void; onOpenStats: () => void }) {
+export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose: () => void }) {
   const toast = useToast()
-  const titleId = useId()
   const dialog = useRef<HTMLDivElement>(null)
-  const stage = useRef<HTMLDivElement>(null)
   const [ready, setReady] = useState(false)
   const [story, setStory] = useState<Story | null>(null)
   const [fit, setFit] = useState(1)
 
-  // 글꼴을 읽은 뒤 여권을 그리고, 저장·공유용 스토리 이미지를 미리 만든다(공유는 누른 순간 파일이 있어야 한다).
+  // 글꼴을 읽은 뒤 여권을 그리고, 저장·공유용 이미지를 미리 만든다(공유는 누른 순간 파일이 있어야 한다).
   useEffect(() => {
     let cancelled = false
     let url: string | null = null
@@ -52,13 +52,12 @@ export function StudyRecapModal({ recap, onClose, onOpenStats }: { recap: StudyR
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
   }, [recap])
 
-  // 여권(가로 480pt)을 무대 폭에 맞춘다(넓으면 조금 키우고, 좁으면 줄인다).
+  // 여권을 창에 맞춘다: 좌우 16 여백, 위아래로는 닫기·저장 자리(약 140)를 남긴다.
   useEffect(() => {
-    const el = stage.current
-    if (!el) return
-    const ro = new ResizeObserver(() => setFit(Math.min(1.18, (el.clientWidth - 24) / (passport.width + 40))))
-    ro.observe(el)
-    return () => ro.disconnect()
+    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / artW, (window.innerHeight - 140) / artH))
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
   }, [])
 
   // 포커스: 열리면 대화상자로, Tab은 안에서만, 닫히면 원래 자리로.
@@ -68,7 +67,7 @@ export function StudyRecapModal({ recap, onClose, onOpenStats }: { recap: StudyR
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); return }
       if (e.key !== 'Tab' || !dialog.current) return
-      const items = [...dialog.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]')]
+      const items = [...dialog.current.querySelectorAll<HTMLElement>('button:not([disabled])')]
       if (items.length === 0) return
       const first = items[0]!
       const last = items[items.length - 1]!
@@ -102,83 +101,25 @@ export function StudyRecapModal({ recap, onClose, onOpenStats }: { recap: StudyR
     }
   }
 
-  const total = formatStudyDuration(recap.todaySeconds)
-  const shown = recap.subjects.slice(0, ledgerRows)
-  const rest = recap.subjects.slice(ledgerRows)
-  const metrics: { label: string; value: string; note?: string }[] = [
-    // 이번 세션 몫은 1분 이상일 때만 적는다("이번에 0분"은 정보가 없다).
-    { label: webText.recapMetricFocus, value: total, note: recap.sessionSeconds >= 60 ? webText.recapMetricSession(formatStudyDuration(recap.sessionSeconds)) : undefined },
-    { label: webText.recapMetricSubjects, value: webText.recapMetricSubjectsValue(recap.subjects.length) },
-    { label: webText.recapMetricStreak, value: t('studyStatsStreakValue', { count: recap.streakDays }) },
-  ]
-
+  const label = webText.recapPassportAlt(recap.nickname, formatStudyDuration(recap.todaySeconds))
   return (
     <div className={s.root}>
       <div className={s.backdrop} onClick={onClose} />
-      <div ref={dialog} className={s.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
-        <button type="button" className={s.close} onClick={onClose} aria-label={webText.recapClose}><IconX size={18} stroke={2} /></button>
-
-        <div ref={stage} className={s.stage}>
-          <div className={s.fit} style={{ '--fit': fit, width: (passport.width + 40) * fit, height: (passport.height + 40) * fit } as CSSProperties}>
-            {ready ? <PassportArt recap={recap} label={webText.recapPassportAlt(recap.nickname, total)} /> : <div className={s.artLoading} aria-busy="true" />}
-          </div>
+      <div ref={dialog} className={s.floating} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
+        <div className={s.fit} style={{ '--fit': fit, width: artW * fit, height: artH * fit } as CSSProperties}>
+          {ready ? <PassportArt recap={recap} label={label} /> : <div className={s.artLoading} aria-busy="true" />}
+          <button type="button" className={s.close} onClick={onClose} aria-label={webText.recapClose}><IconX size={18} stroke={2} /></button>
         </div>
-
-        <div className={s.body}>
-          <section className={s.summary}>
-            <p className={s.eyebrow}><span>{recap.serial}</span><span aria-hidden="true">·</span><span>{recap.studyDate.replace(/-/g, '.')}</span></p>
-            <h2 id={titleId} className={s.headline}>{webText.recapHeadline}</h2>
-            <p className={s.lede}>{webText.recapBody}</p>
-            <dl className={s.metrics}>
-              {metrics.map((m, i) => (
-                <div key={m.label} className={s.metric} style={{ '--i': i } as CSSProperties}>
-                  <dt>{m.label}</dt>
-                  <dd>{m.value}</dd>
-                  {m.note && <dd className={s.metricNote}>{m.note}</dd>}
-                </div>
-              ))}
-            </dl>
-          </section>
-
-          <section className={s.side}>
-            <h3 className={s.ledgerTitle}>{webText.recapLedgerTitle}</h3>
-            <ol className={s.ledger}>
-              {shown.map((r, i) => (
-                <li key={`${r.subject ?? ''}-${i}`} style={{ '--i': i } as CSSProperties}>
-                  <span className={s.ledgerIndex}>{String(i + 1).padStart(2, '0')}</span>
-                  <span className={r.subject == null ? `${s.ledgerName} ${s.ledgerNone}` : s.ledgerName}>{r.subject ?? t('studySubjectNone')}</span>
-                  <span className={s.ledgerLeader} aria-hidden="true" />
-                  <span className={s.ledgerTime}>{formatStudyDuration(r.seconds)}</span>
-                </li>
-              ))}
-              {rest.length > 0 && (
-                <li style={{ '--i': shown.length } as CSSProperties}>
-                  <span className={s.ledgerIndex}>··</span>
-                  <span className={`${s.ledgerName} ${s.ledgerNone}`}>{webText.recapLedgerMore(rest.length)}</span>
-                  <span className={s.ledgerLeader} aria-hidden="true" />
-                  <span className={s.ledgerTime}>{formatStudyDuration(rest.reduce((sum, r) => sum + r.seconds, 0))}</span>
-                </li>
-              )}
-            </ol>
-
-            <div className={s.actions}>
-              <div className={s.primaryRow}>
-                <button type="button" className={s.primary} onClick={save} disabled={!story}>
-                  <IconDownload size={18} stroke={2} />
-                  <span>{story ? webText.recapSave : webText.recapSaving}</span>
-                </button>
-                {story?.canShare && (
-                  <button type="button" className={s.iconAction} onClick={() => void share()} aria-label={webText.recapShare} title={webText.recapShare}>
-                    <IconShare2 size={18} stroke={2} />
-                  </button>
-                )}
-              </div>
-              <div className={s.secondaryRow}>
-                <button type="button" className={s.secondary} onClick={onOpenStats}>{webText.recapOpenStats}</button>
-                <button type="button" className={s.tertiary} onClick={onClose}>{webText.recapClose}</button>
-              </div>
-            </div>
-          </section>
+        <div className={s.actions}>
+          <button type="button" className={s.save} onClick={save} disabled={!story}>
+            <IconDownload size={17} stroke={2} />
+            <span>{story ? webText.recapSave : webText.recapSaving}</span>
+          </button>
+          {story?.canShare && (
+            <button type="button" className={s.share} onClick={() => void share()} aria-label={webText.recapShare} title={webText.recapShare}>
+              <IconShare2 size={17} stroke={2} />
+            </button>
+          )}
         </div>
       </div>
     </div>

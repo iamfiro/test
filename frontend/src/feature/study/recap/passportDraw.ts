@@ -1,5 +1,5 @@
-// "오늘의 공부 여권" 아트. 모달은 레이어(여권 본체·과목 우표·완료 도장)를 따로 그려 하나씩 움직이고,
-// 저장 이미지(인스타그램 스토리 1080×1920)는 같은 함수로 한 장에 합친다. 그래서 미리보기와 저장본이 같다.
+// "오늘의 공부 여권" 아트. 화면은 레이어(여권 본체·과목 우표·완료 도장)를 따로 그려 하나씩 움직이고,
+// 저장 이미지(인스타그램 스토리 1080×1920, 점 격자 종이 위 여권 한 장)는 같은 함수로 합친다.
 // 앱에 없는 화면이라 사용자가 정한 문구용품 팔레트(아이보리·피치·버터·코랄·세이지·잉크, 2026-11-23)를 쓰고,
 // 섬 언어(작은 시계 무늬, 3D 방 사진)만 이어 받는다. 그라데이션 광원·이모지·범용 아이콘은 쓰지 않는다.
 import { paintClockField } from '../../../core/ui/IslandBackground'
@@ -41,10 +41,10 @@ const weekdays = ['월', '화', '수', '목', '금', '토', '일']
 /** 그리기 전에 글꼴을 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
 export async function loadPassportFonts(recap: StudyRecap): Promise<void> {
   const sample = [
-    webText.recapHeadline, webText.recapBody, recap.nickname, ...recap.subjects.map((s) => s.subject ?? t('studySubjectNone')),
+    recap.nickname, ...recap.subjects.map((s) => s.subject ?? t('studySubjectNone')),
     webText.recapPassportTitle(12, 31), webText.recapStampGoal, webText.recapStampDone, webText.recapFieldName, webText.recapFieldDate,
-    webText.recapFieldFocus, webText.recapFieldStreak, webText.recapFieldSubjects, webText.recapMetricFocus, webText.recapMetricSubjects,
-    webText.recapMetricStreak, formatStudyDuration(recap.todaySeconds), '0123456789시간분일과목()월화수목금토일', t('studySubjectNone'),
+    webText.recapFieldFocus, webText.recapFieldStreak, webText.recapFieldSubjects,
+    formatStudyDuration(recap.todaySeconds), '0123456789시간분일과목()월화수목금토일', t('studySubjectNone'),
   ].join('')
   await Promise.all([600, 700, 800].map((w) => document.fonts.load(`${w} 16px ${fonts.sans}`, sample)).concat(document.fonts.load(`800 16px ${fonts.round}`, webText.recapBrand)))
 }
@@ -290,15 +290,11 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap): void {
   for (let y = 14; y < H; y += 18) for (let x = 14; x < W; x += 18) { ctx.beginPath(); ctx.arc(x, y, 0.8, 0, Math.PI * 2); ctx.fill() }
   grain(ctx, W, H, 3, 2600)
 
-  text(ctx, `${webText.recapPassportBrand}  ·  ${recap.serial}`, W / 2, 84, { font: `600 7.5px ${fonts.mono}`, color: ink.inkSoft, align: 'center', spacing: 1.2 })
-  text(ctx, webText.recapHeadline, W / 2, 120, { font: `800 26px ${fonts.sans}`, color: ink.ink, align: 'center', spacing: -0.6 })
-  text(ctx, webText.recapBody, W / 2, 144, { font: `600 13px ${fonts.sans}`, color: ink.inkSoft, align: 'center' })
-
   // 여권 묶음: 뒤 피치 종이 + 여권 + 우표 + 도장.
   // 가로 여권은 스토리 폭에 맞춰 줄인다.
   const k = (W - 40) / passport.width
   const cx = W / 2
-  const cy = 346
+  const cy = H / 2 - 10
   ctx.save()
   ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy)
   ctx.save()
@@ -324,45 +320,7 @@ export function drawStory(canvas: HTMLCanvasElement, recap: StudyRecap): void {
   ctx.restore()
   ctx.restore()
 
-  // 숫자 세 칸.
-  const metrics: [string, string][] = [
-    [webText.recapMetricFocus, formatStudyDuration(recap.todaySeconds)],
-    [webText.recapMetricSubjects, webText.recapMetricSubjectsValue(recap.subjects.length)],
-    [webText.recapMetricStreak, t('studyStatsStreakValue', { count: recap.streakDays })],
-  ]
-  const top = 512
-  const colW = (W - 64) / 3
-  metrics.forEach(([name, value], i) => {
-    const x = 32 + colW * i + colW / 2
-    if (i > 0) { ctx.fillStyle = 'rgba(48,45,53,0.16)'; ctx.fillRect(32 + colW * i, top + 2, 1, 40) }
-    text(ctx, name, x, top + 12, { font: `600 10px ${fonts.sans}`, color: ink.inkSoft, align: 'center' })
-    text(ctx, value, x, top + 36, { font: `800 ${i === 0 ? 18 : 17}px ${fonts.sans}`, color: ink.ink, align: 'center', spacing: -0.3 })
-  })
-  // 오늘의 기록(과목·시간), 목록처럼 점선 이음.
-  const rows = recap.subjects.slice(0, 4)
-  let ly = 600
-  text(ctx, webText.recapLedgerTitle, 36, ly, { font: `700 10.5px ${fonts.sans}`, color: ink.inkSoft })
-  text(ctx, "Today's log", 36 + measure(ctx, webText.recapLedgerTitle, `700 10.5px ${fonts.sans}`) + 6, ly, { font: `italic 500 10px ${fonts.serif}`, color: ink.inkSoft })
-  ly += 8
-  rows.forEach((r, i) => {
-    ly += 24
-    const time = formatStudyDuration(r.seconds)
-    const timeFont = `700 12px ${fonts.sans}`
-    const nameFont = `600 13px ${fonts.sans}`
-    text(ctx, String(i + 1).padStart(2, '0'), 36, ly, { font: `700 10px ${fonts.mono}`, color: ink.coralText })
-    const nameX = 58
-    const timeW = measure(ctx, time, timeFont)
-    const name = ellipsize(ctx, r.subject ?? t('studySubjectNone'), nameFont, W - 36 - timeW - 40 - nameX)
-    text(ctx, name, nameX, ly, { font: nameFont, color: r.subject == null ? ink.inkSoft : ink.ink })
-    text(ctx, time, W - 36, ly, { font: timeFont, color: ink.ink, align: 'right' })
-    const from = nameX + measure(ctx, name, nameFont) + 8
-    const to = W - 36 - timeW - 8
-    if (to > from) {
-      ctx.save(); ctx.strokeStyle = 'rgba(48,45,53,0.3)'; ctx.lineWidth = 0.8; ctx.setLineDash([1, 2.4])
-      ctx.beginPath(); ctx.moveTo(from, ly - 3); ctx.lineTo(to, ly - 3); ctx.stroke(); ctx.restore()
-    }
-  })
-  text(ctx, webText.recapBrand, W / 2, 742, { font: `800 13px ${fonts.round}`, color: ink.ink, align: 'center', alpha: 0.72 })
+  text(ctx, webText.recapBrand, W / 2, H - 92, { font: `800 13px ${fonts.round}`, color: ink.ink, align: 'center', alpha: 0.72 })
 }
 
 /** 논리 크기 w×h를 scale배 캔버스에 그린다. */
