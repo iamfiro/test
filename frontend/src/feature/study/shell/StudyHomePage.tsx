@@ -9,7 +9,14 @@ import { useSession } from '../../auth/session'
 import { StudyTabOverlay, studyTabBarHidden } from '../home/StudyTabOverlay'
 import { useStudyCameraCycle } from '../home/useStudyCameraCycle'
 import { useStudyTimer } from '../timer/useStudyTimer'
+import { useEffect, useState } from 'react'
+import { useSubjectEditor } from '../subject/useSubjectEditor'
+import { ChatSheet } from '../chat/ChatSheet'
+import { chatStore, useChat } from '../chat/chatStore'
 import s from './StudyHomePage.module.css'
+
+/** 방이 없을 때의 채팅 토픽(원본 앱과 같다). 방 도메인(Phase 4)이 붙으면 `room:<id>`. */
+const lobbyTopic = 'lobby'
 
 const titles: Record<StudyTab, () => string> = {
   study: () => t('studyTabStudy'),
@@ -27,6 +34,16 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   // 원본 기본 시점(initialRoomCamera = thirdPerson). 누를 때마다 다음 시점, 이름은 1600ms.
   const camera = useStudyCameraCycle('thirdPerson')
   const timer = useStudyTimer(state.status === 'signedIn')
+  const subjects = useSubjectEditor({ onManage: () => navigate('/subjects') })
+  const chat = useChat()
+  const [chatOpen, setChatOpen] = useState(false)
+  const myId = state.status === 'signedIn' ? state.me.id : null
+  // 원본 `_chat != null`: 내 id가 정해지면 방(없으면 lobby) 채팅에 붙는다.
+  useEffect(() => {
+    if (myId == null) return
+    chatStore.connect(lobbyTopic, myId)
+    return () => chatStore.disconnect()
+  }, [myId])
   return (
     <div className={s.page}>
       {tab === 'rooms' && <IslandBackground ground="grass" />}
@@ -52,8 +69,14 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           cameraMode={camera.mode}
           cameraHint={camera.hint}
           onCycleCamera={camera.cycle}
+          onPickSubject={subjects.openPicker}
+          chatUnread={chat.unread}
+          chatPeek={chat.peek == null ? null : { id: chat.peek.id, nickname: chat.peek.author.nickname, body: chat.peek.body }}
+          onOpenChat={() => setChatOpen(true)}
         />
       )}
+      {tab === 'study' && subjects.sheets}
+      {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )

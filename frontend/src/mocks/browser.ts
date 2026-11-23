@@ -2,6 +2,8 @@ import { getResponse } from 'msw'
 import { handlers } from './handlers'
 import { setTransport } from '../core/api/client'
 import { logger } from '../core/log/log'
+import { setChatSocketFactory } from '../feature/study/chat/chatSocket'
+import { mockChatSocketFactory } from './chat'
 
 const log = logger('Mock')
 
@@ -10,6 +12,7 @@ const log = logger('Mock')
  * 목이 없는 요청은 실제 서버로 보내지 않고 501로 드러낸다.
  */
 export async function startMockWorker() {
+  setChatSocketFactory(mockChatSocketFactory)
   setTransport(async (request) => {
     const res = await getResponse(handlers, request)
     if (res) return res

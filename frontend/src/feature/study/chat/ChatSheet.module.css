@@ -1,0 +1,100 @@
+/* 앱 캡처(384 폭): 위 가운데 안내 14/800 보조 잉크, 아래 입력칸 높이 48 · 양옆 20 · 아래 18. */
+.status {
+  flex: none;
+  margin: 0;
+  padding: 14px 32px 4px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--i-ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.statusOffline { color: var(--i-danger); }
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 20px;
+}
+.empty {
+  margin: auto 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--i-ink-soft);
+}
+.messages {
+  list-style: none;
+  margin: auto 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.row { display: flex; flex-direction: column; align-items: flex-start; }
+.row.mine { align-items: flex-end; }
+.name {
+  margin: 6px 0 3px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--i-ink-soft);
+}
+.line {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 88%;
+}
+.mine .line { flex-direction: row-reverse; }
+.bubble {
+  min-width: 0;
+  padding: 9px 14px;
+  border-radius: 18px;
+  background: var(--i-muted);
+  color: var(--i-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mine .bubble { background: var(--i-sun); color: var(--i-on-sun); }
+.time {
+  flex: none;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--i-ink-soft);
+}
+
+.composer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px 18px 20px;
+}
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--i-muted);
+  color: var(--i-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: inherit;
+  outline: none;
+}
+.input::placeholder { color: var(--i-ink-soft); }
+.input:focus-visible { box-shadow: 0 0 0 2px var(--i-paper-ledge); }
+.input:read-only { opacity: 0.7; }

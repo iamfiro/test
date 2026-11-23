@@ -1,43 +1,68 @@
+/*
+ * 사용자 결정(2026-11-23): 아래에서 위로 옅어지는 검정 선형 그라데이션을 깔고, 라벨은 외곽선 없는 흰 글자.
+ * 어떤 페이지 색 위에서도 흰 글자가 읽히도록 그라데이션이 바 위로 24px 더 번진다(::before).
+ * 높이(기기 아래 여백 제외) = 위 6 + 탭(6 + 아이콘 44 + 2 + 라벨 13×1.2 + 6) + 아래 4 = 83.6
+ * → StudyTabOverlay.module.css의 --tab-bar와 같아야 한다.
+ */
 .bar {
   position: fixed;
   left: 50%;
   bottom: 0;
   transform: translateX(-50%);
   width: min(100%, var(--app-column));
-  border-radius: 12px 12px 0 0;
-  padding: 4px 8px calc(2px + env(safe-area-inset-bottom));
+  padding: 6px 8px calc(4px + env(safe-area-inset-bottom));
   z-index: 20;
   /* 원본: 400ms easeInOutCubic로 내려 숨긴다. */
   transition: transform 400ms cubic-bezier(0.65, 0, 0.35, 1);
 }
+.bar::before {
+  content: '';
+  position: absolute;
+  inset: -24px 0 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.9) 0%, rgb(0 0 0 / 0.8) 45%, rgb(0 0 0 / 0) 100%);
+  pointer-events: none;
+  z-index: -1;
+}
 .hidden { transform: translate(-50%, 110%); }
 .row { display: flex; }
+
 .tab {
+  position: relative;
   flex: 1 1 0;
   min-width: 0;
   margin: 0 2px;
-  padding: 8px 4px;
+  padding: 6px 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
   border: 0;
-  border-radius: 14px;
   background: transparent;
   cursor: pointer;
-  transition: background-color var(--motion-fast) ease-out;
 }
-.selected { background: rgb(255 255 255 / 0.25); }
-.selectedLight { background: rgb(0 0 0 / 0.08); }
-.iconBox { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
-.iconBox img { transform-origin: 50% 100%; }
+.iconBox {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.iconBox img {
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 2px 0 rgb(0 0 0 / 0.18));
+  user-select: none;
+}
+.selected .iconBox { transform: translateY(-4px) scale(1.1); }
+.tab:active .iconBox { transform: scale(0.92); }
+
+/* 둥근 글꼴(티머니 둥근바람), 외곽선 없는 흰 글자. */
 .label {
   margin-top: 2px;
   font-family: var(--font-round);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   line-height: 1.2;
+  letter-spacing: 0;
   white-space: nowrap;
   color: #fff;
-  text-shadow: 0 1px 2px rgb(40 90 15 / 0.2);
 }
-.labelDark { color: var(--tab-dark-label); text-shadow: none; }

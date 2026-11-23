@@ -2,7 +2,11 @@ import { useRef } from 'react'
 import { t } from '../../../l10n/t'
 import s from './StudyTabBar.module.css'
 
-/** 원본: StudyTabBar. 순서가 곧 탭바 순서다. */
+/**
+ * 원본: StudyTabBar. 순서가 곧 탭바 순서다.
+ * 모양은 사용자 결정(2026-11-23)으로 앱과 다르다: 아래에서 위로 옅어지는 검정 그라데이션, 큰 아이콘(44),
+ * 외곽선 없는 흰 둥근 글꼴 라벨, 고른 탭은 아이콘이 올라오고 커진다. docs/design-parity/exceptions.md 참고.
+ */
 export const studyTabs = ['study', 'rooms', 'schedule', 'stats', 'outfit'] as const
 export type StudyTab = (typeof studyTabs)[number]
 
@@ -23,26 +27,22 @@ export const tabSurface: Record<StudyTab, string> = {
   outfit: 'var(--i-paper)',
 }
 
-/** 밝은 바탕이면 진한 글자. 원본은 surface.computeLuminance() > 0.5. */
-const onLight: Record<StudyTab, boolean> = { study: true, rooms: false, schedule: false, stats: false, outfit: true }
-
 export function StudyTabBar(props: { current: StudyTab; onSelect: (tab: StudyTab) => void; hidden?: boolean }) {
   return (
     <nav
       className={`${s.bar} ${props.hidden ? s.hidden : ''}`}
-      style={{ background: tabSurface[props.current] }}
       aria-label={t('studyTabStudy')}
     >
       <div className={s.row}>
         {studyTabs.map((tab) => (
-          <TabButton key={tab} tab={tab} selected={tab === props.current} onLight={onLight[props.current]} onSelect={props.onSelect} />
+          <TabButton key={tab} tab={tab} selected={tab === props.current} onSelect={props.onSelect} />
         ))}
       </div>
     </nav>
   )
 }
 
-function TabButton(props: { tab: StudyTab; selected: boolean; onLight: boolean; onSelect: (tab: StudyTab) => void }) {
+function TabButton(props: { tab: StudyTab; selected: boolean; onSelect: (tab: StudyTab) => void }) {
   const icon = useRef<HTMLImageElement>(null)
   const wiggle = () => {
     // 감쇠하는 사인파로 450ms 흔들기(원본 _angle).
@@ -57,14 +57,14 @@ function TabButton(props: { tab: StudyTab; selected: boolean; onLight: boolean; 
   return (
     <button
       type="button"
-      className={`${s.tab} ${props.selected ? (props.onLight ? s.selectedLight : s.selected) : ''}`}
+      className={`${s.tab} ${props.selected ? s.selected : ''}`}
       aria-current={props.selected ? 'page' : undefined}
       onClick={() => { wiggle(); props.onSelect(props.tab) }}
     >
       <span className={s.iconBox}>
-        <img ref={icon} src={`/assets/icons/nav/study_tab_${props.tab}.png`} width={32} height={32} alt="" />
+        <img ref={icon} src={`/assets/icons/nav/study_tab_${props.tab}.png`} width={44} height={44} alt="" draggable={false} />
       </span>
-      <span className={`${s.label} ${props.onLight ? s.labelDark : ''}`}>{labels[props.tab]()}</span>
+      <span className={s.label}>{labels[props.tab]()}</span>
     </button>
   )
 }

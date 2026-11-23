@@ -5,6 +5,7 @@ import { LoginPage } from '../feature/auth/LoginPage'
 import { ToastProvider } from '../core/ui/Toast'
 import { StudyHomePage } from '../feature/study/shell/StudyHomePage'
 import { LoadFailed } from '../core/ui/StateView'
+import { SubjectManageRoute } from '../feature/study/subject/SubjectManageRoute'
 
 export function App() {
   return (
@@ -18,6 +19,7 @@ export function App() {
             <Route path="/schedule" element={<RequireSession><StudyHomePage tab="schedule" /></RequireSession>} />
             <Route path="/stats" element={<RequireSession><StudyHomePage tab="stats" /></RequireSession>} />
             <Route path="/outfit" element={<RequireSession><StudyHomePage tab="outfit" /></RequireSession>} />
+            <Route path="/subjects" element={<RequireSession><SubjectManageRoute /></RequireSession>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SessionProvider>

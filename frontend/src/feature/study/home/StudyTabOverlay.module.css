@@ -8,9 +8,9 @@
   --bottom: env(safe-area-inset-bottom, 0px);
   /*
    * 원본은 extendBody라 공부 탭 본문의 아래 여백에 탭바 높이가 든다. 웹 StudyTabBar 높이에서
-   * 기기 아래 여백을 뺀 값: 위 4 + 탭(8 + 아이콘 32 + 2 + 라벨 12×1.2 + 8) + 아래 2.
+   * 기기 아래 여백을 뺀 값(StudyTabBar.module.css 머리 주석): 위 6 + 탭(6 + 44 + 2 + 13×1.2 + 6) + 아래 4.
    */
-  --tab-bar: 70.4px;
+  --tab-bar: 83.6px;
   /* 상점 버튼 top: topInset + (sm + 48) + md + 16 */
   --shop-top: calc(var(--top) + 84px);
   /* 랭킹 top: topInset + (sm + 48) × (상점 ? 2 : 1) + md + 16 + (상점 ? 10 + md + 16 : 0) */
