@@ -65,6 +65,7 @@ export const timerHandlers = [
     start16.setDate(monday.getDate() - 15 * 7)
     return ok({
       today: { date: today.toISOString().slice(0, 10), seconds: 0 },
+      today_by_subject: [],
       yesterday_seconds: 0,
       week: { days: dayList(monday, 7), total_seconds: 0 },
       streak_days: 0,
