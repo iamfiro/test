@@ -1,6 +1,5 @@
-// 공부를 끝낸 뒤 공부방 위에 뜨는 "오늘의 공부 여권"(앱에 없는 화면, 사용자 지정 2026-11-23).
-// 모달 틀 없이 흐린 공부방 위에 자랑 문구(오늘 n시간 공부했어요 · n일째 연속)와 가로 여권을 띄운다.
-// 닫기는 카드 모서리의 섬 아이콘 단추, 저장은 햇살 섬 단추(공유 지원 시 옆에 공유 단추). 저장 이미지와 같은 문구·카드.
+// 공부를 끝낸 뒤 흐린 공부방 위에 뜨는 "오늘의 공부" 카드(앱에 없는 화면, 사용자 결정 2026-11-23).
+// 카드 한 장과 그 아래 섬 단추(이미지 저장 · 공유(지원 시) · 닫기)만 둔다. 저장 이미지는 같은 카드를 호수 위에 놓은 스토리.
 // 접근성: dialog·aria-modal, 열리면 대화상자로 포커스, Tab은 안에서만 돈다, Esc·바깥으로 닫고 닫히면 원래 자리로 돌린다.
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { IconDownload, IconShare2, IconX } from '@tabler/icons-react'
@@ -8,28 +7,24 @@ import { webText } from '../../../l10n/web_ko'
 import { useToast } from '../../../core/ui/Toast'
 import { IslandButton } from '../../../core/ui/IslandButton'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
-import { StreakFlame } from '../stats/StreakFlame'
 import { logger } from '../../../core/log/log'
 import { formatStudyDuration } from '../home/studyFormat'
-import { drawStory, loadPassportFonts, passport } from './passportDraw'
-import { PassportArt } from './PassportArt'
+import { drawStory, loadCardAssets, type CardAssets } from './cardDraw'
+import { CardArt, stageSize } from './CardArt'
 import type { StudyRecap } from './studyRecap'
 import s from './recap.module.css'
 
 const log = logger('StudyRecap')
 
-/** 여권 무대(여권 + 뒤 종이 여백) 논리 크기. */
-const artW = passport.width + 40
-const artH = passport.height + 40
 /** 넓은 화면에서 키우는 상한. */
-const maxFit = 1.4
+const maxFit = 1.2
 
 type Story = { url: string; file: File; canShare: boolean }
 
 export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose: () => void }) {
   const toast = useToast()
   const dialog = useRef<HTMLDivElement>(null)
-  const [ready, setReady] = useState(false)
+  const [assets, setAssets] = useState<CardAssets | null>(null)
   const [story, setStory] = useState<Story | null>(null)
   const [fit, setFit] = useState(1)
 
@@ -39,11 +34,11 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
     let url: string | null = null
     const started = performance.now()
     void (async () => {
-      await loadPassportFonts(recap)
+      const loaded = await loadCardAssets(recap)
       if (cancelled) return
-      setReady(true)
+      setAssets(loaded)
       const canvas = document.createElement('canvas')
-      drawStory(canvas, recap)
+      drawStory(canvas, recap, loaded)
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
       if (!blob) throw new Error('toBlob returned null')
       if (cancelled) return
@@ -56,9 +51,9 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url) }
   }, [recap])
 
-  // 여권을 창에 맞춘다: 좌우 16 여백, 위아래로는 자랑 문구·저장 자리(약 250)를 남긴다.
+  // 카드를 창에 맞춘다: 좌우 16 여백, 아래로는 단추 자리(약 110)를 남긴다.
   useEffect(() => {
-    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / artW, (window.innerHeight - 260) / artH))
+    const measure = () => setFit(Math.min(maxFit, (window.innerWidth - 32) / stageSize.width, (window.innerHeight - 110) / stageSize.height))
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
@@ -105,26 +100,18 @@ export function StudyRecapModal({ recap, onClose }: { recap: StudyRecap; onClose
     }
   }
 
-  const label = webText.recapPassportAlt(recap.nickname, formatStudyDuration(recap.todaySeconds))
+  const label = webText.recapCardAlt(recap.nickname, formatStudyDuration(recap.todaySeconds))
   return (
     <div className={`palette-day ${s.root}`}>
       <div className={s.backdrop} onClick={onClose} />
       <div ref={dialog} className={s.floating} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1}>
-        <header className={s.brag}>
-          <h2 className={s.bragTitle}>
-            {webText.recapStoryHeadlineLead} <mark>{formatStudyDuration(recap.todaySeconds)}</mark> {webText.recapStoryHeadlineTail}
-          </h2>
-          {recap.streakDays > 0 && (
-            <p className={s.bragSub}><StreakFlame lit size={20} /><span>{webText.recapStoryStreak(recap.streakDays)}</span></p>
-          )}
-        </header>
-        <div className={s.fit} style={{ '--fit': fit, width: artW * fit, height: artH * fit } as CSSProperties}>
-          {ready ? <PassportArt recap={recap} label={label} /> : <div className={s.artLoading} aria-busy="true" />}
-          <span className={s.close}><IslandIconButton icon={IconX} label={webText.recapClose} onClick={onClose} size={44} iconSize={20} /></span>
+        <div className={s.fit} style={{ '--fit': fit, width: stageSize.width * fit, height: stageSize.height * fit } as CSSProperties}>
+          {assets ? <CardArt recap={recap} assets={assets} label={label} /> : <div className={s.artLoading} aria-busy="true" />}
         </div>
         <div className={s.actions}>
           <IslandButton primary icon={IconDownload} label={story ? webText.recapSave : webText.recapSaving} onClick={story ? save : undefined} minHeight={50} />
           {story?.canShare && <IslandIconButton icon={IconShare2} label={webText.recapShare} onClick={() => void share()} size={50} iconSize={20} />}
+          <IslandIconButton icon={IconX} label={webText.recapClose} onClick={onClose} size={50} iconSize={20} />
         </div>
       </div>
     </div>

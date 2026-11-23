@@ -12,7 +12,7 @@ import { elapsedMs, finish, isRunning, pause, resume, start, startPresence, useT
 import { loadStats, useStats } from './statsStore'
 import { currentSettings, loadSettings, useStudySettings } from './settingsStore'
 import { buildRecap, type StudyRecap } from '../recap/studyRecap'
-import { photoSlot } from '../recap/passportDraw'
+import { photoSlot } from '../recap/cardDraw'
 import { takeRoomSnapshot } from '../room3d/roomSnapshot'
 import { subjectColorOf } from './subjectPalette'
 import { dateKey, splitByStudyDate, studyDateOf } from './studyDay'
@@ -98,8 +98,8 @@ export function useStudyTimer(nickname: string | null) {
     ))
     if (!ok) return
     // 끝내기 전 내 자리 사진(카드 사진 칸). 방이 없으면 null이고 카드는 사진 칸 없이 그린다.
-    // 여권 사진 칸은 작지만 저장 이미지는 2.5배라(렌더러 화소 배율 상한 2) 칸의 2배 화면으로 찍는다(비율은 같다).
-    const photo = takeRoomSnapshot(photoSlot.width * 2, photoSlot.height * 2)
+    // 저장 이미지는 2.5배라(렌더러 화소 배율 상한 2) 사진 칸의 1.25배 화면으로 찍는다(비율은 같다).
+    const photo = takeRoomSnapshot(photoSlot.width * 1.25, photoSlot.height * 1.25)
     try {
       const record = await finish(session.id)
       const fresh = await loadStats()

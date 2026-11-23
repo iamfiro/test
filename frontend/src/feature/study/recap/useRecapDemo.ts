@@ -7,7 +7,7 @@
 import { useEffect } from 'react'
 import { logger } from '../../../core/log/log'
 import { takeRoomSnapshot } from '../room3d/roomSnapshot'
-import { photoSlot } from './passportDraw'
+import { photoSlot } from './cardDraw'
 import type { StudyRecap } from './studyRecap'
 
 const log = logger('RecapDemo')
@@ -42,7 +42,7 @@ export function useRecapDemo(nickname: string | null, show: (recap: StudyRecap) 
     const started = performance.now()
     let timer = 0
     const tryShow = () => {
-      const photo = takeRoomSnapshot(photoSlot.width * 2, photoSlot.height * 2)
+      const photo = takeRoomSnapshot(photoSlot.width * 1.25, photoSlot.height * 1.25)
       // 방이 아직 안 그려졌으면 최대 15초까지 기다리고, 그래도 없으면 사진 칸 없이 띄운다.
       if (!photo && performance.now() - started < 15_000) { timer = window.setTimeout(tryShow, 300); return }
       log.debug('recap demo shown', { variant, photo: photo != null, elapsed_ms: Math.round(performance.now() - started) })
