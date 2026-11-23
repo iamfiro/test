@@ -169,7 +169,7 @@ uniform vec3 warm;        // 전체에 곱할 색(중성에 가깝게)
 uniform float deOrange;   // 주황 계열을 옅은 살구·베이지로 옮기는 정도(0–1)
 uniform float exposure;   // 전체 밝기(하이키)
 uniform float highlightLift; // 밝은 곳을 흰색 쪽으로 들어 올리는 정도
-uniform float style;      // 0 예전 카툰 보정, 1 부드러운 파스텔 보정
+uniform float style;      // 0 예전 카툰 보정, 1 부드러운 파스텔 보정, 2 선명한 게임 아트 보정
 uniform sampler2D tAo;
 uniform float aoAmount;   // 0이면 접촉 그늘 없음
 uniform vec3 aoColor;     // 그늘 색(라벤더 갈색)
@@ -234,7 +234,16 @@ void main() {
   vec3 pale = mix(color, vec3(luma), 0.35) * 1.14;
   color = mix(color, pale, orange * deOrange);
   color *= warm * exposure;
-  if (style > 0.5) {
+  if (style > 1.5) {
+    // 선명한 룩: 채도·대비를 올리고(S 곡선), 그늘은 푸르게·해 받은 곳은 따뜻하게 갈라 칠한다.
+    float l3 = dot(color, vec3(0.299, 0.587, 0.114));
+    float mx3 = max(color.r, max(color.g, color.b));
+    float mn3 = min(color.r, min(color.g, color.b));
+    color = mix(vec3(l3), color, 1.22 + vibrance * (1.0 - 2.0 * (mx3 - mn3)));
+    color = clamp(color, 0.0, 1.0);
+    color = mix(color, color * color * (3.0 - 2.0 * color), 0.38);
+    color *= mix(shadowTone, highlightTone, smoothstep(0.1, 0.75, l3));
+  } else if (style > 0.5) {
     // 생기: 흐린 색은 채도를 올리고 이미 진한 색은 누른다(파스텔이 고르게).
     float mx = max(color.r, max(color.g, color.b));
     float mn = min(color.r, min(color.g, color.b));
@@ -261,7 +270,7 @@ void main() {
 
 /** day: 0 밤 – 1 밝은 낮(해가 떠 있으면 0.5 이상). sunX: 해가 화면 가로 어디쯤(0 왼쪽 – 1 오른쪽). */
 export type MoodLook = { bloom: number; depthOfField: boolean; grain: number; vignette: number; ao: boolean; day: number; sunX: number }
-export type ComposerStyle = 'soft' | 'toon'
+export type ComposerStyle = 'vivid' | 'soft' | 'toon'
 
 function pass(fragmentShader: string, uniforms: Record<string, THREE.IUniform>) {
   const mesh = new THREE.Mesh(
@@ -382,6 +391,22 @@ export class ToonComposer {
       fu.leak!.value = 0.07
       this.softBase = { exposure: 1.08, highlightLift: 0.04, haze: 0.32, leak: 0.07, rays: 0.55 }
     }
+    if (style === 'vivid') {
+      // 선명한 게임 아트(사용자 참고 이미지 2026-11-23): 공기·빛샘·빛줄기 없이 맑게, 선은 아주 옅게.
+      this.outline.mesh.material.uniforms.tintedLine!.value = 1
+      ;(this.outline.mesh.material.uniforms.outline!.value as THREE.Vector4).w = 0.35
+      fu.style!.value = 2
+      fu.exposure!.value = 0.98
+      fu.highlightLift!.value = 0
+      fu.deOrange!.value = 0.3
+      fu.vibrance!.value = 0.2
+      ;(fu.lift!.value as THREE.Vector3).set(0.88, 0.94, 1.0)
+      fu.liftAmount!.value = 0.03
+      ;(fu.shadowTone!.value as THREE.Vector3).set(0.86, 0.93, 1.1)
+      ;(fu.highlightTone!.value as THREE.Vector3).set(1.03, 1.0, 0.92)
+      ;(fu.aoColor!.value as THREE.Vector3).set(0.4, 0.47, 0.68)
+      this.bright.mesh.material.uniforms.threshold!.value = 0.78
+    }
   }
 
   setSize(width: number, height: number) {
@@ -438,7 +463,7 @@ export class ToonComposer {
 
     // 접촉 그늘(부드러운 룩, 높은 단계만): ½ 해상도로 구하고 한 번 흐려 얼룩을 없앤다.
     const fu0 = this.final.mesh.material.uniforms
-    const useAo = this.style === 'soft' && mood.ao
+    const useAo = this.style !== 'toon' && mood.ao
     fu0.aoAmount!.value = useAo ? 1.0 : 0
     if (useAo) {
       const au = this.ao.mesh.material.uniforms

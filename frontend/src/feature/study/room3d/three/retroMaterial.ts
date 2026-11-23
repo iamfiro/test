@@ -189,3 +189,17 @@ export function setSoft(material: THREE.ShaderMaterial, rim: number) {
   ;(material.uniforms.soft!.value as THREE.Vector4).set(1, -0.25, 0.65, rim)
   ;(material.uniforms.toon!.value as THREE.Vector4).set(0, 1, 0, 0)
 }
+
+/**
+ * 선명한 룩(vivid, 기본): 게임 아트처럼 해 쪽은 따뜻하고 밝게, 그늘은 푸르게. 경계는 부드럽되 좁아서
+ * 형태가 또렷하다(사용자 참고 이미지 2026-11-23).
+ */
+export function setVivid(material: THREE.ShaderMaterial, rim: number) {
+  const u = material.uniforms
+  ;(u.soft!.value as THREE.Vector4).set(1, -0.08, 0.38, rim)
+  ;(u.toon!.value as THREE.Vector4).set(0, 1, 0, 0)
+  ;(u.soft_shadow!.value as THREE.Vector3).set(0.66, 0.74, 0.94)
+  ;(u.soft_key!.value as THREE.Vector3).set(1.07, 1.03, 0.94)
+  ;(u.soft_sky!.value as THREE.Vector3).set(1.02, 1.05, 1.1)
+  ;(u.soft_ground!.value as THREE.Vector3).set(0.92, 0.9, 0.88)
+}

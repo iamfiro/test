@@ -11,7 +11,7 @@ import type { StudyRoomLayout } from '../model/layout'
 import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomLook } from '../model/scene'
 import { logger } from '../../../../core/log/log'
 import { CharacterKit, type SeatedPerson } from './characterKit'
-import { createRetroMaterial, retroFloats, setRetroFloats, setSoft, setToon, toonDefault } from './retroMaterial'
+import { createRetroMaterial, retroFloats, setRetroFloats, setSoft, setToon, setVivid, toonDefault } from './retroMaterial'
 import { ToonComposer, type MoodLook } from './toonComposer'
 import { paintSky } from '../StudyRoomSky'
 import type { StudyRoomDaylight } from '../domain/daylight'
@@ -26,13 +26,13 @@ const url = (asset: string) => `/${asset}`
 type Listener = () => void
 
 /**
- * 웹 룩. soft(기본): 부드러운 감싸기 조명·접촉 그늘(AO)·색 외곽선·파스텔 보정(사용자 결정 2026-11-23 "셰이더 대격변").
- * toon: 그 전의 셀 셰이딩 룩(비교용, `?look=toon`). app: PocketTime 앱과 같은 그림(비교용, `?look=app`).
+ * 웹 룩. vivid(기본): 게임 아트 색감(따뜻한 해·푸른 그늘·높은 채도·대비, 공기 효과 없음, 사용자 참고 이미지 2026-11-23).
+ * soft: 몽환적인 파스텔 룩(`?look=soft`). toon: 그 전의 셀 셰이딩 룩(`?look=toon`). app: 앱과 같은 그림(`?look=app`).
  */
-export type RoomLook = 'soft' | 'toon' | 'app'
+export type RoomLook = 'vivid' | 'soft' | 'toon' | 'app'
 export function roomLookFromLocation(): RoomLook {
   const v = new URLSearchParams(window.location.search).get('look')
-  return v === 'app' ? 'app' : v === 'toon' ? 'toon' : 'soft'
+  return v === 'app' || v === 'toon' || v === 'soft' ? v : 'vivid'
 }
 
 export class ThreeStudyRoomRenderer {
@@ -66,7 +66,7 @@ export class ThreeStudyRoomRenderer {
   private daylight: StudyRoomDaylight | null = null
   private skyKey = ''
 
-  constructor(readonly look: RoomLook = 'soft') {
+  constructor(readonly look: RoomLook = 'vivid') {
     this.canvas = document.createElement('canvas')
     // 하늘(뒤)과 자리 칩(앞) 사이에 놓는다.
     Object.assign(this.canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block', zIndex: '1' })
@@ -97,7 +97,7 @@ export class ThreeStudyRoomRenderer {
     // 셰이더가 sRGB 값을 그대로 쓴다(원본 Impeller 경로). 출력 변환·톤 매핑 없음.
     gl.outputColorSpace = THREE.LinearSRGBColorSpace
     gl.toneMapping = THREE.NoToneMapping
-    if (this.look !== 'app') this.composer = new ToonComposer(this.look === 'soft' ? 'soft' : 'toon')
+    if (this.look !== 'app') this.composer = new ToonComposer(this.look)
     this.gl = gl
     return gl
   }
@@ -170,6 +170,7 @@ export class ThreeStudyRoomRenderer {
             retro = createRetroMaterial(map, smooth, this.look !== 'app')
             if (this.look === 'toon') setToon(retro, cel ? { ...toonDefault, rim: 0.12 } : { ...toonDefault, shade: 1 })
             if (this.look === 'soft') setSoft(retro, cel ? 0.16 : 0.08)
+            if (this.look === 'vivid') setVivid(retro, cel ? 0.12 : 0.06)
             byKey.set(key, retro)
             this.retroMaterials.push(retro)
             if (outdoors) this.uncutMaterials.add(retro)
@@ -351,9 +352,9 @@ export class ThreeStudyRoomRenderer {
       // 해가 떠 있으면 아침·저녁도 0.5 이상(밝은 하늘), 한낮 1. 해는 아침엔 왼쪽, 오후엔 오른쪽에서 든다.
       const day = d?.sunUp ? 0.5 + 0.5 * d.sunHeight : 0
       const sunX = d?.sunUp ? -0.15 + 1.3 * d.arc : 0.82
-      const vignette = this.look === 'soft' ? 0.18 : 0.1
-      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.015, vignette, ao: true, day, sunX }
-        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.015, vignette, ao: false, day, sunX }
+      const vignette = this.look === 'soft' ? 0.18 : this.look === 'vivid' ? 0.12 : 0.1
+      const mood: MoodLook | null = q === 'high' ? { bloom: this.look === 'vivid' ? 0.35 : 0.55, depthOfField: true, grain: this.look === 'vivid' ? 0 : 0.015, vignette, ao: true, day, sunX }
+        : q === 'medium' ? { bloom: this.look === 'vivid' ? 0.35 : 0.55, depthOfField: false, grain: this.look === 'vivid' ? 0 : 0.015, vignette, ao: false, day, sunX }
         : null
       const focus = rig.eye.distanceTo(opts.camera.target)
       this.composer.render(gl, this.world, this.camera, pixelRatio, focus, mood)
