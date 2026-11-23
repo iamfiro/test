@@ -24,6 +24,7 @@
   --c-text-secondary: rgb(106 106 106);
   --c-text-light: rgb(161 161 161);
   --c-soft-fill: #ededf2;
+  --c-inactive: rgb(231 231 231);
 
   /* StudyRoomIslandPalette._day */
   --i-grass: #e8945a;
@@ -80,6 +81,10 @@
     --c-text-secondary: #aeaeb2;
     --c-text-light: #8e8e93;
     --c-on-accent-surface: #ff8f66;
+    --c-inactive: #38383a;
+    --c-soft-fill: #2c2c2e;
+    --c-background: #0d0d0d;
+    --c-surface: #1c1c1e;
     --i-grass: #3a2519; --i-grass-pattern: #573624;
     --i-meadow: #2e2919; --i-meadow-pattern: #443b22;
     --i-lake: #1d2f36; --i-lake-pattern: #2a424b;
@@ -92,6 +97,28 @@
     --i-disabled-face: #3a3a3c; --i-disabled-ledge: #28282a; --i-disabled-ink: #8e8e93;
   }
 }
+
+/* 공부 탭(3D 방)의 내용·시트는 앱 밝기와 관계없이 다크(원본 _studyDarkTheme). */
+.theme-dark {
+    --c-primary: #e0e0e0;
+    --c-text-secondary: #aeaeb2;
+    --c-text-light: #8e8e93;
+    --c-on-accent-surface: #ff8f66;
+    --c-inactive: #38383a;
+    --c-soft-fill: #2c2c2e;
+    --c-background: #0d0d0d;
+    --c-surface: #1c1c1e;
+    --i-grass: #3a2519; --i-grass-pattern: #573624;
+    --i-meadow: #2e2919; --i-meadow-pattern: #443b22;
+    --i-lake: #1d2f36; --i-lake-pattern: #2a424b;
+    --i-paper: #2f2b25; --i-paper-ledge: #1a1814; --i-paper-line: #433d33;
+    --i-ink: #f3e7cc; --i-ink-soft: #b9a98a;
+    --i-leaf: #79c487; --i-on-leaf: #15261a;
+    --i-studying: #ff8a55; --i-on-studying: #2a160b;
+    --i-sun: #e4c25a; --i-on-sun: #3a2e1c; --i-sun-ledge: #a9893a;
+    --i-muted: #3b362e; --i-danger: #f08a7c;
+    --i-disabled-face: #3a3a3c; --i-disabled-ledge: #28282a; --i-disabled-ink: #8e8e93;
+  }
 
 /* StudyRoomIslandPalette.onLake */
 .palette-on-lake { --i-leaf: #3e8da6; --i-on-leaf: #ffffff; --i-ground-ink: #ffffff; }

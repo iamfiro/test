@@ -1,0 +1,8 @@
+.button {
+  position: relative; border: 0; border-radius: var(--r-button); padding: 0 16px; font-size: 17px; font-weight: 700;
+  cursor: pointer; transition: transform var(--motion-press) ease-out; display: inline-flex; align-items: center; justify-content: center;
+}
+.button:active:not(:disabled) { transform: scale(0.96); }
+.button:disabled { cursor: default; }
+.spinner { position: absolute; width: 20px; height: 20px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

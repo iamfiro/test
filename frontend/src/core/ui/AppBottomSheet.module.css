@@ -1,0 +1,16 @@
+.root { position: fixed; inset: 0; z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+.barrier { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); opacity: 0; transition: opacity 250ms ease-out; }
+.card {
+  position: relative; width: min(calc(100% - 24px), 480px); margin: 0 12px max(12px, env(safe-area-inset-bottom));
+  padding-bottom: 20px; border-radius: 32px; background: var(--c-background); color: var(--c-primary);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.08); transform: translateY(110%); transition: transform 250ms cubic-bezier(0.2, 0, 0, 1); outline: none;
+}
+.open .barrier { opacity: 1; }
+.open .card { transform: none; }
+.handle { padding: 10px 0; display: flex; justify-content: center; }
+.handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--c-inactive); }
+.header { padding: 4px 24px 8px; }
+.title { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+.description { margin: 4px 0 0; font-size: 14px; color: var(--c-text-secondary); white-space: pre-line; }
+@media (prefers-color-scheme: dark) { .card { background: #1c1c1e; } }
+:global(.theme-dark) .card { background: #1c1c1e; }
