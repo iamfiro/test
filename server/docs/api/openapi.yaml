@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -18,6 +18,7 @@ security:
 tags:
   - name: auth
   - name: profile
+  - name: timer
 paths:
   /auth/session:
     get:
@@ -194,6 +195,218 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/CsrfRejected' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /users/me/study-settings:
+    get:
+      tags: [timer]
+      operationId: getStudySettings
+      summary: 하루 목표·과목 목록·고른 과목
+      responses:
+        '200': { $ref: '#/components/responses/StudySettingsOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [timer]
+      operationId: putStudySettings
+      summary: 설정 전체를 바꾼다
+      description: |
+        과목 이름은 앞뒤 공백을 지운 뒤 1–20자, 서로 달라야 한다. `subject`는 `subjects`에 있는 이름이거나
+        null. `subject_colors`의 값은 0–7(앱 StudySubjectPalette 순서). 목록에 없는 과목의 색은 지운다.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StudySettings' }
+      responses:
+        '200': { $ref: '#/components/responses/StudySettingsOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study/active-session:
+    get:
+      tags: [timer]
+      operationId: getActiveSession
+      summary: 계정의 진행 중 세션(없으면 null)
+      description: 계정당 하나다. 모든 탭·기기가 같은 세션을 본다. 시각은 서버 시각이고 `meta.timestamp`와 비교해 흐른 시간을 그린다.
+      responses:
+        '200': { $ref: '#/components/responses/ActiveSessionOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /study/active-session/start:
+    post:
+      tags: [timer]
+      operationId: startStudySession
+      summary: 공부 시작
+      description: |
+        진행 중 세션이 이미 있으면 새로 만들지 않고 그 세션을 200으로 돌려준다(다른 탭·기기에서 이미 켠
+        경우). 새로 만들면 201. 시작 시각은 서버 시각이다. `timezone`은 이 세션의 공부일(04:00 경계)을
+        정하는 IANA 이름.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [subject, timezone]
+              properties:
+                subject:
+                  description: 설정의 과목 이름 또는 null(과목 없음).
+                  type: [string, 'null']
+                timezone: { type: string, examples: [Asia/Seoul] }
+      responses:
+        '200': { $ref: '#/components/responses/ActiveSessionOk' }
+        '201': { $ref: '#/components/responses/ActiveSessionOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study/active-session/{session_id}/pause:
+    post:
+      tags: [timer]
+      operationId: pauseStudySession
+      summary: 일시정지(열린 구간을 서버 시각으로 닫음)
+      description: 이미 일시정지면 그대로 200. 진행 중 세션이 이 id가 아니면 409 `SESSION_NOT_ACTIVE`.
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/ActiveSessionOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /study/active-session/{session_id}/resume:
+    post:
+      tags: [timer]
+      operationId: resumeStudySession
+      summary: 다시 시작(새 구간을 서버 시각으로 엶)
+      description: 이미 진행 중이면 그대로 200. 진행 중 세션이 이 id가 아니면 409 `SESSION_NOT_ACTIVE`.
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/ActiveSessionOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /study/active-session/{session_id}/finish:
+    post:
+      tags: [timer]
+      operationId: finishStudySession
+      summary: 끝내기(기록으로 확정)
+      description: |
+        열린 구간을 서버 시각으로 닫고 기록을 만든다. 공부한 시간이 0초면 기록 없이 지우고 `record`가 null
+        (앱 규칙). 같은 세션을 다시 끝내면(응답 유실 재시도) 같은 결과. 진행 중 세션이 이 id가 아니고 기록도
+        없으면 409 `SESSION_NOT_ACTIVE`.
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200':
+          description: 끝냄
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [record]
+                    properties:
+                      record:
+                        oneOf:
+                          - { $ref: '#/components/schemas/StudyRecord' }
+                          - { type: 'null' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /study/presence:
+    put:
+      tags: [timer]
+      operationId: putStudyPresence
+      summary: 화면이 열려 있다는 신호(30초마다)
+      description: |
+        진행 중 세션이 있는 동안 웹 탭이 보일 때 30초마다 보낸다. 서버는 **받은 서버 시각**으로 관측 구간을
+        만든다(75초 넘게 끊기면 구간을 닫고 앞뒤 45초 여유, PocketTime 랭킹과 같은 규칙). 랭킹에는 이 관측
+        구간과 겹친 공부 시간만 들어간다. 진행 중 세션이 이 id가 아니면 409. 같은 계정의 여러 탭이 보내도 한
+        구간으로 합친다. 멱등이라 Idempotency-Key가 필요 없다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [session_id]
+              properties:
+                session_id: { type: string, format: uuid }
+      responses:
+        '204': { description: 받음 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /study/stats:
+    get:
+      tags: [timer]
+      operationId: getStudyStats
+      summary: 통계(오늘·어제·이번 주·연속일·과목·최근 16주)
+      description: |
+        서버가 기록 전체와 진행 중 세션(지금까지)을 합쳐 계산한다. 공부일은 사용자 시간대의 04:00 경계,
+        주는 월요일부터, 연속일은 하루 10분 이상인 날(오늘이 10분 미만이면 어제부터 센다), 과목 비중은 이번
+        주 1분 이상만. 모두 PocketTime `study_stats.dart` 규칙과 같다.
+      parameters:
+        - name: timezone
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 통계
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/StudyStats' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study/records:
+    get:
+      tags: [timer]
+      operationId: listStudyRecords
+      summary: 기간의 기록(플래너 격자용)
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, description: 포함. 최대 62일, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: 기록(시작 순)
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [items]
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/StudyRecord' } }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
 components:
   securitySchemes:
     session:
@@ -206,6 +419,11 @@ components:
       in: header
       required: true
       description: 클라이언트가 만든 UUID. 응답을 못 받으면 같은 키로 다시 보낸다.
+      schema: { type: string, format: uuid }
+    SessionId:
+      name: session_id
+      in: path
+      required: true
       schema: { type: string, format: uuid }
   schemas:
     Meta:
@@ -288,6 +506,91 @@ components:
         gender:
           $ref: '#/components/schemas/Gender'
           description: 고른 뒤에는 지울 수 없고 다른 값으로만 바꾼다.
+    StudySettings:
+      type: object
+      additionalProperties: false
+      required: [daily_goal_minutes, subjects, subject, subject_colors]
+      properties:
+        daily_goal_minutes:
+          description: 하루 목표(분, 60의 배수 1–24시간). 없으면 null.
+          type: [integer, 'null']
+          minimum: 60
+          maximum: 1440
+          multipleOf: 60
+        subjects:
+          type: array
+          maxItems: 50
+          items: { type: string, minLength: 1, maxLength: 20 }
+        subject: { type: [string, 'null'] }
+        subject_colors:
+          type: object
+          additionalProperties: { type: integer, minimum: 0, maximum: 7 }
+    Segment:
+      type: object
+      additionalProperties: false
+      required: [started_at, ended_at]
+      properties:
+        started_at: { type: string, format: date-time }
+        ended_at: { type: [string, 'null'], format: date-time, description: 열린 구간이면 null(진행 중 세션의 마지막 구간만) }
+    ActiveSession:
+      type: object
+      additionalProperties: false
+      required: [id, subject, segments, timezone]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: [string, 'null'] }
+        timezone: { type: string }
+        segments: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Segment' } }
+    StudyRecord:
+      type: object
+      additionalProperties: false
+      required: [id, subject, started_at, ended_at, focused_seconds, study_date, segments]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: [string, 'null'] }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+        focused_seconds: { type: integer, minimum: 1 }
+        study_date: { type: string, format: date, description: 시작 시각의 공부일(04:00 경계) }
+        segments: { type: array, items: { $ref: '#/components/schemas/Segment' } }
+    DayTotal:
+      type: object
+      additionalProperties: false
+      required: [date, seconds]
+      properties:
+        date: { type: string, format: date }
+        seconds: { type: integer, minimum: 0 }
+    StudyStats:
+      type: object
+      additionalProperties: false
+      required: [today, yesterday_seconds, week, streak_days, subjects_week, recent_weeks]
+      properties:
+        today: { $ref: '#/components/schemas/DayTotal' }
+        yesterday_seconds: { type: integer, minimum: 0 }
+        week:
+          type: object
+          additionalProperties: false
+          required: [days, total_seconds]
+          properties:
+            days: { type: array, minItems: 7, maxItems: 7, items: { $ref: '#/components/schemas/DayTotal' }, description: 월요일부터 }
+            total_seconds: { type: integer, minimum: 0 }
+        streak_days: { type: integer, minimum: 0 }
+        subjects_week:
+          type: array
+          description: 이번 주 과목별 합계, 많은 순. 1분 미만 제외. 과목 없음은 subject null.
+          items:
+            type: object
+            additionalProperties: false
+            required: [subject, seconds]
+            properties:
+              subject: { type: [string, 'null'] }
+              seconds: { type: integer, minimum: 60 }
+        recent_weeks:
+          type: array
+          description: 최근 16주(이번 주 포함) 하루 합계, 오래된 날부터. 16×7개.
+          minItems: 112
+          maxItems: 112
+          items: { $ref: '#/components/schemas/DayTotal' }
   responses:
     LoggedIn:
       description: 로그인 성공. `sv_session` 쿠키를 둔다. 새 계정이면 닉네임·캐릭터를 무작위로 정한다(PocketTime과 같은 규칙).
@@ -318,6 +621,43 @@ components:
                   profile: { $ref: '#/components/schemas/Profile' }
               error: { type: 'null' }
               meta: { $ref: '#/components/schemas/Meta' }
+    StudySettingsOk:
+      description: 설정
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data: { $ref: '#/components/schemas/StudySettings' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    ActiveSessionOk:
+      description: 진행 중 세션
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [session]
+                properties:
+                  session:
+                    oneOf:
+                      - { $ref: '#/components/schemas/ActiveSession' }
+                      - { type: 'null' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    Conflict:
+      description: 상태 충돌(`SESSION_NOT_ACTIVE` 등).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     Unauthorized:
       description: 세션 없음·만료·폐기(`UNAUTHORIZED`). 원인을 구분하지 않는다.
       content:
