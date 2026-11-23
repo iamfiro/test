@@ -5,7 +5,7 @@ PocketTime에서 가져온 코드 의미·자산·문구. 원본 커밋: PocketT
 
 | StudyVillage | 원본 | 원본 커밋 | 비고 |
 | --- | --- | --- | --- |
-| `frontend/public/assets/icons/{study_*,nav/study_*,empty_*.svg,brand/*}` | PocketTime `assets/icons/` | f574f242 | 원본 그대로 |
+| `frontend/public/assets/icons/{study_*,empty_*.svg,brand/*}`, `nav/study_tab_*.png` | PocketTime `assets/icons/` | f574f242 | 원본 그대로. 단 `nav/study_tab_*.png`는 흰 테두리를 얇게 가공(`tool/assets/thin_tab_icon_outline.py`) |
 | `frontend/public/assets/study_themes/cafe_room_3d/` | PocketTime `assets/study_themes/cafe_room_3d/` (생성: `tool/blender/study_room/export_study_assets.py`) | f6865a86 (자산 마지막 변경) | Draco/meshopt 압축은 사본에만(Phase 8) |
 | `frontend/public/assets/study/sounds/` | PocketTime `assets/study/sounds/` + `sources.json` | f574f242 | CC0 1.0 |
 | `frontend/public/assets/study/music/` | PocketTime `assets/study/music/` + `sources.json` | f574f242 | Pixabay, 사용자 확인(2026-11-23) |
