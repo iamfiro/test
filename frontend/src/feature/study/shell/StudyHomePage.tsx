@@ -9,7 +9,9 @@ import { useSession } from '../../auth/session'
 import { StudyTabOverlay, studyTabBarHidden } from '../home/StudyTabOverlay'
 import { useStudyCameraCycle } from '../home/useStudyCameraCycle'
 import { useStudyTimer } from '../timer/useStudyTimer'
+import { useSubjectEditor } from '../subject/useSubjectEditor'
 import s from './StudyHomePage.module.css'
+
 
 const titles: Record<StudyTab, () => string> = {
   study: () => t('studyTabStudy'),
@@ -27,6 +29,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   // 원본 기본 시점(initialRoomCamera = thirdPerson). 누를 때마다 다음 시점, 이름은 1600ms.
   const camera = useStudyCameraCycle('thirdPerson')
   const timer = useStudyTimer(state.status === 'signedIn')
+  const subjects = useSubjectEditor({ onManage: () => navigate('/subjects') })
   return (
     <div className={s.page}>
       {tab === 'rooms' && <IslandBackground ground="grass" />}
@@ -52,8 +55,10 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           cameraMode={camera.mode}
           cameraHint={camera.hint}
           onCycleCamera={camera.cycle}
+          onPickSubject={subjects.openPicker}
         />
       )}
+      {tab === 'study' && subjects.sheets}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )
