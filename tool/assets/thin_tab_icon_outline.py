@@ -1,6 +1,6 @@
 """study_tab_*.png의 바깥 흰 테두리를 얇게 하고 줄어든 여백만큼 그림을 키운다.
 
-    python3 tool/assets/thin_tab_icon_outline.py <입력폴더> <출력폴더> <남길 두께 px, 200px 기준(5)>
+    python3 tool/assets/thin_tab_icon_outline.py <입력폴더> <출력폴더> <남길 두께 px, 200px 기준(8)>
 """
 import sys, glob, os
 import numpy as np
