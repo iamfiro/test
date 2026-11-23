@@ -514,6 +514,8 @@ export class ToonComposer {
       ;(this.raysPass.mesh.material.uniforms.sun!.value as THREE.Vector2).set(mood.sunX, 1.15)
     }
     fu.rays!.value = useRays ? this.softBase.rays * (1 - 0.5 * mood.day) : 0
+    // 선명한 룩: 해가 높을수록 노출을 내려 한낮 최고 밝기를 낮춘다(아침·저녁 0.98 → 한낮 0.88, 사용자 결정 2026-11-23).
+    if (this.style === 'vivid') fu.exposure!.value = 0.98 - 0.1 * Math.max(0, (mood.day - 0.5) * 2)
     fu.near!.value = camera.near
     fu.far!.value = camera.far
     fu.focus!.value = focusDistance

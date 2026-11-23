@@ -47,7 +47,8 @@ const keys: readonly Key[] = [
   key(5.8, 0.78, 0xffdcc8ec, 0xff8e7398, 0.3, 0.88, 0xff3b3f86, 0xffe6a2a6, 0.3),
   key(7, 0.9, 0xffffe2d6, 0xfff0c6b4, 0.28, 0.9, 0xff86aedb, 0xffffcdaa, 0),
   key(9.5, 0.97, 0xfffff5ee, 0xffe6e2de, 0.22, 0.92, 0xff8ec4ee, 0xffdceef7, 0),
-  key(13, 1.0, 0xffffffff, 0xffe8e5e2, 0.18, 0.92, 0xff79b6ea, 0xffd2eaf6, 0),
+  // 웹: 가장 밝은 때를 원본 13시에서 12시로 당겼다(사용자 결정 2026-11-23). 최고 밝기는 합성 단계에서 낮춘다.
+  key(12, 1.0, 0xffffffff, 0xffe8e5e2, 0.18, 0.92, 0xff79b6ea, 0xffd2eaf6, 0),
   key(16.5, 0.95, 0xffffedf0, 0xffefd9d6, 0.3, 0.9, 0xff9cc2e6, 0xfff3e1dc, 0),
   key(18.4, 0.86, 0xffffcdb6, 0xffe8a08c, 0.34, 0.92, 0xff6e70b2, 0xffffa27e, 0),
   key(19.6, 0.8, 0xffffd9c6, 0xff5e4670, 0.28, 0.9, 0xff34336e, 0xffb3708a, 0.35),
