@@ -12,6 +12,8 @@ import { cameraLabel } from './studyFormat'
 import type { StudyTimerView } from './studyTimerView'
 import s from './StudyTabOverlay.module.css'
 
+/** 오른쪽 위 스티커 단추 한 변(원본은 40~52). 큰 화면에서 작아 보여 키웠다(사용자 결정 2026-11-23). */
+const railSize = 64
 const icon = (name: string) => `/assets/icons/${name}`
 
 export type StudyTabOverlayProps = {
@@ -82,75 +84,64 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
   const onSetFocusMode = props.onSetFocusMode
 
   return (
-    <div
-      className={`${s.overlay} palette-day`}
-      style={{
-        '--ranking-top': shop ? 'var(--ranking-top-with-shop)' : 'var(--ranking-top-alone)',
-        '--chat-top': showsCameraButton ? 'var(--chat-top-below-camera)' : 'var(--chat-top-alone)',
-      } as CSSProperties}
-    >
-      {!seatPlanOpen && (
-        <div className={s.musicColumn}>
-          <StickerButton
-            asset={icon('study_music.png')}
-            emitAsset={icon('study_music_note.svg')}
-            active={!!props.soundPlaying}
-            label={props.soundPlaying ? t('studySoundPlayingLabel') : t('studySoundTitle')}
-            onClick={props.onToggleSound}
-          />
-          {showFocus && focusMode && (
-            <>
-              <span className={s.gapSm} />
+    <>
+      <div className={`${s.rail} palette-day`}>
+        {!seatPlanOpen && (
+          <div className={s.railRow}>
+            <StickerButton
+              asset={icon('study_music.png')}
+              emitAsset={icon('study_music_note.svg')}
+              size={railSize}
+              active={!!props.soundPlaying}
+              label={props.soundPlaying ? t('studySoundPlayingLabel') : t('studySoundTitle')}
+              onClick={props.onToggleSound}
+            />
+            {showFocus && focusMode && (
               <IslandIconButton
                 icon={IconMinimize}
                 label={t('studyFocusModeClose')}
                 // 원본은 늘 누를 수 있는 단추다(비활성 모양 없음).
                 onClick={() => onSetFocusMode?.(false)}
               />
-            </>
-          )}
-        </div>
-      )}
-
-      {roomButtons && chatAvailable && (
-        <div className={s.chatPeek}>
-          <ChatPeek message={props.chatPeek ?? null} onOpen={props.onOpenChat} />
-        </div>
-      )}
-      {roomButtons && chatAvailable && (
-        <div className={s.chat}>
-          <StickerButton
-            asset={icon('study_chat.png')}
-            size={40}
-            label={unread > 0 ? t('studyChatOpenUnread', { count: unread }) : t('studyChatOpen')}
-            onClick={props.onOpenChat}
-          />
-          {unread > 0 && (
-            <span className={s.unread}>
-              <UnreadBadge count={unread} />
-            </span>
-          )}
-        </div>
-      )}
-
-      {roomButtons && showsCameraButton && (
-        <div className={s.camera}>
-          <StickerSlot>
+            )}
+          </div>
+        )}
+        {roomButtons && showsCameraButton && (
+          <div className={s.railRow}>
+            <CameraHint label={props.cameraHint == null ? null : cameraLabel(props.cameraHint)} />
             <StickerButton
               asset={icon('study_camera.png')}
-              size={40}
+              size={railSize}
               label={t('studyRoomCameraChange', { mode: cameraLabel(props.cameraMode) })}
               onClick={props.onCycleCamera}
             />
-          </StickerSlot>
-        </div>
-      )}
-      {roomButtons && (
-        <div className={s.cameraHint}>
-          <CameraHint label={props.cameraHint == null ? null : cameraLabel(props.cameraHint)} />
-        </div>
-      )}
-
+          </div>
+        )}
+        {roomButtons && chatAvailable && (
+          <div className={s.railRow}>
+            <ChatPeek message={props.chatPeek ?? null} onOpen={props.onOpenChat} />
+            <span className={s.railChat}>
+              <StickerButton
+                asset={icon('study_chat.png')}
+                size={railSize}
+                label={unread > 0 ? t('studyChatOpenUnread', { count: unread }) : t('studyChatOpen')}
+                onClick={props.onOpenChat}
+              />
+              {unread > 0 && (
+                <span className={s.unread}>
+                  <UnreadBadge count={unread} />
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+      </div>
+    <div
+      className={`${s.overlay} palette-day`}
+      style={{
+        '--ranking-top': shop ? 'var(--ranking-top-with-shop)' : 'var(--ranking-top-alone)',
+      } as CSSProperties}
+    >
       {roomButtons && (showsSeatMove || showsFocusButton) && (
         <div className={s.bottomButtons}>
           {showsSeatMove && (
@@ -221,5 +212,6 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
         </div>
       )}
     </div>
+    </>
   )
 }

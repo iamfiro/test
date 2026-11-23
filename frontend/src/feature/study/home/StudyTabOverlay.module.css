@@ -137,3 +137,20 @@
 }
 .miniTimerLow { bottom: calc(var(--bottom) + 20px); }
 .veiled { opacity: 0; pointer-events: none; }
+
+/* 오른쪽 위 스티커 단추 줄(음악·시점·채팅): 앱 폭 칸이 아니라 창 오른쪽 위에 붙고, 단추를 키우고 간격을 벌렸다.
+   안내 말풍선(시점 이름·새 채팅)은 각 단추 왼쪽에 붙는다. */
+.rail {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: 20px;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 20px;
+  pointer-events: none;
+}
+.railRow { display: flex; align-items: center; gap: 8px; min-height: 64px; pointer-events: none; }
+.railRow button { pointer-events: auto; }
+.railChat { position: relative; display: block; }
