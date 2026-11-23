@@ -58,12 +58,14 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'stats' && <StudyStatsPage />}
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
       {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode={camera.mode} topInset={68} /></div>}
-      {/* 뒤로 버튼은 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 제목은 앱 폭 칸 가운데에 두고,
-          공부방은 본문의 "모든 공부방"이 제목을 대신한다. */}
-      <header className={`${s.header} ${s.headerCorner}`}>
-        <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(-1)} /></span>
-      </header>
-      {tab !== 'rooms' && (
+      {/* 뒤로 버튼은 공부 탭을 뺀 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 공부 탭은 3D 방이
+          전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
+      {tab !== 'study' && (
+        <header className={`${s.header} ${s.headerCorner}`}>
+          <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(-1)} /></span>
+        </header>
+      )}
+      {tab !== 'study' && tab !== 'rooms' && (
         <header className={s.header}>
           <span className={s.side} />
           <h1 className={s.title}>{titles[tab]()}</h1>
