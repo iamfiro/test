@@ -6,6 +6,8 @@ export const tagText = {
   myTagsDescription: '준비하는 시험이나 공부를 최대 5개 골라요. 내 태그는 다른 사람에게 보이지 않아요.',
   myTagsPrompt: '준비하는 시험이나 공부를 고르면\n같은 공부를 하는 공부방을 추천해 드려요.',
   myTagsPick: '태그 고르기',
+  // 고르기 안내 카드의 장식 칩. docs/plan/study-tags.md 2절 시드에 있는 이름만 쓴다(눌리지 않는다).
+  myTagsSamples: ['수능', '토익', '공무원 9급', '정보처리기사', '코딩', '독서'],
   myTagsEdit: '태그 수정',
   recommendedEmpty: '아직 같은 태그를 단 공부방이 없어요',
   tagSearchPlaceholder: '시험이나 공부 이름으로 찾기',

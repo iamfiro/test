@@ -49,5 +49,21 @@
 .recTag { padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / 0.16); color: #fff; font-size: 13px; font-weight: 800; }
 .recEmpty { margin: 0 4px; font-size: 14px; font-weight: 700; color: rgb(255 255 255 / 0.72); }
 .recSection { margin-bottom: 28px; }
-.prompt { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px 20px 20px; }
-.promptText { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.45; color: var(--i-ink); white-space: pre-line; }
+/*
+ * 태그 고르기 안내 카드(태그가 없을 때). 예시 칩 → 제목·설명 → 꽉 찬 단추 순서. 칩은 장식이라 눌리지 않고,
+ * 서로 다른 각도로 살짝 기울여 스티커처럼 놓는다. 칩 색은 과목 팔레트(앱 StudySubjectPalette).
+ */
+.prompt { display: flex; flex-direction: column; gap: 16px; padding: 20px 20px 22px; }
+.samples { display: flex; flex-wrap: wrap; gap: 8px 6px; margin: 0; padding: 0 0 16px; list-style: none; border-bottom: 2px dashed var(--i-paper-line); }
+.sample {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px 0 9px; border-radius: 999px;
+  background: var(--i-muted); box-shadow: 0 3px 0 var(--i-paper-ledge);
+  font-size: 14px; font-weight: 800; color: var(--i-ink); white-space: nowrap; user-select: none;
+}
+.sample:nth-child(odd) { transform: rotate(-2.5deg); }
+.sample:nth-child(even) { transform: rotate(2deg) translateY(2px); }
+.sample:nth-child(3n) { transform: rotate(-1deg); }
+.sampleDot { width: 16px; height: 16px; border: 2px solid; border-radius: 50%; }
+.promptCopy { display: flex; flex-direction: column; gap: 6px; }
+.promptTitle { margin: 0; font-family: var(--font-round); font-size: 22px; font-weight: 800; line-height: 1.2; color: var(--i-ink); }
+.promptText { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.5; color: var(--i-ink-soft); white-space: pre-line; }

@@ -3,7 +3,7 @@
 // 위에 "나와 같은 공부" 추천 칸(docs/plan/study-tags.md). 초기에는 방이 많아 보여야 하므로 추천은 거르기가 아니라
 // 한 칸 더 보여 주는 것이고, 아래 모든 공부방에는 추천된 방도 그대로 있다.
 import { useEffect, useRef, useState } from 'react'
-import { IconSearch, IconX } from '@tabler/icons-react'
+import { IconSearch, IconTag, IconX } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
 import { LoadFailed, StateView } from '../../../core/ui/StateView'
@@ -13,6 +13,7 @@ import { useRooms, type Room } from './roomsStore'
 import { IslandButton } from '../../../core/ui/IslandButton'
 import { IslandSurface } from '../../../core/ui/IslandSurface'
 import { tagText } from '../../../l10n/web_tags_ko'
+import { studySubjectColors } from '../timer/subjectPalette'
 import { MyTagsSheet } from '../tags/MyTagsSheet'
 import { loadMyTags, useMyTags } from '../tags/tagsStore'
 import ts from '../tags/tags.module.css'
@@ -71,8 +72,19 @@ function Recommended(props: { onOpenRoom?: (room: Room) => void }) {
       <section className={ts.recSection}>
         <IslandSurface radius={26}>
           <div className={ts.prompt}>
-            <p className={ts.promptText}>{tagText.myTagsPrompt}</p>
-            <IslandButton primary label={tagText.myTagsPick} minHeight={40} onClick={() => setEditing(true)} />
+            <ul className={ts.samples} aria-hidden="true">
+              {tagText.myTagsSamples.map((name, i) => (
+                <li key={name} className={ts.sample}>
+                  <span className={ts.sampleDot} style={{ background: studySubjectColors[i % studySubjectColors.length]!.fill, borderColor: studySubjectColors[i % studySubjectColors.length]!.ink }} />
+                  {name}
+                </li>
+              ))}
+            </ul>
+            <div className={ts.promptCopy}>
+              <h2 className={ts.promptTitle}>{tagText.roomsRecommended}</h2>
+              <p className={ts.promptText}>{tagText.myTagsPrompt}</p>
+            </div>
+            <IslandButton primary expand icon={IconTag} label={tagText.myTagsPick} minHeight={48} onClick={() => setEditing(true)} />
           </div>
         </IslandSurface>
         {sheet}
