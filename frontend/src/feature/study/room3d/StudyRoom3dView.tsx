@@ -14,7 +14,7 @@ import { StudyRoomCharacter } from './model/character'
 import { colorToHex } from './model/color'
 import { StudyRoomLayout } from './model/layout'
 import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomSeat } from './model/scene'
-import { ThreeStudyRoomRenderer } from './three/ThreeStudyRoomRenderer'
+import { ThreeStudyRoomRenderer, roomLookFromLocation } from './three/ThreeStudyRoomRenderer'
 import { StudyRoomSky } from './StudyRoomSky'
 
 export type SeatPlacement = {
@@ -59,7 +59,7 @@ export function StudyRoom3dView(props: {
   useEffect(() => {
     const el = host.current
     if (!el) return
-    const r = new ThreeStudyRoomRenderer()
+    const r = new ThreeStudyRoomRenderer(roomLookFromLocation())
     el.prepend(r.canvas)
     const unsubscribe = r.subscribe(() => setPhase(r.phase))
     setRenderer(r)

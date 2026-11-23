@@ -7,8 +7,10 @@ const vertexShader = /* glsl */ `
 varying vec3 v_position;
 varying vec3 v_viewvector;
 varying vec2 v_texture_coords;
+varying vec3 v_normal;
 void main() {
   vec4 world = modelMatrix * vec4(position, 1.0);
+  v_normal = normalize(mat3(modelMatrix) * normal);
   v_position = world.xyz;
   v_viewvector = cameraPosition - world.xyz;
   v_texture_coords = uv;
@@ -22,9 +24,16 @@ uniform vec4 fog_range;
 uniform vec4 posterize;
 uniform vec4 tint;
 uniform sampler2D base_color_texture;
+// StudyVillage 카툰 룩(원본에 없음, docs/design-parity/exceptions.md): x 켬(0/1), y 그늘 밝기, z 경계(ndl), w 채도 더하기.
+uniform vec4 toon;
+uniform vec3 toon_light;
+// 그늘 색(곱함)과 림 라이트(rgb 색, a 세기).
+uniform vec3 toon_shadow;
+uniform vec4 toon_rim;
 varying vec3 v_position;
 varying vec3 v_viewvector;
 varying vec2 v_texture_coords;
+varying vec3 v_normal;
 
 float Bayer2(vec2 a) {
   a = floor(a);
@@ -39,8 +48,21 @@ void main() {
   if (fog_range.z > 0.0 && v_position.y > fog_range.z) discard;
 
   vec3 color = texture2D(base_color_texture, v_texture_coords).rgb * tint.rgb;
+  if (toon.x > 0.0) {
+    // 셀 셰이딩: 구운 조명 위에 빛을 받는 면/그늘 두 단을 또렷하게 나눈다.
+    vec3 n = normalize(v_normal);
+    float ndl = dot(n, toon_light);
+    float lit = smoothstep(toon.z - 0.015, toon.z + 0.015, ndl);
+    // 그늘은 회색으로 어둡게 하지 않고 푸른 보랏빛으로 물들인다(셀 애니메이션 그늘).
+    color *= mix(toon_shadow * toon.y, vec3(1.0), lit);
+    // 림 라이트: 시선과 비껴 서는 가장자리를 살짝 밝혀 형태를 띄운다(빛 받는 쪽만).
+    float facing = 1.0 - max(dot(n, normalize(v_viewvector)), 0.0);
+    float rim = smoothstep(0.55, 0.85, facing) * (0.35 + 0.65 * lit);
+    color = mix(color, toon_rim.rgb, rim * toon_rim.a);
+  }
   float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
   color = mix(color, vec3(luma), posterize.w);
+  if (toon.x > 0.0) color = clamp(mix(vec3(luma), color, 1.0 + toon.w), 0.0, 1.0);
   float contrast = tint.a > 0.0 ? tint.a : 1.0;
   color = (color - 0.5) * contrast + 0.5;
 
@@ -91,13 +113,15 @@ const white = (() => {
  * 언릿 텍스처 하나를 질감 셰이더 재질로. smooth면 선형, 아니면 최근접으로 읽는다(원본 sampler).
  * 원본 flutter_scene은 밉맵을 만들지 않으므로 여기서도 만들지 않는다.
  */
-export function createRetroMaterial(map: THREE.Texture | null, smooth: boolean): THREE.ShaderMaterial {
+export function createRetroMaterial(map: THREE.Texture | null, smooth: boolean, crisp: boolean): THREE.ShaderMaterial {
   const texture = map ?? white
   if (map) {
     map.colorSpace = THREE.NoColorSpace
-    map.generateMipmaps = false
-    map.minFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter
-    map.magFilter = smooth ? THREE.LinearFilter : THREE.NearestFilter
+    // crisp(웹 카툰 룩): 밉맵·선형으로 읽어 멀리 있는 텍스처가 지글거리지 않게 한다(픽셀 느낌 제거).
+    map.generateMipmaps = crisp
+    map.minFilter = crisp ? THREE.LinearMipmapLinearFilter : smooth ? THREE.LinearFilter : THREE.NearestFilter
+    map.magFilter = crisp || smooth ? THREE.LinearFilter : THREE.NearestFilter
+    map.anisotropy = crisp ? 4 : 1
     map.wrapS = THREE.ClampToEdgeWrapping
     map.wrapT = THREE.ClampToEdgeWrapping
     map.needsUpdate = true
@@ -111,6 +135,10 @@ export function createRetroMaterial(map: THREE.Texture | null, smooth: boolean):
       fog_range: { value: new THREE.Vector4(0, 1, 0, 0) },
       posterize: { value: new THREE.Vector4(256, 0, 0, 0) },
       tint: { value: new THREE.Vector4(1, 1, 1, 1) },
+      toon: { value: new THREE.Vector4(0, 1, 0, 0) },
+      toon_light: { value: new THREE.Vector3(0.35, 0.85, 0.4).normalize() },
+      toon_shadow: { value: new THREE.Vector3(0.9, 0.86, 1.0) },
+      toon_rim: { value: new THREE.Vector4(1.0, 0.95, 0.86, 0.0) },
     },
   })
 }
@@ -121,4 +149,15 @@ export function setRetroFloats(material: THREE.ShaderMaterial, f: number[]) {
   ;(u.fog_range!.value as THREE.Vector4).set(f[4]!, f[5]!, f[6]!, f[7]!)
   ;(u.posterize!.value as THREE.Vector4).set(f[8]!, f[9]!, f[10]!, f[11]!)
   ;(u.tint!.value as THREE.Vector4).set(f[12]!, f[13]!, f[14]!, f[15]!)
+}
+
+/** 카툰 룩 값. 켜지 않으면 원본 셰이더와 같은 결과. */
+export type ToonLook = { enabled: boolean; shade: number; threshold: number; saturation: number; rim: number }
+export const toonDefault: ToonLook = { enabled: true, shade: 0.86, threshold: 0.12, saturation: 0.25, rim: 0.28 }
+
+export function setToon(material: THREE.ShaderMaterial, toon: ToonLook) {
+  ;(material.uniforms.toon!.value as THREE.Vector4).set(toon.enabled ? 1 : 0, toon.shade, toon.threshold, toon.saturation)
+  ;(material.uniforms.toon_rim!.value as THREE.Vector4).w = toon.rim
+  // 그늘 단을 끈 재질(shade 1)은 그늘 색도 물들이지 않는다(면이 각져 보이지 않게).
+  ;(material.uniforms.toon_shadow!.value as THREE.Vector3).set(...((toon.shade >= 1 ? [1, 1, 1] : [0.9, 0.86, 1.0]) as [number, number, number]))
 }

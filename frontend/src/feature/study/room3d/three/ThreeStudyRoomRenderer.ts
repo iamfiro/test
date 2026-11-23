@@ -11,7 +11,8 @@ import type { StudyRoomLayout } from '../model/layout'
 import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomLook } from '../model/scene'
 import { logger } from '../../../../core/log/log'
 import { CharacterKit, type SeatedPerson } from './characterKit'
-import { createRetroMaterial, retroFloats, setRetroFloats } from './retroMaterial'
+import { createRetroMaterial, retroFloats, setRetroFloats, setToon, toonDefault } from './retroMaterial'
+import { ToonComposer } from './toonComposer'
 
 const log = logger('StudyRoom3d')
 
@@ -21,6 +22,15 @@ export type RenderPhase = 'idle' | 'loading' | 'ready' | 'failed'
 const url = (asset: string) => `/${asset}`
 
 type Listener = () => void
+
+/**
+ * 웹 룩. toon(기본): 셀 셰이딩·외곽선·채도·MSAA·기기 해상도(StudyVillage, 사용자 결정 2026-11-23).
+ * app: PocketTime 앱과 같은 그림(비교용, 주소에 `?look=app`).
+ */
+export type RoomLook = 'toon' | 'app'
+export function roomLookFromLocation(): RoomLook {
+  return new URLSearchParams(window.location.search).get('look') === 'app' ? 'app' : 'toon'
+}
 
 export class ThreeStudyRoomRenderer {
   readonly canvas: HTMLCanvasElement
@@ -46,8 +56,9 @@ export class ThreeStudyRoomRenderer {
   private disposed = false
   private readonly listeners = new Set<Listener>()
   private contextLost = false
+  private composer: ToonComposer | null = null
 
-  constructor() {
+  constructor(readonly look: RoomLook = 'toon') {
     this.canvas = document.createElement('canvas')
     // 하늘(뒤)과 자리 칩(앞) 사이에 놓는다.
     Object.assign(this.canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block', zIndex: '1' })
@@ -78,6 +89,7 @@ export class ThreeStudyRoomRenderer {
     // 셰이더가 sRGB 값을 그대로 쓴다(원본 Impeller 경로). 출력 변환·톤 매핑 없음.
     gl.outputColorSpace = THREE.LinearSRGBColorSpace
     gl.toneMapping = THREE.NoToneMapping
+    if (this.look === 'toon') this.composer = new ToonComposer()
     this.gl = gl
     return gl
   }
@@ -105,8 +117,8 @@ export class ThreeStudyRoomRenderer {
       this.uncutMaterials.clear()
       this.useRetroMaterials(root, !scene.look.pixelated)
       // 사람은 얼굴·옷이 그려진 텍스처라 선형으로 읽는다.
-      if (charactersGltf) this.useRetroMaterials(charactersGltf.scene, true)
-      if (propsGltf) this.useRetroMaterials(propsGltf.scene, true)
+      if (charactersGltf) this.useRetroMaterials(charactersGltf.scene, true, false)
+      if (propsGltf) this.useRetroMaterials(propsGltf.scene, true, false)
       this.kit = charactersGltf ? CharacterKit.from(charactersGltf.scene, propsGltf?.scene ?? null) : null
       let scenery: THREE.Object3D | null = null
       if (sceneryGltf) {
@@ -135,7 +147,8 @@ export class ThreeStudyRoomRenderer {
   }
 
   /** 언릿 재질을 질감 셰이더 재질로(텍스처별·바깥 여부별로 하나씩 공유). */
-  private useRetroMaterials(root: THREE.Object3D, smooth: boolean) {
+  /** cel: 그늘 두 단 나누기. 사람·소품은 면이 적어 그늘이 각져 보이므로 끈다(채도·외곽선만). */
+  private useRetroMaterials(root: THREE.Object3D, smooth: boolean, cel = true) {
     const byKey = new Map<string, THREE.ShaderMaterial>()
     const visit = (node: THREE.Object3D, outdoorsAbove: boolean) => {
       const outdoors = outdoorsAbove || node.name.startsWith('room_outdoors')
@@ -146,7 +159,8 @@ export class ThreeStudyRoomRenderer {
           const key = `${map?.uuid ?? 'none'}:${outdoors}`
           let retro = byKey.get(key)
           if (!retro) {
-            retro = createRetroMaterial(map, smooth)
+            retro = createRetroMaterial(map, smooth, this.look === 'toon')
+            if (this.look === 'toon') setToon(retro, cel ? { ...toonDefault, rim: 0.12 } : { ...toonDefault, shade: 1 })
             byKey.set(key, retro)
             this.retroMaterials.push(retro)
             if (outdoors) this.uncutMaterials.add(retro)
@@ -215,7 +229,8 @@ export class ThreeStudyRoomRenderer {
     const focus = rig.eye.clone().sub(rig.camera.target).length()
     const plain = retroFloats({
       fogColor: [spec.fogColor.r, spec.fogColor.g, spec.fogColor.b],
-      fogAmount: spec.fogAmount,
+      // 카툰 룩은 먼 곳을 덜 뿌옇게(안개 절반) 해 색을 또렷하게 둔다.
+      fogAmount: this.look === 'toon' ? spec.fogAmount * 0.5 : spec.fogAmount,
       fogNear: focus + spec.fogStart,
       fogFar: focus + spec.fogEnd,
       colorLevels: spec.colorLevels,
@@ -274,13 +289,17 @@ export class ThreeStudyRoomRenderer {
     }
     this.updateLook(rig, opts.cutHeight)
     // 내부 해상도: 부드러운 장면은 가로가 smoothWidth를 넘지 않게(기기보다 크게는 그리지 않음).
-    const pixelRatio = spec.look.pixelated
+    // 카툰 룩(픽셀 느낌 없음): 높은·중간 단계는 기기 해상도(최대 2배), 낮은 단계만 원본 상한을 쓴다.
+    const crisp = this.look === 'toon' && (opts.quality.name === 'high' || opts.quality.name === 'medium')
+    const pixelRatio = crisp
+      ? Math.min(opts.devicePixelRatio, 2)
+      : spec.look.pixelated
       ? opts.devicePixelRatio / Math.max(1, Math.round((opts.width * opts.devicePixelRatio) / opts.quality.pixelWidth))
       : Math.min(opts.devicePixelRatio, opts.quality.smoothWidth / opts.width)
     if (gl.getPixelRatio() !== pixelRatio) gl.setPixelRatio(pixelRatio)
     const canvasSize = gl.getSize(new THREE.Vector2())
     if (canvasSize.x !== opts.width || canvasSize.y !== opts.height) gl.setSize(opts.width, opts.height, false)
-    this.canvas.style.imageRendering = spec.look.pixelated ? 'pixelated' : 'auto'
+    this.canvas.style.imageRendering = spec.look.pixelated && this.look === 'app' ? 'pixelated' : 'auto'
     // 원본 카메라 행렬과 같은 화면: 같은 fov·aspect로 eye에서 target을 본다(깊이 범위만 WebGL 규약).
     this.camera.fov = opts.camera.fovYDegrees
     this.camera.aspect = opts.width / opts.height
@@ -290,7 +309,12 @@ export class ThreeStudyRoomRenderer {
     this.camera.position.copy(rig.eye)
     this.camera.up.set(0, 1, 0)
     this.camera.lookAt(opts.camera.target)
-    gl.render(this.world, this.camera)
+    if (this.composer) {
+      this.composer.setSize(Math.round(opts.width * pixelRatio), Math.round(opts.height * pixelRatio))
+      this.composer.render(gl, this.world, this.camera, pixelRatio)
+    } else {
+      gl.render(this.world, this.camera)
+    }
     return { drawn, ms: performance.now() - started }
   }
 
@@ -320,6 +344,7 @@ export class ThreeStudyRoomRenderer {
       ;(m.uniforms.base_color_texture?.value as THREE.Texture | undefined)?.dispose()
       m.dispose()
     }
+    this.composer?.dispose()
     this.gl?.dispose()
     this.gl = null
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost)
