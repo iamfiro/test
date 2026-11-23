@@ -1,0 +1,21 @@
+Generate 5 new app icon images with your image generation tool and save them as PNG files in the current working directory.
+
+Purpose: bottom tab bar icons of a cozy study web app (StudyVillage). They sit at 44x44 CSS px on a dark-to-transparent gradient over a warm 3D cafe scene, with a white Korean label under each.
+
+STYLE REFERENCE = the first 5 attached images (study_shop, study_trophy, study_music, study_camera, study_chat). Match them exactly in style: small 3D-ish cute sticker objects, soft glossy shading with gentle highlights and darker sides, rounded chunky shapes, saturated warm colors (red, cream, gold, orange), a clean thin white sticker outline around the whole object, and a slight soft drop shadow. Slight 3/4 perspective like those references, not flat.
+
+SUBJECT REFERENCE = the last 5 attached images (old_tab_study, old_tab_rooms, old_tab_schedule, old_tab_stats, old_tab_outfit). Keep each subject, but redraw it in the style-reference look:
+1. tab_study.png: a cute small house (red roof, cream walls, chimney, blue windows, yellow door)
+2. tab_rooms.png: two stacked/leaning books (purple and orange covers)
+3. tab_schedule.png: a desk calendar with red top binding rings and a grid of days
+4. tab_stats.png: a rising bar chart with three bars (yellow, gold, orange)
+5. tab_outfit.png: a blue T-shirt
+
+Requirements for every file:
+- 512x512 PNG, fully transparent background (real alpha, no checkerboard, no background color, no scene).
+- One object, centered, filling about 86% of the canvas, consistent size and visual weight across all 5.
+- White sticker outline about 12px thick at 512px, same thickness on all 5, matching the references.
+- No text, no letters, no numbers on the icons.
+- All 5 must look like one consistent set together with the 5 style references.
+
+Save exactly these files: tab_study.png, tab_rooms.png, tab_schedule.png, tab_stats.png, tab_outfit.png. After saving, list the files with their pixel sizes.
