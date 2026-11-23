@@ -19,6 +19,7 @@ uniform float near;
 uniform float far;
 uniform float lineWidth;
 uniform vec4 outline;
+uniform float tintedLine; // 1이면 선 색을 그 자리 색을 어둡게 한 색으로(부드러운 룩)
 varying vec2 vUv;
 
 float viewZ(vec2 uv) { return perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
@@ -44,7 +45,47 @@ void main() {
   // 멀수록 선을 옅게. 가까운 3m 안은 또렷하다.
   float fade = 1.0 - smoothstep(3.0, 11.0, -zc);
   float edge = max(depthEdge * solid, normalEdge * 0.75 * solid) * outline.a * mix(0.35, 1.0, fade);
-  gl_FragColor = vec4(mix(color.rgb, outline.rgb, edge), 1.0);
+  vec3 lineColor = mix(outline.rgb, color.rgb * vec3(0.5, 0.46, 0.56), tintedLine);
+  gl_FragColor = vec4(mix(color.rgb, lineColor, edge), 1.0);
+}
+`
+
+// 접촉 그늘(화면 공간 AO, ½ 해상도 8탭): 물건이 닿는 곳·구석을 살짝 어둡게 해 부피를 준다.
+const aoFragment = /* glsl */ `
+#include <packing>
+uniform sampler2D tNormal;
+uniform sampler2D tDepth;
+uniform vec2 texel;
+uniform float near;
+uniform float far;
+uniform vec2 projScale; // 투영 행렬 [0][0], [1][1]
+uniform float radius;   // m
+varying vec2 vUv;
+
+vec3 viewPos(vec2 uv) {
+  float z = perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far);
+  return vec3((uv * 2.0 - 1.0) * -z / projScale, z);
+}
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+
+void main() {
+  if (texture2D(tDepth, vUv).x >= 0.99999) { gl_FragColor = vec4(1.0); return; }
+  vec3 p = viewPos(vUv);
+  vec3 n = normalize(texture2D(tNormal, vUv).xyz * 2.0 - 1.0);
+  // 화면에서 radius(m)가 차지하는 반지름.
+  vec2 r = radius * projScale / max(-p.z, 0.3) * 0.5;
+  float a0 = hash(gl_FragCoord.xy) * 6.2831;
+  float occ = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float a = a0 + float(i) * 2.3999;
+    float d = (float(i) + 0.5) / 8.0;
+    vec3 s = viewPos(vUv + vec2(cos(a), sin(a)) * r * d);
+    vec3 v = s - p;
+    float dist2 = dot(v, v);
+    occ += max(0.0, dot(n, v) / sqrt(dist2 + 1e-4) - 0.08) * (1.0 / (1.0 + dist2 / (radius * radius)));
+  }
+  float ao = clamp(1.0 - occ / 8.0 * 2.6, 0.0, 1.0);
+  gl_FragColor = vec4(vec3(ao), 1.0);
 }
 `
 
@@ -95,6 +136,13 @@ uniform vec3 warm;        // 전체에 곱할 색(중성에 가깝게)
 uniform float deOrange;   // 주황 계열을 옅은 살구·베이지로 옮기는 정도(0–1)
 uniform float exposure;   // 전체 밝기(하이키)
 uniform float highlightLift; // 밝은 곳을 흰색 쪽으로 들어 올리는 정도
+uniform float style;      // 0 예전 카툰 보정, 1 부드러운 파스텔 보정
+uniform sampler2D tAo;
+uniform float aoAmount;   // 0이면 접촉 그늘 없음
+uniform vec3 aoColor;     // 그늘 색(라벤더 갈색)
+uniform float vibrance;
+uniform vec3 shadowTone;
+uniform vec3 highlightTone;
 varying vec2 vUv;
 
 float viewDistance(vec2 uv) { return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
@@ -123,6 +171,10 @@ void main() {
     }
     color = sum / weight;
   }
+  if (aoAmount > 0.0) {
+    float ao = texture2D(tAo, vUv).r;
+    color *= mix(aoColor, vec3(1.0), mix(1.0, ao, aoAmount));
+  }
   color += texture2D(tBloom, vUv).rgb * bloom;
   // 색 보정(Focustown 참고: 밝고 깨끗한 하이키, 옅은 나무, 맑은 그림자). 주황 계열(빨강 > 초록 > 파랑,
   // 색상 비 0.2–0.7)은 회색으로 누르지 않고 채도를 조금 덜며 밝혀 옅은 살구·베이지로 옮긴다.
@@ -134,6 +186,17 @@ void main() {
   vec3 pale = mix(color, vec3(luma), 0.35) * 1.14;
   color = mix(color, pale, orange * deOrange);
   color *= warm * exposure;
+  if (style > 0.5) {
+    // 생기: 흐린 색은 채도를 올리고 이미 진한 색은 누른다(파스텔이 고르게).
+    float mx = max(color.r, max(color.g, color.b));
+    float mn = min(color.r, min(color.g, color.b));
+    float l2 = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(l2), color, 1.0 + vibrance * (1.0 - 2.0 * (mx - mn)));
+    // 부드러운 어깨: 밝은 곳이 하얗게 날아가지 않고 크림빛으로 눕는다.
+    color = color / (1.0 + color * 0.14) * 1.14;
+    // 분할 톤: 어두운 쪽은 라벤더, 밝은 쪽은 크림.
+    color *= mix(shadowTone, highlightTone, smoothstep(0.15, 0.85, l2));
+  }
   color = 1.0 - (1.0 - color) * (1.0 - highlightLift);
   // 그림자를 우윳빛으로 들어 올려 파스텔 느낌.
   color = color * (1.0 - liftAmount) + lift * liftAmount;
@@ -146,7 +209,8 @@ void main() {
 }
 `
 
-export type MoodLook = { bloom: number; depthOfField: boolean; grain: number; vignette: number }
+export type MoodLook = { bloom: number; depthOfField: boolean; grain: number; vignette: number; ao: boolean }
+export type ComposerStyle = 'soft' | 'toon'
 
 function pass(fragmentShader: string, uniforms: Record<string, THREE.IUniform>) {
   const mesh = new THREE.Mesh(
@@ -165,6 +229,8 @@ export class ToonComposer {
   private readonly aa = new THREE.WebGLRenderTarget(1, 1)
   private readonly halfA = new THREE.WebGLRenderTarget(1, 1)
   private readonly halfB = new THREE.WebGLRenderTarget(1, 1)
+  private readonly aoA = new THREE.WebGLRenderTarget(1, 1)
+  private readonly aoB = new THREE.WebGLRenderTarget(1, 1)
   private readonly normalMaterial = new THREE.MeshNormalMaterial()
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   private readonly outline = pass(outlineFragment, {
@@ -177,6 +243,16 @@ export class ToonComposer {
     lineWidth: { value: 1 },
     // 따뜻한 짙은 갈색 선(섬 팔레트 잉크 #5E4A32보다 조금 진하게).
     outline: { value: new THREE.Vector4(0.24, 0.17, 0.12, 0.85) },
+    tintedLine: { value: 0 },
+  })
+  private readonly ao = pass(aoFragment, {
+    tNormal: { value: this.normal.texture },
+    tDepth: { value: this.normal.depthTexture },
+    texel: { value: new THREE.Vector2(1, 1) },
+    near: { value: 0.1 },
+    far: { value: 100 },
+    projScale: { value: new THREE.Vector2(1, 1) },
+    radius: { value: 0.5 },
   })
   private readonly fxaa = (() => {
     const mesh = new THREE.Mesh(
@@ -211,12 +287,31 @@ export class ToonComposer {
     deOrange: { value: 0.6 },
     exposure: { value: 1.06 },
     highlightLift: { value: 0.06 },
+    style: { value: 0 },
+    tAo: { value: this.aoA.texture },
+    aoAmount: { value: 0 },
+    aoColor: { value: new THREE.Vector3(0.5, 0.47, 0.62) },
+    vibrance: { value: 0.4 },
+    shadowTone: { value: new THREE.Vector3(0.9, 0.93, 1.04) },
+    highlightTone: { value: new THREE.Vector3(1.04, 1.02, 0.95) },
   })
   private width = 1
   private height = 1
 
-  constructor() {
+  constructor(readonly style: ComposerStyle = 'soft') {
     this.fxaa.mesh.material.uniforms.tDiffuse!.value = this.lined.texture
+    const fu = this.final.mesh.material.uniforms
+    if (style === 'soft') {
+      // 부드러운 파스텔 룩 값(Focustown 참고): 선은 그 자리 색을 어둡게, 빛 번짐은 조금 더, 그림자는 라벤더.
+      this.outline.mesh.material.uniforms.tintedLine!.value = 1
+      ;(this.outline.mesh.material.uniforms.outline!.value as THREE.Vector4).w = 0.7
+      fu.style!.value = 1
+      fu.exposure!.value = 1.08
+      fu.highlightLift!.value = 0.04
+      ;(fu.lift!.value as THREE.Vector3).set(0.92, 0.96, 1.0)
+      fu.liftAmount!.value = 0.05
+      this.bright.mesh.material.uniforms.threshold!.value = 0.68
+    }
   }
 
   setSize(width: number, height: number) {
@@ -228,6 +323,9 @@ export class ToonComposer {
     const hh = Math.max(1, Math.round(height / 2))
     this.halfA.setSize(hw, hh)
     this.halfB.setSize(hw, hh)
+    this.aoA.setSize(hw, hh)
+    this.aoB.setSize(hw, hh)
+    ;(this.ao.mesh.material.uniforms.texel!.value as THREE.Vector2).set(1 / hw, 1 / hh)
     ;(this.fxaa.mesh.material.uniforms.resolution!.value as THREE.Vector2).set(1 / width, 1 / height)
     ;(this.outline.mesh.material.uniforms.texel!.value as THREE.Vector2).set(1 / width, 1 / height)
     ;(this.final.mesh.material.uniforms.texel!.value as THREE.Vector2).set(1 / width, 1 / height)
@@ -266,6 +364,25 @@ export class ToonComposer {
     }
     this.draw(gl, this.aa, this.fxaa.scene)
 
+    // 접촉 그늘(부드러운 룩, 높은 단계만): ½ 해상도로 구하고 한 번 흐려 얼룩을 없앤다.
+    const fu0 = this.final.mesh.material.uniforms
+    const useAo = this.style === 'soft' && mood.ao
+    fu0.aoAmount!.value = useAo ? 1.0 : 0
+    if (useAo) {
+      const au = this.ao.mesh.material.uniforms
+      au.near!.value = camera.near
+      au.far!.value = camera.far
+      ;(au.projScale!.value as THREE.Vector2).set(camera.projectionMatrix.elements[0]!, camera.projectionMatrix.elements[5]!)
+      this.draw(gl, this.aoA, this.ao.scene)
+      const bu0 = this.blur.mesh.material.uniforms
+      bu0.tColor!.value = this.aoA.texture
+      ;(bu0.step!.value as THREE.Vector2).set(1.2 / this.aoA.width, 0)
+      this.draw(gl, this.aoB, this.blur.scene)
+      bu0.tColor!.value = this.aoB.texture
+      ;(bu0.step!.value as THREE.Vector2).set(0, 1.2 / this.aoA.height)
+      this.draw(gl, this.aoA, this.blur.scene)
+    }
+
     // 빛 번짐: 밝은 곳을 ½ 해상도로 뽑아 두 번 흐린다(가로·세로).
     this.draw(gl, this.halfA, this.bright.scene)
     const bu = this.blur.mesh.material.uniforms
@@ -285,18 +402,18 @@ export class ToonComposer {
     fu.far!.value = camera.far
     fu.focus!.value = focusDistance
     fu.maxBlur!.value = mood.depthOfField ? 6 * pixelRatio : 0
-    fu.bloom!.value = mood.bloom
+    fu.bloom!.value = this.style === 'soft' ? mood.bloom * 1.25 : mood.bloom
     fu.grain!.value = mood.grain
     fu.vignette!.value = mood.vignette
     this.draw(gl, null, this.final.scene)
   }
 
   dispose() {
-    for (const rt of [this.color, this.lined, this.aa, this.halfA, this.halfB]) rt.dispose()
+    for (const rt of [this.color, this.lined, this.aa, this.halfA, this.halfB, this.aoA, this.aoB]) rt.dispose()
     this.normal.depthTexture?.dispose()
     this.normal.dispose()
     this.normalMaterial.dispose()
-    for (const p of [this.outline, this.fxaa, this.bright, this.blur, this.final]) {
+    for (const p of [this.outline, this.fxaa, this.bright, this.blur, this.final, this.ao]) {
       p.mesh.geometry.dispose()
       p.mesh.material.dispose()
     }

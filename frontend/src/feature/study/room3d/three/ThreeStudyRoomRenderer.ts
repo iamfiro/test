@@ -11,7 +11,7 @@ import type { StudyRoomLayout } from '../model/layout'
 import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomLook } from '../model/scene'
 import { logger } from '../../../../core/log/log'
 import { CharacterKit, type SeatedPerson } from './characterKit'
-import { createRetroMaterial, retroFloats, setRetroFloats, setToon, toonDefault } from './retroMaterial'
+import { createRetroMaterial, retroFloats, setRetroFloats, setSoft, setToon, toonDefault } from './retroMaterial'
 import { ToonComposer, type MoodLook } from './toonComposer'
 import { paintSky } from '../StudyRoomSky'
 import type { StudyRoomDaylight } from '../domain/daylight'
@@ -26,12 +26,13 @@ const url = (asset: string) => `/${asset}`
 type Listener = () => void
 
 /**
- * 웹 룩. toon(기본): 셀 셰이딩·외곽선·채도·MSAA·기기 해상도(StudyVillage, 사용자 결정 2026-11-23).
- * app: PocketTime 앱과 같은 그림(비교용, 주소에 `?look=app`).
+ * 웹 룩. soft(기본): 부드러운 감싸기 조명·접촉 그늘(AO)·색 외곽선·파스텔 보정(사용자 결정 2026-11-23 "셰이더 대격변").
+ * toon: 그 전의 셀 셰이딩 룩(비교용, `?look=toon`). app: PocketTime 앱과 같은 그림(비교용, `?look=app`).
  */
-export type RoomLook = 'toon' | 'app'
+export type RoomLook = 'soft' | 'toon' | 'app'
 export function roomLookFromLocation(): RoomLook {
-  return new URLSearchParams(window.location.search).get('look') === 'app' ? 'app' : 'toon'
+  const v = new URLSearchParams(window.location.search).get('look')
+  return v === 'app' ? 'app' : v === 'toon' ? 'toon' : 'soft'
 }
 
 export class ThreeStudyRoomRenderer {
@@ -65,7 +66,7 @@ export class ThreeStudyRoomRenderer {
   private daylight: StudyRoomDaylight | null = null
   private skyKey = ''
 
-  constructor(readonly look: RoomLook = 'toon') {
+  constructor(readonly look: RoomLook = 'soft') {
     this.canvas = document.createElement('canvas')
     // 하늘(뒤)과 자리 칩(앞) 사이에 놓는다.
     Object.assign(this.canvas.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', display: 'block', zIndex: '1' })
@@ -96,7 +97,7 @@ export class ThreeStudyRoomRenderer {
     // 셰이더가 sRGB 값을 그대로 쓴다(원본 Impeller 경로). 출력 변환·톤 매핑 없음.
     gl.outputColorSpace = THREE.LinearSRGBColorSpace
     gl.toneMapping = THREE.NoToneMapping
-    if (this.look === 'toon') this.composer = new ToonComposer()
+    if (this.look !== 'app') this.composer = new ToonComposer(this.look === 'soft' ? 'soft' : 'toon')
     this.gl = gl
     return gl
   }
@@ -166,8 +167,9 @@ export class ThreeStudyRoomRenderer {
           const key = `${map?.uuid ?? 'none'}:${outdoors}`
           let retro = byKey.get(key)
           if (!retro) {
-            retro = createRetroMaterial(map, smooth, this.look === 'toon')
+            retro = createRetroMaterial(map, smooth, this.look !== 'app')
             if (this.look === 'toon') setToon(retro, cel ? { ...toonDefault, rim: 0.12 } : { ...toonDefault, shade: 1 })
+            if (this.look === 'soft') setSoft(retro, cel ? 0.16 : 0.08)
             byKey.set(key, retro)
             this.retroMaterials.push(retro)
             if (outdoors) this.uncutMaterials.add(retro)
@@ -228,7 +230,7 @@ export class ThreeStudyRoomRenderer {
   }
 
   private updateSky(width: number, height: number) {
-    if (this.look !== 'toon' || !this.daylight) return
+    if (this.look === 'app' || !this.daylight) return
     const key = `${width}x${height}:${this.daylight.hour}`
     if (key === this.skyKey) return
     this.skyKey = key
@@ -261,7 +263,7 @@ export class ThreeStudyRoomRenderer {
     const plain = retroFloats({
       fogColor: [spec.fogColor.r, spec.fogColor.g, spec.fogColor.b],
       // 카툰 룩은 먼 곳을 덜 뿌옇게(안개 절반) 해 색을 또렷하게 둔다.
-      fogAmount: this.look === 'toon' ? spec.fogAmount * 0.5 : spec.fogAmount,
+      fogAmount: this.look !== 'app' ? spec.fogAmount * 0.5 : spec.fogAmount,
       fogNear: focus + spec.fogStart,
       fogFar: focus + spec.fogEnd,
       colorLevels: spec.colorLevels,
@@ -321,7 +323,7 @@ export class ThreeStudyRoomRenderer {
     this.updateLook(rig, opts.cutHeight)
     // 내부 해상도: 부드러운 장면은 가로가 smoothWidth를 넘지 않게(기기보다 크게는 그리지 않음).
     // 카툰 룩(픽셀 느낌 없음): 높은·중간 단계는 기기 해상도(최대 2배), 낮은 단계만 원본 상한을 쓴다.
-    const crisp = this.look === 'toon' && (opts.quality.name === 'high' || opts.quality.name === 'medium')
+    const crisp = this.look !== 'app' && (opts.quality.name === 'high' || opts.quality.name === 'medium')
     const pixelRatio = crisp
       ? Math.min(opts.devicePixelRatio, 2)
       : spec.look.pixelated
@@ -345,8 +347,8 @@ export class ThreeStudyRoomRenderer {
       this.composer.setSize(Math.round(opts.width * pixelRatio), Math.round(opts.height * pixelRatio))
       // 감성 후처리: 높은 단계는 전부, 중간은 심도 없이, 낮은 단계는 외곽선만.
       const q = opts.quality.name
-      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.01, vignette: 0.1 }
-        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.01, vignette: 0.1 }
+      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.01, vignette: 0.1, ao: true }
+        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.01, vignette: 0.1, ao: false }
         : null
       const focus = rig.eye.distanceTo(opts.camera.target)
       this.composer.render(gl, this.world, this.camera, pixelRatio, focus, mood)

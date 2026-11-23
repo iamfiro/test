@@ -30,6 +30,12 @@ uniform vec3 toon_light;
 // 그늘 색(곱함)과 림 라이트(rgb 색, a 세기).
 uniform vec3 toon_shadow;
 uniform vec4 toon_rim;
+// 부드러운 룩(soft, 기본): x 켬, y·z 빛 경계(ndl, 넓은 감싸기), w 림 세기. 그늘·빛·하늘·바닥 색.
+uniform vec4 soft;
+uniform vec3 soft_shadow;
+uniform vec3 soft_key;
+uniform vec3 soft_sky;
+uniform vec3 soft_ground;
 varying vec3 v_position;
 varying vec3 v_viewvector;
 varying vec2 v_texture_coords;
@@ -48,7 +54,17 @@ void main() {
   if (fog_range.z > 0.0 && v_position.y > fog_range.z) discard;
 
   vec3 color = texture2D(base_color_texture, v_texture_coords).rgb * tint.rgb;
-  if (toon.x > 0.0) {
+  if (soft.x > 0.0) {
+    // 부드러운 감싸기 조명: 구운 조명 위에 빛 쪽은 크림, 그늘 쪽은 라벤더로 넓게 번지게(단 없음).
+    vec3 n = normalize(v_normal);
+    float lit = smoothstep(soft.y, soft.z, dot(n, toon_light));
+    vec3 light = mix(soft_shadow, soft_key, lit);
+    // 반구 조명: 위를 보는 면은 하늘빛, 아래를 보는 면은 바닥 반사빛.
+    light *= mix(soft_ground, soft_sky, n.y * 0.5 + 0.5);
+    color *= light;
+    float facing = 1.0 - max(dot(n, normalize(v_viewvector)), 0.0);
+    color = mix(color, vec3(1.0, 0.98, 0.94), smoothstep(0.6, 0.95, facing) * soft.w * (0.4 + 0.6 * lit));
+  } else if (toon.x > 0.0) {
     // 셀 셰이딩: 구운 조명 위에 빛을 받는 면/그늘 두 단을 또렷하게 나눈다.
     vec3 n = normalize(v_normal);
     float ndl = dot(n, toon_light);
@@ -139,6 +155,11 @@ export function createRetroMaterial(map: THREE.Texture | null, smooth: boolean, 
       toon_light: { value: new THREE.Vector3(0.35, 0.85, 0.4).normalize() },
       toon_shadow: { value: new THREE.Vector3(0.9, 0.86, 1.0) },
       toon_rim: { value: new THREE.Vector4(1.0, 0.95, 0.86, 0.0) },
+      soft: { value: new THREE.Vector4(0, -0.35, 0.8, 0) },
+      soft_shadow: { value: new THREE.Vector3(0.74, 0.77, 0.95) },
+      soft_key: { value: new THREE.Vector3(1.1, 1.06, 0.98) },
+      soft_sky: { value: new THREE.Vector3(1.03, 1.05, 1.08) },
+      soft_ground: { value: new THREE.Vector3(0.9, 0.88, 0.9) },
     },
   })
 }
@@ -161,4 +182,10 @@ export function setToon(material: THREE.ShaderMaterial, toon: ToonLook) {
   ;(material.uniforms.toon_rim!.value as THREE.Vector4).w = toon.rim
   // 그늘 단을 끈 재질(shade 1)은 그늘 색도 물들이지 않는다(면이 각져 보이지 않게).
   ;(material.uniforms.toon_shadow!.value as THREE.Vector3).set(...((toon.shade >= 1 ? [1, 1, 1] : [0.9, 0.86, 1.0]) as [number, number, number]))
+}
+
+/** 부드러운 룩(기본): 셀 단 대신 넓은 감싸기 조명·반구 조명·옅은 림. 채도는 합성 단계에서 다룬다. */
+export function setSoft(material: THREE.ShaderMaterial, rim: number) {
+  ;(material.uniforms.soft!.value as THREE.Vector4).set(1, -0.25, 0.65, rim)
+  ;(material.uniforms.toon!.value as THREE.Vector4).set(0, 1, 0, 0)
 }
