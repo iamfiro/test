@@ -33,8 +33,9 @@
 }
 .search {
   display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 16px; width: min(260px, 50%);
-  border-radius: 999px; background: var(--i-paper); color: var(--i-ink-soft);
-  box-shadow: 0 4px 0 var(--i-paper-ledge), 0 8px 14px rgb(0 0 0 / 0.06);
+  border-radius: 999px; background: #fff; color: var(--i-ink-soft);
+  /* 밤하늘 위에서 비쳐 보이지 않게 순백 단색(뒤로 버튼과 같다, 사용자 요청 2026-11-23). */
+  box-shadow: 0 4px 0 #d9dbe3;
 }
 .search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--i-ink); letter-spacing: -0.5px; }
 .search input::placeholder { color: var(--i-ink-soft); }

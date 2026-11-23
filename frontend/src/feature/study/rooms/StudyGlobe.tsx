@@ -226,7 +226,6 @@ export function StudyGlobe(props: { className?: string }) {
     const deskLegGeo = track(new THREE.BoxGeometry(0.004, 0.044, 0.004))
     const bookGeo = track(new THREE.BoxGeometry(0.034, 0.004, 0.024))
     const basic = (hex: number, side: THREE.Side = THREE.FrontSide) => track(new THREE.MeshBasicMaterial({ color: rawColor(hex), side }))
-    const white = basic(0xffffff, THREE.BackSide)
     const skin = basic(0xffd9b8)
     const eyeMat = basic(0x2a2018)
     const legMat = basic(0x5e4a32)
@@ -248,15 +247,13 @@ export function StudyGlobe(props: { className?: string }) {
       holder.add(body)
       const shirt = basic(shirts[i % shirts.length]!)
       const torso = new THREE.Mesh(bodyGeo, shirt); torso.position.set(0, 0.042, -0.012)
-      const torsoOutline = new THREE.Mesh(bodyGeo, white); torsoOutline.position.copy(torso.position); torsoOutline.scale.setScalar(1.28)
       const head = new THREE.Group(); head.position.set(0, 0.088, -0.008)
       const skull = new THREE.Mesh(headGeo, skin)
-      const skullOutline = new THREE.Mesh(headGeo, white); skullOutline.scale.setScalar(1.22)
       const hair = new THREE.Mesh(hairGeo, basic(hairs[i % hairs.length]!)); hair.position.set(0, 0.002, -0.004)
       const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.01, 0, 0.026)
       const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.01, 0, 0.026)
-      head.add(skullOutline, skull, hair, eyeL, eyeR)
-      body.add(torsoOutline, torso, head)
+      head.add(skull, hair, eyeL, eyeR)
+      body.add(torso, head)
       // 다리는 앞으로 뻗고(앉은 자세) 책상 아래로 들어간다.
       for (const x of [-0.011, 0.011]) {
         const hip = new THREE.Group(); hip.position.set(x, 0.026, -0.012); hip.rotation.x = -Math.PI / 2
