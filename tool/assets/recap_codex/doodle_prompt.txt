@@ -1,0 +1,15 @@
+Use the image_generation tool to create 7 separate small PNG doodle icons and save them in the current folder with exactly these file names. They will decorate a cute hand-written study log sheet on cream paper, placed next to row labels and in empty space.
+
+Style for all: hand-drawn doodles like a cute Korean diary / stationery sheet — drawn with a slightly uneven marker or gel pen line (about 6-8% of the icon size thick), playful and a little wobbly, simple shapes, NO fill or only a light flat fill, no shading, no outlines in black, no text, no letters, no numbers, no characters, no emoji. Transparent background (PNG alpha), the doodle centered with some padding. 256x256 px each.
+
+Colors: sky blue #3e8da6, dusty rose #b4505f, sunny yellow #f2c641 (only where stated).
+
+1) doodle_heart.png — a small open heart outline in dusty rose with two tiny motion ticks.
+2) doodle_star.png — a five-point star outline in sky blue with two tiny sparkle dots.
+3) doodle_note.png — a double eighth music note in sky blue, filled note heads.
+4) doodle_flower.png — a simple five-petal flower outline in sky blue with a small circle center.
+5) doodle_sparkle.png — three small four-point sparkles in sunny yellow with a thin darker yellow outline.
+6) doodle_scribble.png — a short looping zigzag scribble mark in dusty rose (like an emphasis scribble).
+7) doodle_arrow.png — a hand-drawn curved arrow in sky blue curving from top-right down to bottom-left, open arrow head.
+
+Save the 7 files directly in the current working folder. Make sure the backgrounds are truly transparent PNG.
