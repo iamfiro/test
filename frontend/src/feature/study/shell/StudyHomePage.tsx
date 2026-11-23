@@ -45,7 +45,14 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   const chat = useChat()
   const [chatOpen, setChatOpen] = useState(false)
   const [soundOpen, setSoundOpen] = useState(false)
+  const [seatPlanOpen, setSeatPlanOpen] = useState(false)
   const sound = useStudySound(state.status === 'signedIn')
+  useEffect(() => {
+    if (!seatPlanOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSeatPlanOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [seatPlanOpen])
   const focus = useFocusMode(tab === 'study', () => setSoundOpen(false))
   const wide = useMediaQuery('(min-width: 768px) and (min-height: 500px) and (orientation: landscape)')
   const myId = state.status === 'signedIn' ? state.me.id : null
@@ -65,6 +72,8 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'study' && <div className={s.stage}><StudyRoomStage
             cameraMode={camera.mode}
             topInset={68}
+            seatPlanOpen={seatPlanOpen}
+            onCloseSeatPlan={() => setSeatPlanOpen(false)}
             focus={focus.on ? (wide ? { above: null, below: null } : {
               above: <FocusClock timer={timer.view} portrait={window.innerHeight >= window.innerWidth} />,
               below: <FocusControls timer={timer.view} size={80} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />,
@@ -72,6 +81,12 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           /></div>}
       {/* 뒤로 버튼은 공부 탭을 뺀 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 공부 탭은 3D 방이
           전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
+      {/* 자리 이동 중에는 뒤로 버튼이 위에서 보기만 닫고 내 자리로 내려온다(원본 _studyBackButton). */}
+      {tab === 'study' && seatPlanOpen && (
+        <header className={`${s.header} ${s.headerCorner}`}>
+          <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => setSeatPlanOpen(false)} /></span>
+        </header>
+      )}
       {tab !== 'study' && (
         <header className={`${s.header} ${s.headerCorner}`}>
           <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(paths.study)} /></span>
@@ -103,6 +118,8 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           onOpenChat={() => setChatOpen(true)}
           soundPanelOpen={soundOpen}
           focusMode={focus.on}
+          seatPlanOpen={seatPlanOpen}
+          onOpenSeatPlan={() => setSeatPlanOpen(true)}
           onSetFocusMode={focus.set}
           soundPlaying={sound.playing}
           onToggleSound={() => setSoundOpen((v) => !v)}
@@ -115,7 +132,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
       {timer.recap && <StudyRecapOverlay recap={timer.recap} onClose={timer.closeRecap} />}
-      <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on })} onSelect={(next) => navigate(paths[next])} />
+      <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on, seatPlanOpen })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )
 }

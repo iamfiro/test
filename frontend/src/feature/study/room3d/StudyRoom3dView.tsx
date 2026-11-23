@@ -13,7 +13,7 @@ import { StudyRoomSeatCamera, type StudyRoomCameraMode } from './domain/seatCame
 import { StudyRoomCharacter } from './model/character'
 import { colorToHex } from './model/color'
 import { StudyRoomLayout } from './model/layout'
-import type { StudyRoom3dScene, StudyRoomCamera, StudyRoomSeat } from './model/scene'
+import { StudyRoomCamera, type StudyRoom3dScene, type StudyRoomSeat } from './model/scene'
 import { ThreeStudyRoomRenderer, roomLookFromLocation } from './three/ThreeStudyRoomRenderer'
 import { registerRoomSnapshot } from './roomSnapshot'
 import { StudyRoomSky } from './StudyRoomSky'
@@ -25,7 +25,7 @@ export type SeatPlacement = {
   pixelsPerMeter: number
 }
 
-type Frame = { modeBlend: number; zoom: number; motionSeconds: number; orbit: number; pitch: number; distance: number; cameraSeconds: number }
+type Frame = { modeBlend: number; zoom: number; plan: number; motionSeconds: number; orbit: number; pitch: number; distance: number; cameraSeconds: number }
 /** 다가간 자리 위·아래 위젯 위치(px). above는 아래 끝, below는 위 끝. landscape면 양옆. */
 type ZoomSpots = { t: number; landscape: boolean; above: { x: number; y: number }; below: { x: number; y: number } } | null
 
@@ -40,6 +40,14 @@ const modeMs = 1600
 const zoomMs = 650
 /** 다가갔을 때 화면 세로에 꼭 담겨야 하는 장면 높이(m): 머리 위부터 책상 앞까지. */
 const zoomSpanMeters = 1.7
+/** 자리 이동: 방 위로 떠오르기·내려오기 시간과 위에서 보기 구도(원본 _plan*). */
+const planMs = 1500
+const planCutHeight = 2.3
+const planPitch = 89
+const planFov = 30
+const planMargin = 1.06
+const planTopReserve = 72
+const planBottomReserve = 40
 
 export function StudyRoom3dView(props: {
   scene: StudyRoom3dScene
@@ -58,6 +66,10 @@ export function StudyRoom3dView(props: {
   zoomSeat?: number | null
   zoomAbove?: ReactNode
   zoomBelow?: ReactNode
+  /** 자리 이동: 카메라가 천장 위로 떠올라 맵 전체를 내려다본다. */
+  planView?: boolean
+  /** 위에서 볼 때 맵 자리(번호 mapSeat)마다 그릴 표시. null이면 그리지 않는다. */
+  planSeatBuilder?: (mapSeat: number, placement: SeatPlacement) => ReactNode | null
 }) {
   const host = useRef<HTMLDivElement>(null)
   // 렌더러는 마운트마다 새로 만들고 해제한다(StrictMode의 두 번 실행에도 안전).
@@ -66,6 +78,7 @@ export function StudyRoom3dView(props: {
   const [daylight, setDaylight] = useState(() => StudyRoomDaylight.now())
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [zoomSpots, setZoomSpots] = useState<ZoomSpots>(null)
+  const [planSpots, setPlanSpots] = useState<{ t: number; list: SeatPlacement[] }>({ t: 0, list: [] })
   const [placements, setPlacements] = useState<{ list: SeatPlacement[]; built: { p: SeatPlacement; node: ReactNode }[] }>({ list: [], built: [] })
   const viewerSeat = props.viewerSeat ?? 0
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
@@ -117,6 +130,10 @@ export function StudyRoom3dView(props: {
     zoomTo: props.zoomSeat != null ? 1 : 0,
     zoomStarted: null as number | null,
     zoomedSeat: props.zoomSeat ?? null,
+    planFrom: props.planView ? 1 : 0,
+    planTo: props.planView ? 1 : 0,
+    planStarted: null as number | null,
+    planYaw: null as number | null,
   })
   const scheduler = useMemo(() => new StudyRoomRenderScheduler({ capHz: StudyRoomQuality.high.renderHz, motionFps: StudyRoomQuality.high.motionFps }), [])
   const latest = useRef(props)
@@ -147,6 +164,19 @@ export function StudyRoom3dView(props: {
     scheduler.invalidateCamera()
     kick.current()
   }, [props.zoomSeat, reduceMotion, scheduler])
+
+  // 자리 이동: 1500ms에 걸쳐 방 위로 떠오르고 내려온다. 떠오를 때마다 맵 방향을 새로 정한다.
+  useEffect(() => {
+    const s = state.current
+    const to = props.planView ? 1 : 0
+    if (s.planTo === to) return
+    if (to === 1) s.planYaw = null
+    s.planFrom = currentPlan(s, performance.now())
+    s.planTo = to
+    s.planStarted = reduceMotion ? null : performance.now()
+    scheduler.invalidateCamera()
+    kick.current()
+  }, [props.planView, reduceMotion, scheduler])
 
   useEffect(() => {
     if (!renderer || phase !== 'ready' || size.width === 0) return
@@ -202,6 +232,11 @@ export function StudyRoom3dView(props: {
         scheduler.invalidateCamera()
       }
       const zoom = easeInOutCubic(currentZoom(s, now))
+      const plan = easeInOutCubic(currentPlan(s, now))
+      if (s.planStarted != null) {
+        if (now - s.planStarted >= planMs) s.planStarted = null
+        scheduler.invalidateCamera()
+      }
       if (s.zoomStarted != null) {
         if (now - s.zoomStarted >= zoomMs) s.zoomStarted = null
         scheduler.invalidateCamera()
@@ -213,11 +248,11 @@ export function StudyRoom3dView(props: {
           return
         }
         const motionFrame = scheduler.motionFrameAt(s.motionMs)
-        const frame: Frame = { modeBlend, zoom, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, pitch: s.pitch, distance: s.distance, cameraSeconds: s.cameraSeconds }
+        const frame: Frame = { modeBlend, zoom, plan, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, pitch: s.pitch, distance: s.distance, cameraSeconds: s.cameraSeconds }
         draw(frame, now)
         scheduler.didRender({ frameTimeMs: now, motionFrame })
       }
-      if (s.modeStarted != null || s.zoomStarted != null || StudyRoomDirector.moves(s.mode)) { schedule(); return }
+      if (s.modeStarted != null || s.zoomStarted != null || s.planStarted != null || StudyRoomDirector.moves(s.mode)) { schedule(); return }
       const next = scheduler.untilNextMotionFrame(s.motionMs)
       if (next != null) wake = window.setTimeout(schedule, next)
     }
@@ -228,9 +263,11 @@ export function StudyRoom3dView(props: {
       const p = latest.current
       const zoomSeat = state.current.zoomedSeat != null && state.current.zoomedSeat < layout.seatCount ? state.current.zoomedSeat : null
       const base = cameraFor(p.scene, layout, size, frame, state.current.fromMode, state.current.mode, viewerSeat)
-      const camera = frame.zoom === 0 || zoomSeat == null
+      const zoomed = frame.zoom === 0 || zoomSeat == null
         ? base
         : StudyRoomSeatCamera.lerp(base, focusCamera(layout.seat(zoomSeat), size, p.topInset ?? 0), frame.zoom)
+      const s0 = state.current
+      const camera = frame.plan <= 0 ? zoomed : rise(zoomed, planCamera(p.scene, size, zoomed, p.topInset ?? 0, s0), frame.plan, size)
       const hiddenSeat = frame.zoom > 0 ? null : hiddenSeatOf(frame, state.current.fromMode, state.current.mode, viewerSeat)
       setZoomSpots(zoomSeat == null || frame.zoom === 0 ? null : zoomSpotsOf(layout, zoomSeat, camera, size, frame.zoom))
       const result = renderer.render({
@@ -241,10 +278,13 @@ export function StudyRoom3dView(props: {
         motionSeconds: frame.motionSeconds,
         quality: currentQuality(),
         hiddenSeat,
-        cutHeight: 0,
+        // 위로 떠오르는 동안 지붕·천장·벽 윗부분을 걷어 방 안을 보인다.
+        cutHeight: frame.plan > 0 ? planCutHeight : 0,
       })
       if (result && quality?.isWatching) quality.onTimings([{ atMs: now, buildMs: 0, rasterMs: result.ms }])
-      setPlacements(placeSeats(p, layout, camera, size, hiddenSeat ?? -1))
+      // 위로 떠오르기 시작하면 자리 위 위젯을 곧바로 감춘다.
+      setPlacements(frame.plan > 0 ? { list: [], built: [] } : placeSeats(p, layout, camera, size, hiddenSeat ?? -1))
+      setPlanSpots(frame.plan < 0.8 || !p.planSeatBuilder ? { t: 0, list: [] } : { t: frame.plan, list: planPlacements(p.scene, camera, size) })
     }
 
     const onVisibility = () => {
@@ -300,7 +340,7 @@ export function StudyRoom3dView(props: {
   const drag = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<number | null>(null)
-  const canOrbit = props.cameraMode === 'thirdPerson' && props.zoomSeat == null
+  const canOrbit = props.cameraMode === 'thirdPerson' && props.zoomSeat == null && !props.planView
   const moveCamera = (dOrbit: number, dPitch: number, distanceFactor: number) => {
     const s = state.current
     s.orbit = (((s.orbit + dOrbit) % 360) + 360) % 360
@@ -383,6 +423,16 @@ export function StudyRoom3dView(props: {
           })}
         </div>
       )}
+      {phase === 'ready' && planSpots.t >= 0.8 && props.planSeatBuilder && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 4, opacity: Math.min(1, (planSpots.t - 0.8) / 0.2), pointerEvents: planSpots.t >= 1 ? 'auto' : 'none' }}>
+          {planSpots.list.map((pl) => {
+            const node = props.planSeatBuilder!(pl.seat, pl)
+            return node == null ? null : (
+              <div key={pl.seat} style={{ position: 'absolute', left: pl.anchor.x, top: pl.anchor.y, transform: 'translate(-50%, -50%)' }}>{node}</div>
+            )
+          })}
+        </div>
+      )}
       {phase === 'ready' && zoomSpots && (
         <ZoomOverlays spots={zoomSpots} above={props.zoomAbove} below={props.zoomBelow} />
       )}
@@ -393,6 +443,86 @@ export function StudyRoom3dView(props: {
 function pinchDistance(points: Map<number, { x: number; y: number }>): number {
   const [a, b] = [...points.values()]
   return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
+}
+
+/** 떠오른 정도(0–1, 곡선 전). */
+function currentPlan(s: { planFrom: number; planTo: number; planStarted: number | null }, now: number): number {
+  if (s.planStarted == null) return s.planTo
+  const t = Math.min(1, (now - s.planStarted) / planMs)
+  return s.planFrom + (s.planTo - s.planFrom) * t
+}
+
+/**
+ * 원본 _planCamera: 맵 전체를 바로 위에서 내려다본다. 긴 변을 화면 긴 쪽에 맞추고, 그 두 방향 중
+ * 지금 카메라가 보는 쪽에 가까운 쪽을 화면 위로 둔다(떠오르며 덜 돈다). 헤더·아래 여백 사이에 맞춘다.
+ */
+function planCamera(scene: StudyRoom3dScene, size: { width: number; height: number }, from: StudyRoomCamera, topInset: number, s: { planYaw: number | null }): StudyRoomCamera {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+  const include = (x0: number, z0: number, x1: number, z1: number) => {
+    minX = Math.min(minX, x0); maxX = Math.max(maxX, x1); minZ = Math.min(minZ, z0); maxZ = Math.max(maxZ, z1)
+  }
+  const areas = scene.interior?.areas ?? []
+  for (const a of areas) include(a.minX, a.minZ, a.maxX, a.maxZ)
+  if (areas.length === 0) for (const seat of scene.seats) { const p = seat.anchor; include(p.x - 1, p.z - 1, p.x + 1, p.z + 1) }
+  const spanX = maxX - minX
+  const spanZ = maxZ - minZ
+  const center = new Vector3((minX + maxX) / 2, 0, (minZ + maxZ) / 2)
+  const portrait = size.height >= size.width
+  const alongX = (spanX >= spanZ) === portrait
+  const options = alongX ? [90, 270] : [0, 180]
+  const turn = (yaw: number) => { const d = (((yaw - from.yawDegrees) % 360) + 360) % 360; return Math.min(d, 360 - d) }
+  const yaw = (s.planYaw ??= turn(options[0]!) <= turn(options[1]!) ? options[0]! : options[1]!)
+  const across = alongX ? spanZ : spanX
+  const along = alongX ? spanX : spanZ
+  const top = topInset + planTopReserve
+  const usable = Math.max(1, size.height - top - planBottomReserve)
+  const width = Math.max(across * planMargin, (along * planMargin * size.width) / usable)
+  const visibleHeight = (width * size.height) / size.width
+  const shift = (((top - planBottomReserve) / 2) * visibleHeight) / size.height
+  const yawRad = (yaw * Math.PI) / 180
+  const forward = new Vector3(-Math.sin(yawRad), 0, -Math.cos(yawRad))
+  return new StudyRoomCamera({
+    projection: 'perspective',
+    pitchDegrees: planPitch,
+    yawDegrees: yaw,
+    fovYDegrees: planFov,
+    target: center.add(forward.multiplyScalar(shift)),
+    viewWidth: width,
+    minViewHeight: 0,
+  })
+}
+
+/** 원본 _rise: 각도·보는 곳은 곧게, 거리는 곱으로 섞어 머리 위로 천천히 뜨다가 크게 물러난다. */
+function rise(a: StudyRoomCamera, b: StudyRoomCamera, t: number, size: { width: number; height: number }): StudyRoomCamera {
+  if (t >= 1) return b
+  const da = Math.max(0.05, new StudyRoomCameraRig(a, size).eye.distanceTo(a.target))
+  const db = Math.max(0.05, new StudyRoomCameraRig(b, size).eye.distanceTo(b.target))
+  const distance = da * Math.pow(db / da, t)
+  let dyaw = (((b.yawDegrees - a.yawDegrees) % 360) + 360) % 360
+  if (dyaw > 180) dyaw -= 360
+  const fov = a.fovYDegrees + (b.fovYDegrees - a.fovYDegrees) * t
+  return new StudyRoomCamera({
+    projection: 'perspective',
+    pitchDegrees: a.pitchDegrees + (b.pitchDegrees - a.pitchDegrees) * t,
+    yawDegrees: a.yawDegrees + dyaw * t,
+    fovYDegrees: fov,
+    target: a.target.clone().add(b.target.clone().sub(a.target).multiplyScalar(t)),
+    viewWidth: distance * 2 * Math.tan(((fov * Math.PI) / 180) / 2) * (size.width / size.height),
+    minViewHeight: 0,
+  })
+}
+
+/** 위에서 볼 때 맵 자리마다 화면 위치(원본 _planSeats). */
+function planPlacements(scene: StudyRoom3dScene, camera: StudyRoomCamera, size: { width: number; height: number }): SeatPlacement[] {
+  const rig = new StudyRoomCameraRig(camera, size)
+  const out: SeatPlacement[] = []
+  scene.seats.forEach((seat, i) => {
+    const anchor = rig.project(seat.anchor.add(new Vector3(0, 0.45, 0)))
+    const top = rig.project(seat.anchor.add(new Vector3(0, 1.45, 0)))
+    if (!anchor || !top) return
+    out.push({ seat: i, anchor: { x: anchor.x, y: anchor.y }, head: { x: anchor.x, y: anchor.y }, pixelsPerMeter: Math.max(1, Math.hypot(anchor.x - top.x, anchor.y - top.y)) })
+  })
+  return out
 }
 
 /** 다가간 정도(0–1, 곡선 전). */
