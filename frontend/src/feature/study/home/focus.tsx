@@ -69,8 +69,8 @@ export function SeatPlanHeader() {
 }
 
 /**
- * 넓은 화면(PC) 집중 모드: 과목·시간·단추를 화면 가운데 세로로 쌓아 크게 보인다(사용자 결정 2026-11-23).
- * 원본 가로 화면은 시간을 사람 왼쪽, 단추를 오른쪽에 두지만 PC 창에서는 작고 흩어져 보였다.
+ * 넓은 화면(PC) 집중 모드: 원본 가로 화면처럼 시간은 왼쪽, 단추는 오른쪽(양끝 정렬)에 두되 크게,
+ * 화면 세로 가운데에 둔다(사용자 결정 2026-11-23).
  */
 export function FocusStack(props: { timer: StudyTimerView; onTogglePause?: () => void; onFinish?: () => void }) {
   return (
