@@ -14,35 +14,40 @@ export function PaperSheet(props: {
   /** 고정 높이(예: 채팅). 없으면 내용 높이. */
   height?: string
   className?: string
+  /** sun: 햇살 노랑 테두리(아래 턱) 안에 종이(사운드 패널과 같은 틀). */
+  tone?: 'paper' | 'sun'
 }) {
   const [open, setOpen] = useState(false)
   const card = useRef<HTMLDivElement>(null)
   const onDismiss = useRef(props.onDismiss)
   onDismiss.current = props.onDismiss
   useEffect(() => {
-    const id = requestAnimationFrame(() => setOpen(true))
+    // 한 프레임 뒤에 열어야 올라오는 움직임이 보인다. rAF는 가려진 탭에서 멈추므로 타이머로 미룬다.
+    const id = window.setTimeout(() => setOpen(true), 20)
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss.current() }
     window.addEventListener('keydown', onKey)
     // 처음 열 때 카드에 초점을 둔다(안쪽 입력칸이 스스로 초점을 가져가면 그대로 둔다).
     if (!card.current?.contains(document.activeElement)) card.current?.focus({ preventScroll: true })
-    return () => { cancelAnimationFrame(id); window.removeEventListener('keydown', onKey) }
+    return () => { window.clearTimeout(id); window.removeEventListener('keydown', onKey) }
   }, [])
   return createPortal(
     <div className={`${s.root} ${open ? s.open : ''} palette-day`}>
       <div className={s.barrier} onClick={props.onDismiss} />
       <div
         ref={card}
-        className={`${s.card} ${props.className ?? ''}`}
+        className={`${s.card} ${props.tone === 'sun' ? s.sun : ''} ${props.className ?? ''}`}
         style={{ height: props.height } as CSSProperties}
         role="dialog"
         aria-modal="true"
         aria-label={props.label}
         tabIndex={-1}
       >
-        <svg className={s.dash} aria-hidden>
-          <rect x="0" y="0" width="100%" height="100%" rx="24" ry="24" />
-        </svg>
-        <div className={s.content}>{props.children}</div>
+        <div className={s.inner}>
+          <svg className={s.dash} aria-hidden>
+            <rect x="0" y="0" width="100%" height="100%" rx="24" ry="24" />
+          </svg>
+          <div className={s.content}>{props.children}</div>
+        </div>
       </div>
     </div>,
     document.body,

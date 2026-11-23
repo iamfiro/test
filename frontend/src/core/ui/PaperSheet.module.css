@@ -48,6 +48,12 @@
   stroke-dasharray: 9 6;
   stroke-linecap: round;
 }
+.inner { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; border-radius: inherit; }
+/* 사운드 패널과 같은 틀: 햇살 노랑 6 + 아래 턱 6, 안쪽 종이 반지름 26, 점선은 종이 안쪽 7. */
+.sun { padding: 6px; background: var(--i-sun); box-shadow: 0 6px 0 var(--i-sun-ledge), 0 14px 24px rgb(0 0 0 / 0.18); }
+.sun .inner { border-radius: 26px; background: var(--i-paper); overflow: hidden; }
+.sun .dash { inset: 7px; width: calc(100% - 14px); height: calc(100% - 14px); }
+.sun .dash rect { stroke: var(--i-paper-line); }
 .content {
   position: relative;
   display: flex;

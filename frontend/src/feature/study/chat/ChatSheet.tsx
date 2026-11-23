@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { IconSend } from '@tabler/icons-react'
+import { IconMessageCircle, IconSend } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { PaperSheet } from '../../../core/ui/PaperSheet'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
@@ -19,9 +19,18 @@ function statusText(status: ChatState['status']): string {
   }
 }
 
+/** 남의 말풍선 옆 동그라미 색: 사운드 패널 파스텔 중 하나를 작성자 id로 고정해 고른다. */
+const avatarColors = ['#E6E0F2', '#BFDDF0', '#E8C39E', '#FFD9BC', '#F7E7B0', '#CDE8C8', '#F7B49A']
+function avatarColor(id: string): string {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return avatarColors[h % avatarColors.length]!
+}
+
 /**
- * 채팅 시트(앱 캡처). 크림 종이 시트 위 가운데 연결 안내, 가운데 메시지 목록(비면 안내 한 줄),
- * 아래 알약 입력칸과 주황 보내기 단추. 메시지는 텍스트로만 그린다.
+ * 채팅 시트. 사운드 패널과 같은 햇살 노랑 틀 안에 메시지 목록(머리 없음, 연결 중·끊김만 목록 위 알약으로, 같은 사람이
+ * 이어 쓰면 이름·동그라미를 한 번만), 아래 종이 우물 입력칸과 주황 보내기 단추. 메시지는 텍스트로만 그린다.
+ * 2026-11-23 사용자 요청으로 앱 캡처의 밋밋한 시트에서 다듬었다(docs/design-parity/exceptions.md).
  */
 export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
   const chat = useChat()
@@ -55,10 +64,7 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
   const submit = () => { if (canSend) chatStore.send(draft) }
 
   return (
-    <PaperSheet label={t('studyChatTitle')} onDismiss={props.onDismiss} height="min(461px, calc(100dvh - 120px))">
-      <p className={`${s.status} ${chat.status === 'offline' ? s.statusOffline : ''}`} role="status" aria-live="polite">
-        {statusText(chat.status)}
-      </p>
+    <PaperSheet label={t('studyChatTitle')} onDismiss={props.onDismiss} height="min(560px, calc(100dvh - 120px))" tone="sun" className={s.sheet}>
       <div
         ref={list}
         className={s.list}
@@ -67,12 +73,27 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
         }}
       >
+        {chat.status !== 'open' && (
+          <p className={`${s.notice} ${chat.status === 'offline' ? s.noticeOffline : ''}`} role="status" aria-live="polite">
+            {chat.status !== 'offline' && <i className={s.dot} />}
+            {statusText(chat.status)}
+          </p>
+        )}
         {chat.messages.length === 0 ? (
-          <p className={s.empty}>{t('studyChatEmpty')}</p>
+          <div className={s.empty}>
+            <span className={s.emptyIcon}><IconMessageCircle size={30} stroke={2} /></span>
+            <p>{t('studyChatEmpty')}</p>
+          </div>
         ) : (
           <ol className={s.messages} aria-label={t('studyChatTitle')}>
             {chat.messages.map((m, i) => (
-              <MessageRow key={m.id} message={m} mine={m.author.id === props.myId} showName={chat.messages[i - 1]?.author.id !== m.author.id} />
+              <MessageRow
+                key={m.id}
+                message={m}
+                mine={m.author.id === props.myId}
+                first={chat.messages[i - 1]?.author.id !== m.author.id}
+                last={chat.messages[i + 1]?.author.id !== m.author.id}
+              />
             ))}
           </ol>
         )}
@@ -90,7 +111,7 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
           onChange={(e) => setDraft(e.target.value)}
         />
         <IslandIconButton
-          size={48}
+          size={46}
           iconSize={20}
           icon={IconSend}
           label={t('studyChatSend')}
@@ -103,15 +124,23 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
   )
 }
 
-function MessageRow(props: { message: ChatMessage; mine: boolean; showName: boolean }) {
-  const { message, mine } = props
+function MessageRow(props: { message: ChatMessage; mine: boolean; first: boolean; last: boolean }) {
+  const { message, mine, first, last } = props
   const time = timeFormat.format(new Date(message.sent_at))
+  const cls = [s.row, mine ? s.mine : '', first ? s.first : '', last ? s.last : ''].join(' ')
   return (
-    <li className={`${s.row} ${mine ? s.mine : ''}`}>
-      {!mine && props.showName && <span className={s.name}>{message.author.nickname}</span>}
-      <span className={s.line}>
-        <span className={s.bubble}>{message.body}</span>
-        <time className={s.time} dateTime={message.sent_at}>{time}</time>
+    <li className={cls}>
+      {!mine && (
+        <span className={s.avatar} style={{ background: first ? avatarColor(message.author.id) : 'transparent' }} aria-hidden="true">
+          {first ? Array.from(message.author.nickname)[0] : ''}
+        </span>
+      )}
+      <span className={s.stack}>
+        {!mine && first && <span className={s.name}>{message.author.nickname}</span>}
+        <span className={s.line}>
+          <span className={s.bubble}>{message.body}</span>
+          {last && <time className={s.time} dateTime={message.sent_at}>{time}</time>}
+        </span>
       </span>
     </li>
   )
