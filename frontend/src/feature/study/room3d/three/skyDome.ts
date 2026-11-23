@@ -33,7 +33,8 @@ void main() {
     float h = hash(cell);
     vec3 center = (cell + 0.5) / 70.0;
     float star = step(0.93, h) * smoothstep(0.006, 0.0, distance(d, normalize(center)) - h * 0.002);
-    color += vec3(star) * stars * 0.85;
+    // 별은 은은하게(밝은 값은 빛 번짐·심도 흐림에 번져 큼직한 덩어리가 된다). 별마다 밝기를 다르게.
+    color += vec3(star) * stars * (0.18 + 0.22 * fract(h * 17.0));
   }
   float c = dot(d, body);
   if (c > 0.0) {

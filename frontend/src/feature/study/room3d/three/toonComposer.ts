@@ -189,6 +189,11 @@ varying vec2 vUv;
 
 float viewDistance(vec2 uv) { return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
 float coc(float d) { return smoothstep(focusBand, focusBand + blurRange, abs(d - focus)); }
+// 하늘(깊이 1)은 심도 흐림을 덜 받는다: 많이 흐리면 별·달이 네모난 덩어리가 된다.
+float cocAt(vec2 uv) {
+  float c = coc(viewDistance(uv));
+  return texture2D(tDepth, uv).x >= 0.99999 ? min(c, 0.25) : c;
+}
 
 const vec2 disk[12] = vec2[12](
   vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621),
@@ -199,7 +204,7 @@ const vec2 disk[12] = vec2[12](
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 void main() {
-  float c = coc(viewDistance(vUv));
+  float c = cocAt(vUv);
   vec3 color = texture2D(tColor, vUv).rgb;
   if (c > 0.01 && maxBlur > 0.0) {
     // 얕은 심도: 원판 표본. 또렷한 앞 물체가 뒤로 번지지 않게 표본도 자기 흐림만큼만 섞는다.
@@ -207,7 +212,7 @@ void main() {
     float weight = 1.0;
     for (int i = 0; i < 12; i++) {
       vec2 uv = vUv + disk[i] * texel * maxBlur * c;
-      float w = coc(viewDistance(uv));
+      float w = cocAt(uv);
       sum += texture2D(tColor, uv).rgb * w;
       weight += w;
     }
