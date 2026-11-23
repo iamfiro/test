@@ -1,0 +1,350 @@
+openapi: 3.1.0
+info:
+  title: StudyVillage API
+  version: 0.1.0
+  description: |
+    StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
+    인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
+    요청(POST·PUT·PATCH·DELETE)은 `X-CSRF-Token` 헤더에 세션의 CSRF 토큰을 실어야 한다(로그인
+    요청 제외). 쓰기 요청은 `Idempotency-Key`가 필수인 경우 명시한다. 같은 키 재전송은 처음 응답을
+    그대로 돌려주고, 같은 키에 다른 본문이면 `409 IDEMPOTENCY_KEY_REUSED`다.
+servers:
+  - url: http://localhost:5191
+    description: 로컬 개발
+  - url: https://village-api.pocket-time.study
+    description: 운영(미배포)
+security:
+  - session: []
+tags:
+  - name: auth
+  - name: profile
+paths:
+  /auth/session:
+    get:
+      tags: [auth]
+      operationId: getSession
+      summary: 지금 세션의 사용자와 CSRF 토큰
+      description: 쿠키가 없거나 만료·폐기됐으면 401. 성공하면 세션 마지막 사용 시각을 갱신해 만료를 180일 뒤로 민다.
+      responses:
+        '200':
+          description: 로그인 상태
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/Session' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/nonce:
+    get:
+      tags: [auth]
+      operationId: getLoginNonce
+      summary: Google·Apple ID 토큰에 넣을 1회용 nonce
+      security: []
+      description: nonce를 돌려주고 같은 값을 5분짜리 HttpOnly 쿠키 `sv_nonce`에도 둔다. 로그인 때 ID 토큰의 nonce가 쿠키 값과 같아야 한다.
+      responses:
+        '200':
+          description: nonce
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [nonce]
+                    properties:
+                      nonce: { type: string }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+  /auth/login/{provider}:
+    post:
+      tags: [auth]
+      operationId: loginWithIdToken
+      summary: Google·Apple ID 토큰으로 로그인
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [google, apple] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id_token]
+              properties:
+                id_token: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/LoggedIn' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /auth/kakao/start:
+    get:
+      tags: [auth]
+      operationId: startKakaoLogin
+      summary: 카카오 로그인 시작(브라우저 이동)
+      security: []
+      parameters:
+        - name: return_to
+          in: query
+          required: true
+          description: 로그인 뒤 돌아갈 웹 경로. `/`로 시작하는 같은 사이트 경로만 받는다.
+          schema: { type: string, pattern: '^/' }
+      responses:
+        '302': { description: 카카오 인가 화면으로 이동. state를 HttpOnly 쿠키에 둔다 }
+  /auth/kakao/callback:
+    get:
+      tags: [auth]
+      operationId: finishKakaoLogin
+      summary: 카카오 인가 코드 교환(브라우저 이동)
+      security: []
+      parameters:
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        '302':
+          description: |
+            성공하면 세션 쿠키를 두고 `return_to`로, 실패하면 웹 `/login?error=kakao`로 이동한다.
+  /auth/login/dev:
+    post:
+      tags: [auth]
+      operationId: loginForDevelopment
+      summary: 개발 전용 로그인
+      security: []
+      description: 서버 설정 `DEV_LOGIN_ENABLED=true`일 때만 있다. 꺼져 있으면 404. 운영 설정에서는 서버가 이 값으로 시작하지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [subject]
+              properties:
+                subject:
+                  type: string
+                  pattern: '^[a-z0-9_-]{1,32}$'
+                  description: 같은 subject는 같은 개발 계정이다.
+      responses:
+        '200': { $ref: '#/components/responses/LoggedIn' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: 이 세션 로그아웃
+      description: 세션을 지우고 쿠키를 만료시킨다. 이미 없는 세션이어도 204.
+      responses:
+        '204': { description: 로그아웃됨 }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+  /auth/logout-all:
+    post:
+      tags: [auth]
+      operationId: logoutAll
+      summary: 모든 기기·탭 로그아웃
+      responses:
+        '204': { description: 이 사용자의 모든 세션을 지움 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+  /users/me:
+    delete:
+      tags: [auth]
+      operationId: deleteMyAccount
+      summary: 탈퇴(즉시 삭제)
+      description: 유예 없이 이 사용자의 데이터 전부를 지우고 모든 세션을 끊는다. 되돌릴 수 없다.
+      responses:
+        '204': { description: 삭제됨 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+  /users/me/profile:
+    get:
+      tags: [profile]
+      operationId: getMyProfile
+      summary: 다른 사람에게 보이는 내 프로필
+      responses:
+        '200': { $ref: '#/components/responses/ProfileOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [profile]
+      operationId: updateMyProfile
+      summary: 닉네임·캐릭터·성별 바꾸기
+      description: 보낸 항목만 바꾼다. 하나도 없거나 규칙에 맞지 않으면 422(`error.details.field`).
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/ProfileOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sv_session
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 클라이언트가 만든 UUID. 응답을 못 받으면 같은 키로 다시 보낸다.
+      schema: { type: string, format: uuid }
+  schemas:
+    Meta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: 안정적인 기계용 코드. 새 코드가 생길 수 있으니 닫힌 목록으로 다루지 않는다.
+        message: { type: string }
+        details: {}
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [data, error, meta]
+      properties:
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ErrorBody' }
+        meta: { $ref: '#/components/schemas/Meta' }
+    Session:
+      type: object
+      additionalProperties: false
+      required: [user, csrf_token]
+      properties:
+        user: { $ref: '#/components/schemas/Me' }
+        csrf_token:
+          type: string
+          description: 상태 변경 요청의 `X-CSRF-Token`에 넣는다. 메모리에만 두고 저장하지 않는다.
+    Me:
+      type: object
+      additionalProperties: false
+      required: [id, profile, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        profile: { $ref: '#/components/schemas/Profile' }
+        created_at: { type: string, format: date-time }
+    Nickname:
+      type: string
+      description: 앞뒤 공백을 지운 뒤 1–12자(grapheme), UTF-8 48바이트 이하, 제어 문자 금지. 같은 닉네임을 여러 사람이 쓸 수 있다.
+    Avatar:
+      type: object
+      additionalProperties: false
+      description: 조합 캐릭터. 값 목록의 순서는 계약이다(PocketTime Friends.Avatar와 같음).
+      required: [shape, color, eyes, mouth, accessory]
+      properties:
+        shape: { type: string, enum: [circle, squircle, cloud, heart, flower, bow, star, triangle, burst, bubble, drop, arch] }
+        color: { type: string, enum: [orange, tangerine, yellow, mint, blue, purple, pink, red, green, sky] }
+        eyes: { type: string, enum: [googly, dot, happy, closed, wink, sparkle, sleepy, side] }
+        mouth: { type: string, enum: [smile, grin, small, tongue, open, flat, kiss, smirk] }
+        accessory: { type: string, enum: [none, blush, tuft, sprout, ribbon, crown, glasses, sunglasses] }
+    Gender:
+      type: string
+      enum: [male, female]
+      description: 3D 공부방 캐릭터 차림(머리·하의·신발).
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [nickname, avatar, gender]
+      properties:
+        nickname: { $ref: '#/components/schemas/Nickname' }
+        avatar: { $ref: '#/components/schemas/Avatar' }
+        gender:
+          description: 아직 고르지 않았으면 null. 웹은 이때 공부방 첫 방문 소개를 보여 준다.
+          oneOf:
+            - { $ref: '#/components/schemas/Gender' }
+            - { type: 'null' }
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nickname: { $ref: '#/components/schemas/Nickname' }
+        avatar: { $ref: '#/components/schemas/Avatar' }
+        gender:
+          $ref: '#/components/schemas/Gender'
+          description: 고른 뒤에는 지울 수 없고 다른 값으로만 바꾼다.
+  responses:
+    LoggedIn:
+      description: 로그인 성공. `sv_session` 쿠키를 둔다. 새 계정이면 닉네임·캐릭터를 무작위로 정한다(PocketTime과 같은 규칙).
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data: { $ref: '#/components/schemas/Session' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    ProfileOk:
+      description: 프로필
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [profile]
+                properties:
+                  profile: { $ref: '#/components/schemas/Profile' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    Unauthorized:
+      description: 세션 없음·만료·폐기(`UNAUTHORIZED`). 원인을 구분하지 않는다.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    InvalidCredentials:
+      description: 제공자 토큰 검증 실패(`INVALID_CREDENTIALS`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    CsrfRejected:
+      description: CSRF 토큰이 없거나 틀림, 또는 허용하지 않은 Origin(`CSRF_REJECTED`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: 없음(`RESOURCE_NOT_FOUND`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ValidationError:
+      description: 입력 규칙 위반(`VALIDATION_ERROR`, `details.field`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: 요청이 너무 잦음(`RATE_LIMIT_EXCEEDED`). `Retry-After` 헤더.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
