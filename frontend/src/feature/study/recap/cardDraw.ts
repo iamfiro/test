@@ -8,6 +8,8 @@
 // assets/icons/study_*.png). 클립보드·티켓·클립·테이프는 Codex로 그린 일러스트(public/assets/study_recap,
 // 원본·프롬프트 tool/assets/recap_codex)이고, 글자·사진·스티커는 그 위에 캔버스로 그린다. 화면과 저장 이미지(인스타그램 스토리 1080×1920)는 같은 함수로 그린다.
 // 다크 모드에서 저장해도 같은 이미지가 나오도록 값은 낮 팔레트로 고정한다.
+import '@fontsource/gaegu/400.css'
+import '@fontsource/gaegu/700.css'
 import { paintClockField } from '../../../core/ui/IslandBackground'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
@@ -22,11 +24,15 @@ const c = {
   lake: '#609baf', lakePattern: '#528ba0', title: '#3e8da6',
   sun: '#f8d66a', sunLedge: '#d9b246', onSun: '#5e4a32',
   white: '#ffffff',
+  /** 손글씨 라벨·낙서 장미색, 워터마크, 인덱스 탭. */
+  rose: '#b4505f', watermark: 'rgba(233,170,120,0.16)', tab: '#86c6de', tabEdge: '#5ea9c6',
 } as const
 
 const fonts = {
   sans: '"Pretendard Variable", Pretendard, -apple-system, sans-serif',
   round: '"TmoneyRoundWind", "Pretendard Variable", sans-serif',
+  /** 손글씨(Gaegu, OFL): 라벨·값·메모. */
+  hand: '"Gaegu", "Pretendard Variable", sans-serif',
   mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
 } as const
 
@@ -45,6 +51,13 @@ const stickerUrls = {
   ticket: '/assets/study_recap/ticket.webp',
   paperclip: '/assets/study_recap/paperclip.webp',
   tape: '/assets/study_recap/tape.webp',
+  heart: '/assets/study_recap/doodle_heart.webp',
+  star: '/assets/study_recap/doodle_star.webp',
+  note: '/assets/study_recap/doodle_note.webp',
+  flower: '/assets/study_recap/doodle_flower.webp',
+  sparkle: '/assets/study_recap/doodle_sparkle.webp',
+  scribble: '/assets/study_recap/doodle_scribble.webp',
+  arrow: '/assets/study_recap/doodle_arrow.webp',
 } as const
 export type CardAssets = Record<keyof typeof stickerUrls, HTMLImageElement>
 
@@ -53,7 +66,7 @@ export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
   const sample = [
     webText.recapMe, webText.recapScene, ...Object.values(webText.recapFields),
     formatStudyDuration(recap.todaySeconds), formatStudyDuration(recap.sessionSeconds), webText.recapBrand,
-    '0123456789.·/!()시간분일등명월화수목금토일',
+    '0123456789.·/!()시간분일등명월화수목금토일STUDY',
   ].join('')
   const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
@@ -65,6 +78,7 @@ export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
   const [images] = await Promise.all([
     Promise.all(keys.map((k) => load(stickerUrls[k]))),
     document.fonts.load(`800 16px ${fonts.round}`, sample),
+    document.fonts.load(`700 16px ${fonts.hand}`, sample),
     ...[600, 700, 800].map((w) => document.fonts.load(`${w} 16px ${fonts.sans}`, sample)),
   ] as const)
   return Object.fromEntries(keys.map((k, i) => [k, images[i]!])) as CardAssets
@@ -79,19 +93,31 @@ function dateText(studyDate: string): string {
 // ── 시트 ──
 
 export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets): void {
-  // 클립보드(판·종이·집게) 일러스트.
+  // 클립보드(판·종이·집게) 일러스트, 왼쪽 가장자리 인덱스 탭, 종이 뒤쪽 큰 워터마크.
   ctx.drawImage(assets.clipboard, 0, 0, sheet.width, sheet.height)
+  indexTabs(ctx)
+  ctx.save()
+  ctx.font = `800 112px ${fonts.round}`
+  ctx.textAlign = 'center'
+  ctx.fillStyle = c.watermark
+  ctx.fillText(webText.recapWatermark, 200, 360)
+  ctx.restore()
 
   // 제목 자리: 오늘 공부한 시간을 가장 크게(둥근 글꼴 호수 청록 + 흰 테두리, 숫자 크게·단위 작게). 집게 아래.
   titleDuration(ctx, recap.todaySeconds, 150, 136, 230)
 
   drawTicket(ctx, assets, 332, 108)
   drawPortrait(ctx, recap, assets)
-  drawTopRows(ctx, recap)
+  drawTopRows(ctx, recap, assets)
   sticker(ctx, assets.music, 62, 372, 46, -14)
   if (recap.rank) sticker(ctx, assets.trophy, 196, 372, 42, 10)
   else sticker(ctx, assets.focus, 196, 374, 38, 10)
-  drawBottomRows(ctx, recap)
+  // 빈자리 손그림 낙서.
+  doodle(ctx, assets.sparkle, 272, 92, 30, 0)
+  doodle(ctx, assets.note, 112, 366, 24, -8)
+  doodle(ctx, assets.star, 236, 360, 22, 12)
+  doodle(ctx, assets.scribble, 232, 526, 30, -4)
+  drawBottomRows(ctx, recap, assets)
   drawPolaroid(ctx, recap, assets)
 }
 
@@ -131,56 +157,70 @@ function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: 
   photo(ctx, recap.photo, -portraitSize.width / 2, -portraitSize.height / 2, portraitSize.width, portraitSize.height)
   tape(ctx, assets, -fw / 2 + 10, -fh / 2 + 4, -38, 68)
   ctx.restore()
-  // "나!" 와 휜 화살표: 사진 오른쪽 아래에서 사진을 가리킨다(위는 큰 공부 시간 자리).
+  // "나!"(손글씨)와 손그림 화살표: 사진 오른쪽 아래에서 사진을 가리킨다(위는 큰 공부 시간 자리).
   const by = cy + fh / 2
-  text(ctx, webText.recapMe, cx + 48, by + 26, { font: `800 15px ${fonts.round}`, color: c.title })
   ctx.save()
-  ctx.strokeStyle = c.title; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
-  ctx.beginPath(); ctx.moveTo(cx + 44, by + 20); ctx.quadraticCurveTo(cx + 26, by + 22, cx + 22, by + 4); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(cx + 17, by + 9); ctx.lineTo(cx + 22, by + 3); ctx.lineTo(cx + 27, by + 9); ctx.stroke()
+  ctx.translate(cx + 32, by + 6); ctx.scale(-1, -1)
+  ctx.drawImage(assets.arrow, -13, -13, 26, 26)
   ctx.restore()
+  text(ctx, webText.recapMe, cx + 46, by + 28, { font: `700 21px ${fonts.hand}`, color: c.title })
+  doodle(ctx, assets.flower, cx + 82, by + 20, 18, 10)
 }
 
-type Row = { label: string; draw: (x: number, base: number, maxW: number) => void }
+type Row = { label: string; icon: HTMLImageElement; draw: (x: number, base: number, maxW: number) => void }
 
-/** 큰 항목 한 묶음: 라벨(작게, 위) → 값(크게, 아래) → 점선 밑줄. */
+/** 큰 항목 한 묶음: 낙서 아이콘 + 손글씨 라벨(장미색, 위) → 값(크게, 아래) → 손으로 그은 점선. */
 function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, right: number, startY: number, rowH: number) {
   list.forEach((r, i) => {
     const y = startY + i * rowH
-    text(ctx, r.label, x, y + 15, { font: `800 13px ${fonts.sans}`, color: c.inkSoft })
+    ctx.drawImage(r.icon, x - 2, y + 1, 17, 17)
+    text(ctx, r.label, x + 18, y + 15, { font: `700 17px ${fonts.hand}`, color: c.rose })
     const base = y + rowH - 16
     r.draw(x, base, right - x)
-    ctx.save()
-    ctx.strokeStyle = c.dash; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3])
-    ctx.beginPath(); ctx.moveTo(x, base + 9); ctx.lineTo(right, base + 9); ctx.stroke()
-    ctx.restore()
+    handDash(ctx, x, right, base + 9, i * 7 + Math.round(startY))
   })
 }
 
-function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const big = `800 28px ${fonts.round}`
+/** 손으로 그은 점선: 길이·높이가 조금씩 흔들리는 짧은 선. */
+function handDash(ctx: CanvasRenderingContext2D, x0: number, x1: number, y: number, seed: number) {
+  let a = seed * 2654435761 >>> 0
+  const rand = () => { a = (a * 1103515245 + 12345) >>> 0; return a / 4294967296 }
+  ctx.save()
+  ctx.strokeStyle = 'rgba(180,80,95,0.42)'; ctx.lineWidth = 1.3; ctx.lineCap = 'round'
+  let x = x0
+  while (x < x1) {
+    const len = 5 + rand() * 3
+    const end = Math.min(x1, x + len)
+    ctx.beginPath(); ctx.moveTo(x, y + (rand() - 0.5) * 1.2); ctx.lineTo(end, y + (rand() - 0.5) * 1.2); ctx.stroke()
+    x = end + 3.5 + rand() * 1.5
+  }
+  ctx.restore()
+}
+
+function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
+  const big = `700 34px ${fonts.hand}`
   const list: Row[] = [
-    { label: webText.recapFields.streak, draw: (x, b) => {
+    { label: webText.recapFields.streak, icon: assets.heart, draw: (x, b) => {
       flame(ctx, x, b - 25, 28, recap.streakDays > 0)
       highlight(ctx, t('studyStatsStreakValue', { count: recap.streakDays }), x + 30, b, big, recap.streakDays > 0 ? c.ink : c.inkSoft)
     } },
   ]
   if (recap.rank) {
     const rank = recap.rank
-    list.push({ label: webText.recapFields.rank, draw: (x, b) => {
+    list.push({ label: webText.recapFields.rank, icon: assets.star, draw: (x, b) => {
       const num = `${rank.position}${webText.recapRankUnit}`
       highlight(ctx, num, x, b, big)
-      text(ctx, webText.recapRankTotal(rank.total), x + measure(ctx, num, big) + 8, b, { font: `800 14px ${fonts.sans}`, color: c.inkSoft })
+      text(ctx, webText.recapRankTotal(rank.total), x + measure(ctx, num, big) + 8, b, { font: `700 17px ${fonts.hand}`, color: c.inkSoft })
     } })
   }
   rows(ctx, list, 200, 370, 150, 64)
 }
 
-function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const font = `800 22px ${fonts.round}`
+function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: CardAssets) {
+  const font = `700 28px ${fonts.hand}`
   const list: Row[] = [
-    { label: webText.recapFields.session, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
-    { label: webText.recapFields.date, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
+    { label: webText.recapFields.session, icon: assets.note, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
+    { label: webText.recapFields.date, icon: assets.flower, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
   ]
   rows(ctx, list, 32, 248, 398, 64)
 }
@@ -199,7 +239,7 @@ function drawPolaroid(ctx: CanvasRenderingContext2D, recap: StudyRecap, assets: 
   ctx.fillRect(-w / 2, -h / 2, w, h)
   ctx.restore()
   photo(ctx, recap.scenePhoto, -sceneSize.width / 2, -h / 2 + 7, sceneSize.width, sceneSize.height)
-  text(ctx, webText.recapScene, 0, h / 2 - 12, { font: `800 11.5px ${fonts.round}`, color: c.inkSoft, align: 'center' })
+  text(ctx, webText.recapScene, 0, h / 2 - 11, { font: `700 16px ${fonts.hand}`, color: c.ink, align: 'center' })
   ctx.restore()
   sticker(ctx, assets.camera, cx + 46, cy - 62, 40, 14)
 }
@@ -302,6 +342,26 @@ function sticker(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: numbe
   ctx.shadowColor = 'rgba(90,55,20,0.25)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 3
   ctx.drawImage(img, -size / 2, -size / 2, size, size)
   ctx.restore()
+}
+
+/** 손그림 낙서를 기울여 얹는다(그림자 없음: 종이에 그린 것). */
+function doodle(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, size: number, deg: number) {
+  ctx.save()
+  ctx.translate(cx, cy); ctx.rotate((deg * Math.PI) / 180)
+  ctx.drawImage(img, -size / 2, -size / 2, size, size)
+  ctx.restore()
+}
+
+/** 판 왼쪽 가장자리의 하늘색 인덱스 탭 두 개(종이 아래에 끼운 느낌으로 판 위에만). */
+function indexTabs(ctx: CanvasRenderingContext2D) {
+  for (const y of [210, 252]) {
+    ctx.fillStyle = c.tabEdge
+    ctx.beginPath(); ctx.roundRect(2, y + 2, 16, 34, 5); ctx.fill()
+    ctx.fillStyle = c.tab
+    ctx.beginPath(); ctx.roundRect(2, y, 16, 34, 5); ctx.fill()
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'
+    ctx.beginPath(); ctx.roundRect(5, y + 4, 3, 24, 1.5); ctx.fill()
+  }
 }
 
 /** 마스킹 테이프 일러스트를 기울여 붙인다. */
