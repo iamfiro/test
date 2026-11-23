@@ -51,7 +51,3 @@ export function buildRecap(input: {
     rank: null,
   }
 }
-
-export function goalReached(recap: StudyRecap): boolean {
-  return recap.goalSeconds != null && recap.goalSeconds > 0 && recap.todaySeconds >= recap.goalSeconds
-}

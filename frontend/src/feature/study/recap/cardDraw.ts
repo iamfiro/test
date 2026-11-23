@@ -1,7 +1,8 @@
 // "오늘의 공부" 시트: 스토리에 올려 오늘 공부한 결과를 자랑하는 클립보드 프로필 시트 한 장.
 // 구성은 사용자가 준 클립보드 프로필 레퍼런스(2026-11-23)를 따른다: 나무 판 + 금속 집게, 크림 종이, 큰 제목, 마스킹
-// 테이프로 붙인 내 사진("나!" 화살표), 오른쪽 항목 줄(이름·공부 시간·연속 공부·방 순위·목표), 아래 항목 줄(과목·이번 공부·
-// 공부일), 폴라로이드(오늘의 공부방), 티켓 스티커와 클립, 앱 스티커. 레퍼런스의 캐릭터·로고·문구는 쓰지 않는다.
+// 테이프로 붙인 내 사진("나!" 화살표), 오른쪽 큰 항목(공부 시간·연속 공부·방 순위), 아래 큰 항목(이번 공부·공부일),
+// 폴라로이드(오늘의 공부방), 티켓 스티커와 클립, 앱 스티커. 레퍼런스의 캐릭터·로고·문구는 쓰지 않는다.
+// 이름·목표·과목은 넣지 않고 남은 항목을 크게 쓴다(사용자 결정 2026-11-23).
 // 톤은 앱 공부 화면: 섬 팔레트 낮 값(tokens.css), 둥근 글꼴, 햇살 노랑 강조, 앱 스티커 아트(원본 PocketTime
 // assets/icons/study_*.png). 화면과 저장 이미지(인스타그램 스토리 1080×1920)는 같은 함수로 그린다.
 // 다크 모드에서 저장해도 같은 이미지가 나오도록 값은 낮 팔레트로 고정한다.
@@ -10,7 +11,7 @@ import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
 import { formatStudyDuration } from '../home/studyFormat'
 import { flameShape } from '../stats/StreakFlame'
-import { goalReached, type StudyRecap } from './studyRecap'
+import type { StudyRecap } from './studyRecap'
 
 /** 섬 팔레트 낮 값(tokens.css :root·.palette-day)과 판·집게 색. */
 const c = {
@@ -49,10 +50,9 @@ export type CardAssets = Record<keyof typeof stickerUrls, HTMLImageElement>
 /** 글꼴과 스티커 그림을 미리 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
 export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
   const sample = [
-    webText.recapSheetTitle, webText.recapSheetBrand, webText.recapMe, webText.recapScene, recap.nickname, goalText(recap) ?? '',
-    ...Object.values(webText.recapFields), ...recap.subjects.map((s) => s.subject ?? t('studySubjectNone')),
+    webText.recapSheetTitle, webText.recapSheetBrand, webText.recapMe, webText.recapScene, ...Object.values(webText.recapFields),
     formatStudyDuration(recap.todaySeconds), formatStudyDuration(recap.sessionSeconds), webText.recapBrand,
-    '0123456789.·+/%!()시간분일등명과목월화수목금토일', t('studySubjectNone'),
+    '0123456789.·/!()시간분일등명월화수목금토일',
   ].join('')
   const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
@@ -66,15 +66,6 @@ export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
     ...[600, 700, 800].map((w) => document.fonts.load(`${w} 16px ${fonts.sans}`, sample)),
   ] as const)
   return { trophy, focus, music, camera }
-}
-
-/** 목표 줄: 채웠으면 "달성!", 못 채웠으면 "n%", 목표가 없고 어제보다 더 했으면 "어제보다 +n". 아니면 줄을 뺀다. */
-function goalText(recap: StudyRecap): string | null {
-  if (goalReached(recap)) return webText.recapGoalDone
-  if (recap.goalSeconds != null && recap.goalSeconds > 0) return webText.recapGoalPercentShort(Math.floor((recap.todaySeconds * 100) / recap.goalSeconds))
-  const diff = recap.todaySeconds - recap.yesterdaySeconds
-  if (diff > 0 && Math.trunc(diff / 60) > 0) return webText.recapMoreChip(formatStudyDuration(diff))
-  return null
 }
 
 const weekdays = ['월', '화', '수', '목', '금', '토', '일']
@@ -106,9 +97,9 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   drawTicket(ctx, recap, 322, top + 76)
   drawPortrait(ctx, recap)
   drawTopRows(ctx, recap)
-  sticker(ctx, assets.music, 64, top + 330, 46, -14)
-  if (recap.rank) sticker(ctx, assets.trophy, 192, top + 330, 40, 10)
-  else sticker(ctx, assets.focus, 192, top + 332, 36, 10)
+  sticker(ctx, assets.music, 64, top + 340, 46, -14)
+  if (recap.rank) sticker(ctx, assets.trophy, 178, top + 340, 42, 10)
+  else sticker(ctx, assets.focus, 178, top + 342, 38, 10)
   drawBottomRows(ctx, recap)
   drawPolaroid(ctx, recap, assets)
 }
@@ -242,64 +233,47 @@ function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
 
 type Row = { label: string; draw: (x: number, base: number, maxW: number) => void }
 
-/** 항목 줄 한 묶음: 라벨(굵은 갈색) + 값 + 점선 밑줄. */
-function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, valueX: number, right: number, startY: number, rowH: number) {
+/** 큰 항목 한 묶음: 라벨(작게, 위) → 값(크게, 아래) → 점선 밑줄. */
+function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, right: number, startY: number, rowH: number) {
   list.forEach((r, i) => {
-    const base = startY + i * rowH + rowH - 12
-    text(ctx, r.label, x, base, { font: `800 12px ${fonts.sans}`, color: c.inkSoft })
-    r.draw(valueX, base, right - valueX)
+    const y = startY + i * rowH
+    text(ctx, r.label, x, y + 15, { font: `800 13px ${fonts.sans}`, color: c.inkSoft })
+    const base = y + rowH - 16
+    r.draw(x, base, right - x)
     ctx.save()
     ctx.strokeStyle = c.dash; ctx.lineWidth = 1.2; ctx.setLineDash([4, 3])
-    ctx.beginPath(); ctx.moveTo(x, base + 8); ctx.lineTo(right, base + 8); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x, base + 9); ctx.lineTo(right, base + 9); ctx.stroke()
     ctx.restore()
   })
 }
 
 function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const goal = goalText(recap)
+  const big = `800 28px ${fonts.round}`
   const list: Row[] = [
-    { label: webText.recapFields.name, draw: (x, b, w) => text(ctx, ellipsize(ctx, recap.nickname, `800 16px ${fonts.round}`, w), x, b, { font: `800 16px ${fonts.round}`, color: c.ink }) },
-    { label: webText.recapFields.time, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.todaySeconds), x, b, `800 19px ${fonts.round}`) },
+    { label: webText.recapFields.time, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.todaySeconds), x, b, big) },
     { label: webText.recapFields.streak, draw: (x, b) => {
-      flame(ctx, x, b - 16, 18, recap.streakDays > 0)
-      text(ctx, t('studyStatsStreakValue', { count: recap.streakDays }), x + 20, b, { font: `800 17px ${fonts.round}`, color: recap.streakDays > 0 ? c.ink : c.inkSoft })
+      flame(ctx, x, b - 25, 28, recap.streakDays > 0)
+      highlight(ctx, t('studyStatsStreakValue', { count: recap.streakDays }), x + 30, b, big, recap.streakDays > 0 ? c.ink : c.inkSoft)
     } },
   ]
   if (recap.rank) {
     const rank = recap.rank
     list.push({ label: webText.recapFields.rank, draw: (x, b) => {
       const num = `${rank.position}${webText.recapRankUnit}`
-      highlight(ctx, num, x, b, `800 19px ${fonts.round}`)
-      text(ctx, webText.recapRankTotal(rank.total), x + measure(ctx, num, `800 19px ${fonts.round}`) + 6, b, { font: `700 11.5px ${fonts.sans}`, color: c.inkSoft })
+      highlight(ctx, num, x, b, big)
+      text(ctx, webText.recapRankTotal(rank.total), x + measure(ctx, num, big) + 8, b, { font: `800 14px ${fonts.sans}`, color: c.inkSoft })
     } })
   }
-  if (goal) {
-    list.push({ label: webText.recapFields.goal, draw: (x, b) => {
-      if (goalReached(recap)) {
-        const font = `800 12.5px ${fonts.sans}`
-        const w = measure(ctx, goal, font) + 20
-        ctx.fillStyle = c.sunLedge; ctx.beginPath(); ctx.roundRect(x, b - 15 + 2, w, 20, 10); ctx.fill()
-        ctx.fillStyle = c.sun; ctx.beginPath(); ctx.roundRect(x, b - 15, w, 20, 10); ctx.fill()
-        text(ctx, goal, x + 10, b - 1, { font, color: c.onSun })
-      } else {
-        text(ctx, goal, x, b, { font: `800 14px ${fonts.round}`, color: c.ink })
-      }
-    } })
-  }
-  rows(ctx, list, 200, 262, 372, top + 124, 36)
+  rows(ctx, list, 200, 372, top + 118, 64)
 }
 
 function drawBottomRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
-  const names = recap.subjects.map((s) => s.subject ?? t('studySubjectNone'))
-  const valueFont = `800 13.5px ${fonts.round}`
-  const plain = (value: string) => (x: number, b: number, w: number) => text(ctx, ellipsize(ctx, value, valueFont, w), x, b, { font: valueFont, color: c.ink })
+  const font = `800 22px ${fonts.round}`
   const list: Row[] = [
-    { label: webText.recapFields.topSubject, draw: plain(names[0] ?? t('studySubjectNone')) },
-    { label: webText.recapFields.subjects, draw: plain(names.length > 0 ? `${webText.recapSubjectCount(names.length)} · ${names.join(', ')}` : t('studySubjectNone')) },
-    { label: webText.recapFields.session, draw: plain(formatStudyDuration(recap.sessionSeconds)) },
-    { label: webText.recapFields.date, draw: plain(dateText(recap.studyDate)) },
+    { label: webText.recapFields.session, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.sessionSeconds), x, b, font) },
+    { label: webText.recapFields.date, draw: (x, b, w) => text(ctx, ellipsize(ctx, dateText(recap.studyDate), font, w), x, b, { font, color: c.ink }) },
   ]
-  rows(ctx, list, 34, 122, 250, top + 356, 34)
+  rows(ctx, list, 34, 250, top + 372, 62)
 }
 
 /** 폴라로이드: 3인칭으로 본 오늘의 공부방, 아래 여백에 글씨, 카메라 스티커. */
@@ -377,11 +351,12 @@ function photo(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement | null, x: 
 }
 
 /** 숫자에 햇살 형광펜을 긋고 쓴다. */
-function highlight(ctx: CanvasRenderingContext2D, value: string, x: number, base: number, font: string) {
+function highlight(ctx: CanvasRenderingContext2D, value: string, x: number, base: number, font: string, color: string = c.ink) {
   const w = measure(ctx, value, font)
+  const size = Number(/(\d+)px/.exec(font)?.[1] ?? 16)
   ctx.fillStyle = c.sun
-  ctx.beginPath(); ctx.roundRect(x - 3, base - 8, w + 6, 9, 4); ctx.fill()
-  text(ctx, value, x, base, { font, color: c.ink })
+  ctx.beginPath(); ctx.roundRect(x - 3, base - size * 0.42, w + 6, size * 0.48, size * 0.2); ctx.fill()
+  text(ctx, value, x, base, { font, color })
 }
 
 function sticker(ctx: CanvasRenderingContext2D, img: HTMLImageElement, cx: number, cy: number, size: number, deg: number) {
