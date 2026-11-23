@@ -2,13 +2,13 @@
 .paper { position: fixed; inset: 0; background: var(--i-paper); }
 .stage { position: fixed; inset: 0; }
 .header {
-  position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 50%; transform: translateX(-50%);
+  position: fixed; top: calc(env(safe-area-inset-top) + 20px); left: 50%; transform: translateX(-50%); min-height: 48px;
   width: min(100%, var(--app-column)); padding: 0 16px; display: flex; align-items: center; z-index: 10;
 }
 .headerCorner {
-  left: 0; transform: none; width: auto; top: calc(env(safe-area-inset-top) + 20px);
+  z-index: 11; left: 0; transform: none; width: auto; top: calc(env(safe-area-inset-top) + 20px);
 }
-/* 공부방: 밤하늘 위의 흰 뒤로 버튼(사용자 결정 2026-11-23). palette-day가 변수를 다시 정하므로 그 안에서 덮는다. */
+/* 모든 탭: 흰 뒤로 버튼(사용자 결정 2026-11-23). palette-day가 변수를 다시 정하므로 그 안에서 덮는다. */
 .headerCorner > :global(.palette-day) { --i-paper: #ffffff; --i-paper-ledge: #d9dbe3; }
 .side { width: 43px; flex: none; }
 .title {

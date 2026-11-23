@@ -56,12 +56,18 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {tab === 'schedule' && <IslandBackground colors={['#7FAF61', '#6F9F52']} />}
       {tab === 'outfit' && <div className={s.paper} />}
       {tab === 'study' && <div className={s.stage}><StudyRoomStage cameraMode={camera.mode} topInset={68} /></div>}
-      {/* 공부방: 넓은 화면에서도 뒤로 버튼은 창 왼쪽 위에 두고, 제목은 본문의 "모든 공부방"이 대신한다(사용자 결정 2026-11-23). */}
-      <header className={tab === 'rooms' ? `${s.header} ${s.headerCorner}` : s.header}>
+      {/* 뒤로 버튼은 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 제목은 앱 폭 칸 가운데에 두고,
+          공부방은 본문의 "모든 공부방"이 제목을 대신한다. */}
+      <header className={`${s.header} ${s.headerCorner}`}>
         <span className="palette-day"><IslandIconButton icon={IconChevronLeft} label="뒤로" onClick={() => navigate(-1)} /></span>
-        {tab !== 'rooms' && <h1 className={s.title}>{titles[tab]()}</h1>}
-        {tab !== 'rooms' && <span className={s.side} />}
       </header>
+      {tab !== 'rooms' && (
+        <header className={s.header}>
+          <span className={s.side} />
+          <h1 className={s.title}>{titles[tab]()}</h1>
+          <span className={s.side} />
+        </header>
+      )}
       {tab === 'study' && (
         <StudyTabOverlay
           timer={timer.view}
