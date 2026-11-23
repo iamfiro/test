@@ -145,7 +145,9 @@ export class StudyRoomDaylight {
    * 시각을 고정해 볼 수 있다(원본: 디버그 빌드 `--dart-define=STUDY_DEV_HOUR`).
    */
   static now(): StudyRoomDaylight {
-    const fixed: unknown = import.meta.env.DEV ? import.meta.env['VITE_STUDY_DEV_HOUR'] : undefined;
+    // 개발 빌드: 주소 `?hour=15`가 환경 변수보다 먼저다(서버를 다시 켜지 않고 시간대별 룩을 본다).
+    const fromUrl = import.meta.env.DEV && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('hour') : null;
+    const fixed: unknown = import.meta.env.DEV ? fromUrl ?? import.meta.env['VITE_STUDY_DEV_HOUR'] : undefined;
     const hour = typeof fixed === 'string' ? tryParseDouble(fixed) : null;
     return hour !== null ? StudyRoomDaylight.atHour(hour) : StudyRoomDaylight.at(new Date());
   }

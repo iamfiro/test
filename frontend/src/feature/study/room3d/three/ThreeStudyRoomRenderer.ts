@@ -347,8 +347,8 @@ export class ThreeStudyRoomRenderer {
       this.composer.setSize(Math.round(opts.width * pixelRatio), Math.round(opts.height * pixelRatio))
       // 감성 후처리: 높은 단계는 전부, 중간은 심도 없이, 낮은 단계는 외곽선만.
       const q = opts.quality.name
-      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.01, vignette: 0.1, ao: true }
-        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.01, vignette: 0.1, ao: false }
+      const mood: MoodLook | null = q === 'high' ? { bloom: 0.55, depthOfField: true, grain: 0.015, vignette: this.look === 'soft' ? 0.18 : 0.1, ao: true }
+        : q === 'medium' ? { bloom: 0.55, depthOfField: false, grain: 0.015, vignette: this.look === 'soft' ? 0.18 : 0.1, ao: false }
         : null
       const focus = rig.eye.distanceTo(opts.camera.target)
       this.composer.render(gl, this.world, this.camera, pixelRatio, focus, mood)

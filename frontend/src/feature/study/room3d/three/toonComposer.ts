@@ -89,6 +89,39 @@ void main() {
 }
 `
 
+// 빛줄기 재료: 창밖 하늘(깊이 없음) 중 밝은 곳만.
+const skyMaskFragment = /* glsl */ `
+uniform sampler2D tColor;
+uniform sampler2D tDepth;
+varying vec2 vUv;
+void main() {
+  float sky = step(0.99999, texture2D(tDepth, vUv).x);
+  vec3 c = texture2D(tColor, vUv).rgb;
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  gl_FragColor = vec4(c * sky * smoothstep(0.35, 0.95, l), 1.0);
+}
+`
+
+// 빛줄기(GPU Gems 3 방식): 해 쪽으로 걸어가며 하늘빛을 모아 창에서 방 안으로 뻗는 결을 만든다.
+const raysFragment = /* glsl */ `
+uniform sampler2D tMask;
+uniform vec2 sun;     // 화면 uv(화면 밖일 수 있다)
+uniform float decay;
+varying vec2 vUv;
+void main() {
+  vec2 delta = (vUv - sun) / 40.0;
+  vec2 uv = vUv;
+  float w = 1.0;
+  vec3 sum = vec3(0.0);
+  for (int i = 0; i < 40; i++) {
+    uv -= delta;
+    sum += texture2D(tMask, clamp(uv, 0.0, 1.0)).rgb * w;
+    w *= decay;
+  }
+  gl_FragColor = vec4(sum / 14.0, 1.0);
+}
+`
+
 const brightFragment = /* glsl */ `
 uniform sampler2D tColor;
 uniform float threshold;
@@ -143,6 +176,14 @@ uniform vec3 aoColor;     // 그늘 색(라벤더 갈색)
 uniform float vibrance;
 uniform vec3 shadowTone;
 uniform vec3 highlightTone;
+uniform sampler2D tRays;
+uniform float rays;       // 빛줄기 세기(0이면 없음)
+uniform vec3 raysTint;
+uniform vec3 bloomTint;   // 번짐 빛 색(할레이션)
+uniform float haze;       // 먼 곳 공기 원근 세기
+uniform vec3 hazeTop;
+uniform vec3 hazeBottom;
+uniform float leak;       // 빛샘 세기
 varying vec2 vUv;
 
 float viewDistance(vec2 uv) { return -perspectiveDepthToViewZ(texture2D(tDepth, uv).x, near, far); }
@@ -175,7 +216,13 @@ void main() {
     float ao = texture2D(tAo, vUv).r;
     color *= mix(aoColor, vec3(1.0), mix(1.0, ao, aoAmount));
   }
-  color += texture2D(tBloom, vUv).rgb * bloom;
+  color += texture2D(tBloom, vUv).rgb * bloom * bloomTint;
+  if (rays > 0.0) color += texture2D(tRays, vUv).rgb * raysTint * rays;
+  if (haze > 0.0) {
+    // 공기 원근: 멀수록 위는 맑은 하늘빛, 아래는 크림빛 공기로 옅어진다.
+    float far01 = smoothstep(3.5, 14.0, viewDistance(vUv)) * step(texture2D(tDepth, vUv).x, 0.99999);
+    color = mix(color, mix(hazeBottom, hazeTop, vUv.y), far01 * haze);
+  }
   // 색 보정(Focustown 참고: 밝고 깨끗한 하이키, 옅은 나무, 맑은 그림자). 주황 계열(빨강 > 초록 > 파랑,
   // 색상 비 0.2–0.7)은 회색으로 누르지 않고 채도를 조금 덜며 밝혀 옅은 살구·베이지로 옮긴다.
   float spread = color.r - color.b;
@@ -200,6 +247,8 @@ void main() {
   color = 1.0 - (1.0 - color) * (1.0 - highlightLift);
   // 그림자를 우윳빛으로 들어 올려 파스텔 느낌.
   color = color * (1.0 - liftAmount) + lift * liftAmount;
+  // 빛샘: 해 쪽 모서리에서 번지는 옅은 크림빛.
+  if (leak > 0.0) color += vec3(1.0, 0.94, 0.86) * leak * smoothstep(0.9, 0.0, distance(vUv, vec2(1.05, 1.05)));
   // 비네트.
   vec2 d = vUv - 0.5;
   color *= 1.0 - vignette * smoothstep(0.35, 0.85, length(d * vec2(1.0, 0.8)));
@@ -231,6 +280,8 @@ export class ToonComposer {
   private readonly halfB = new THREE.WebGLRenderTarget(1, 1)
   private readonly aoA = new THREE.WebGLRenderTarget(1, 1)
   private readonly aoB = new THREE.WebGLRenderTarget(1, 1)
+  private readonly raysA = new THREE.WebGLRenderTarget(1, 1)
+  private readonly raysB = new THREE.WebGLRenderTarget(1, 1)
   private readonly normalMaterial = new THREE.MeshNormalMaterial()
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   private readonly outline = pass(outlineFragment, {
@@ -294,7 +345,17 @@ export class ToonComposer {
     vibrance: { value: 0.4 },
     shadowTone: { value: new THREE.Vector3(0.9, 0.93, 1.04) },
     highlightTone: { value: new THREE.Vector3(1.04, 1.02, 0.95) },
+    tRays: { value: this.raysA.texture },
+    rays: { value: 0 },
+    raysTint: { value: new THREE.Vector3(1.0, 0.92, 0.82) },
+    bloomTint: { value: new THREE.Vector3(1, 1, 1) },
+    haze: { value: 0 },
+    hazeTop: { value: new THREE.Vector3(0.9, 0.93, 1.0) },
+    hazeBottom: { value: new THREE.Vector3(1.0, 0.95, 0.9) },
+    leak: { value: 0 },
   })
+  private readonly skyMask = pass(skyMaskFragment, { tColor: { value: this.aa.texture }, tDepth: { value: this.normal.depthTexture } })
+  private readonly raysPass = pass(raysFragment, { tMask: { value: this.raysB.texture }, sun: { value: new THREE.Vector2(0.82, 1.15) }, decay: { value: 0.965 } })
   private width = 1
   private height = 1
 
@@ -310,7 +371,11 @@ export class ToonComposer {
       fu.highlightLift!.value = 0.04
       ;(fu.lift!.value as THREE.Vector3).set(0.92, 0.96, 1.0)
       fu.liftAmount!.value = 0.05
-      this.bright.mesh.material.uniforms.threshold!.value = 0.68
+      this.bright.mesh.material.uniforms.threshold!.value = 0.66
+      // 감성(사용자 요청 2026-11-23): 창빛 줄기·공기 원근·살구빛 할레이션·빛샘·조금 짙은 비네트.
+      ;(fu.bloomTint!.value as THREE.Vector3).set(1.06, 0.96, 0.92)
+      fu.haze!.value = 0.32
+      fu.leak!.value = 0.07
     }
   }
 
@@ -325,6 +390,8 @@ export class ToonComposer {
     this.halfB.setSize(hw, hh)
     this.aoA.setSize(hw, hh)
     this.aoB.setSize(hw, hh)
+    this.raysA.setSize(hw, hh)
+    this.raysB.setSize(hw, hh)
     ;(this.ao.mesh.material.uniforms.texel!.value as THREE.Vector2).set(1 / hw, 1 / hh)
     ;(this.fxaa.mesh.material.uniforms.resolution!.value as THREE.Vector2).set(1 / width, 1 / height)
     ;(this.outline.mesh.material.uniforms.texel!.value as THREE.Vector2).set(1 / width, 1 / height)
@@ -397,7 +464,15 @@ export class ToonComposer {
       this.draw(gl, this.halfA, this.blur.scene)
     }
 
+    // 빛줄기(부드러운 룩, 높은 단계만): 하늘 가면 → 해 쪽으로 모으기(½ 해상도).
+    const useRays = this.style === 'soft' && mood.ao
+    if (useRays) {
+      this.draw(gl, this.raysB, this.skyMask.scene)
+      this.draw(gl, this.raysA, this.raysPass.scene)
+    }
+
     const fu = this.final.mesh.material.uniforms
+    fu.rays!.value = useRays ? 0.55 : 0
     fu.near!.value = camera.near
     fu.far!.value = camera.far
     fu.focus!.value = focusDistance
@@ -409,11 +484,11 @@ export class ToonComposer {
   }
 
   dispose() {
-    for (const rt of [this.color, this.lined, this.aa, this.halfA, this.halfB, this.aoA, this.aoB]) rt.dispose()
+    for (const rt of [this.color, this.lined, this.aa, this.halfA, this.halfB, this.aoA, this.aoB, this.raysA, this.raysB]) rt.dispose()
     this.normal.depthTexture?.dispose()
     this.normal.dispose()
     this.normalMaterial.dispose()
-    for (const p of [this.outline, this.fxaa, this.bright, this.blur, this.final, this.ao]) {
+    for (const p of [this.outline, this.fxaa, this.bright, this.blur, this.final, this.ao, this.skyMask, this.raysPass]) {
       p.mesh.geometry.dispose()
       p.mesh.material.dispose()
     }
