@@ -51,9 +51,15 @@ function Body({ view, goalMinutes }: { view: StatsView; goalMinutes: number | nu
         {goalMinutes != null && <GoalBar seconds={view.todaySeconds} goalSeconds={goalMinutes * 60} />}
         <Summary view={view} />
       </section>
-      <Panel title={t('studyWeekTitle')}><WeekChart view={view} /></Panel>
-      <SubjectCard rows={view.subjects} />
-      <HeatmapCard view={view} />
+      <div className={s.grid}>
+        <div className={s.gridCol}>
+          <Panel title={t('studyWeekTitle')}><WeekChart view={view} /></Panel>
+          <SubjectCard rows={view.subjects} />
+        </div>
+        <div className={s.gridCol}>
+          <HeatmapCard view={view} />
+        </div>
+      </div>
     </>
   )
 }
