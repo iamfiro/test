@@ -85,9 +85,10 @@ export const timerHandlers = [
     return ok({
       today: todayRow,
       today_by_subject: todayRow.seconds > 0 ? [
-        { subject: '수학', seconds: Math.floor(todayRow.seconds * 0.5) },
-        { subject: '영어', seconds: Math.floor(todayRow.seconds * 0.3) },
-        { subject: null, seconds: todayRow.seconds - Math.floor(todayRow.seconds * 0.5) - Math.floor(todayRow.seconds * 0.3) },
+        // 개발용 표본 과목(프론트엔드 공부). 실제 값은 서버가 준다.
+        { subject: 'React 렌더링', seconds: Math.floor(todayRow.seconds * 0.45) },
+        { subject: 'JavaScript 이벤트 루프', seconds: Math.floor(todayRow.seconds * 0.35) },
+        { subject: '브라우저 렌더링 파이프라인', seconds: todayRow.seconds - Math.floor(todayRow.seconds * 0.45) - Math.floor(todayRow.seconds * 0.35) },
       ].filter((r) => r.seconds > 0) : [],
       yesterday_seconds: yesterday.seconds,
       week: { days: week, total_seconds: weekTotal },

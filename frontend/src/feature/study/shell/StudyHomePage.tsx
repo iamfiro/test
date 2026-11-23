@@ -19,7 +19,7 @@ import { StudyStatsPage } from '../stats/StudyStatsPage'
 import { useEffect, useRef, useState } from 'react'
 import { useSubjectEditor } from '../subject/useSubjectEditor'
 import { ChatSheet } from '../chat/ChatSheet'
-import { StudyRecapOverlay } from '../recap/StudyRecapOverlay'
+import { StudyRecapModal } from '../recap/StudyRecapModal'
 import { chatStore, useChat } from '../chat/chatStore'
 import s from './StudyHomePage.module.css'
 
@@ -133,7 +133,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       )}
       {tab === 'study' && subjects.sheets}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
-      {timer.recap && <StudyRecapOverlay recap={timer.recap} onClose={timer.closeRecap} />}
+      {timer.recap && <StudyRecapModal recap={timer.recap} onClose={timer.closeRecap} onOpenStats={() => { timer.closeRecap(); navigate(paths.stats) }} />}
       <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on, seatPlanOpen })} onSelect={(next) => navigate(paths[next])} />
     </div>
   )
