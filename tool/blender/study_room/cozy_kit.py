@@ -36,10 +36,11 @@ def srgb_to_linear(hex_value):
 # 이름: (sRGB 헥스, 발광 세기). 발광 0이면 일반 표면.
 PALETTE = {
     # ① 크림(벽·큰 면)
-    "cream": ("#FBF1DC", 0), "cream_deep": ("#F1DEBC", 0), "ceiling": ("#FBF1DC", 0.35), "paper": ("#FFF9EC", 0), "wainscot": ("#CFE3B4", 0),
-    # ② 오렌지 우드(가구). wood_hi는 상판 가장자리 하이라이트 띠.
-    "wood": ("#E58B3A", 0), "wood_mid": ("#EE9A4A", 0), "wood_light": ("#F2A65A", 0),
-    "wood_hi": ("#FBC98A", 0), "wood_deep": ("#C96E2A", 0),
+    "cream": ("#FBF1DC", 0), "cream_deep": ("#F1DEBC", 0), "ceiling": ("#FBF1DC", 0.35), "paper": ("#FFF9EC", 0), "page": ("#EEDFC3", 0), "page_shade": ("#D8C4A3", 0), "wainscot": ("#CFE3B4", 0),
+    # ② 오렌지 우드(가구). wood_hi는 상판 가장자리 하이라이트 띠. 오래 보는 책상 면이라 채도·노란빛을 낮춘다
+    # (사용자 관점 리뷰 2026-11-23: 넓은 주황 책상이 2~3시간 보기에 진하다).
+    "wood": ("#DD9262", 0), "wood_mid": ("#E6A06E", 0), "wood_light": ("#EDAE7C", 0),
+    "wood_hi": ("#F6D2A8", 0), "wood_deep": ("#C27443", 0),
     # ③ 잎 초록
     "leaf": ("#6DB35E", 0), "leaf_light": ("#8CC56A", 0), "leaf_deep": ("#4E9A4E", 0), "sage": ("#A8CC8C", 0),
     "sage_deep": ("#86B470", 0), "stem": ("#5E8A3E", 0), "grass": ("#9BCB6E", 0), "bark": ("#A8673A", 0),
@@ -50,7 +51,7 @@ PALETTE = {
     "butter": ("#F8D66A", 0), "butter_deep": ("#E8BE48", 0), "lilac": ("#C9B6E4", 0),
     "terracotta": ("#E07F55", 0), "soil": ("#7A4E33", 0), "ink": ("#5B4A6B", 0), "coffee": ("#8A5634", 0),
     # 바닥: 따뜻한 큰 타일 + 또렷한 줄눈(텍스처에서 4px 이상)
-    "floor_tile": ("#EACFAE", 0), "floor_tile_b": ("#E3C49F", 0), "grout": ("#C9A07A", 0),
+    "floor_tile": ("#EACFAE", 0), "floor_tile_b": ("#E3C49F", 0), "grout": ("#D6B48F", 0),
     # 빛: 전구·스탠드 갓 안쪽(베이크에서 #FFE9A8 이상으로 남긴다)
     "glow": ("#FFE9A8", 6.0), "glow_soft": ("#FFE9A8", 2.0),
 }
@@ -511,8 +512,10 @@ def book_stack(name, seed, n=3):
 def open_book(name, cover="sky"):
     mb = MB()
     mb.box((0.34, 0.24, 0.014), (0, 0, 0.007), cover, r=0, segs=0)
+    # 종이는 아이보리(순백은 1인칭에서 빈 흰 판처럼 보인다) + 가운데 접힌 곳 음영.
     for sx in (-1, 1):
-        mb.box((0.16, 0.22, 0.016), (sx * 0.083, 0, 0.02), "paper", r=0, segs=0, rot=(0, -sx * 4, 0))
+        mb.box((0.16, 0.22, 0.016), (sx * 0.083, 0, 0.02), "page", r=0, segs=0, rot=(0, -sx * 4, 0))
+    mb.box((0.028, 0.215, 0.004), (0, 0, 0.0265), "page_shade", r=0, segs=0)
     return mb.mesh(name)
 
 
@@ -604,16 +607,16 @@ def big_plant(name, seed, pot_col="cream", band="coral", leaves=9, height=1.25, 
     return mb.mesh(name)
 
 
-def bush_plant(name, seed, pot_col="terracotta"):
-    """덩어리 잎 화분(둥근 잎 덩어리 5개, 두 톤)."""
+def bush_plant(name, seed, pot_col="terracotta", blobs=5, sub=1):
+    """덩어리 잎 화분(둥근 잎 덩어리, 두 톤). 가까이 보이는 것은 덩어리를 줄이고 더 둥글게(sub=2)."""
     rnd = random.Random(seed)
     mb = MB()
     mb.cyl(0.2, 0.16, 0.36, (0, 0, 0.18), pot_col, segs=12, r=0.025)
-    for k in range(5):
+    for k in range(blobs):
         a = rnd.uniform(0, 360)
         rr = rnd.uniform(0.0, 0.14)
-        mb.ball(rnd.uniform(0.15, 0.2), (rr * math.cos(math.radians(a)), rr * math.sin(math.radians(a)), 0.48 + rnd.uniform(0, 0.25)),
-                "leaf_light" if k % 2 else "leaf", sub=1)
+        mb.ball(rnd.uniform(0.15, 0.2) * (1.25 if blobs < 5 else 1.0), (rr * math.cos(math.radians(a)), rr * math.sin(math.radians(a)), 0.48 + rnd.uniform(0, 0.25)),
+                "leaf_light" if k % 2 else "leaf", sub=sub)
     return mb.mesh(name)
 
 

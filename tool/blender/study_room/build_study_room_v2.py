@@ -367,12 +367,12 @@ def build_plants(b):
     big_a = p("big_a", lambda: K["big_plant"]("big_plant_a", 7))
     big_b = p("big_b", lambda: K["big_plant"]("big_plant_b", 8, pot_col="sky", band="cream", height=1.5))
     big_c = p("big_c", lambda: K["big_plant"]("big_plant_c", 9, pot_col="butter", band="coral", leaves=9, height=1.1))
-    bush_a = p("bush_a", lambda: K["bush_plant"]("bush_plant_a", 4))
+    bush_a = p("bush_a", lambda: K["bush_plant"]("bush_plant_a", 4, blobs=3, sub=2))
     bush_b = p("bush_b", lambda: K["bush_plant"]("bush_plant_b", 5, pot_col="coral_soft"))
     rng = random.Random(5)
     for name, me, loc in (("Plant_NW", bush_a, (0.3, 6.3)), ("Plant_N_A", big_a, (3.75, 6.2)), ("Plant_N_B", big_b, (9.95, 6.35)),
                           ("Plant_E", big_c, (15.6, 4.0)), ("Plant_SE", bush_b, (15.62, 0.35)), ("Plant_S", bush_a, (3.62, 0.3)),
-                          ("Plant_SW", bush_b, (0.35, 0.35)), ("Plant_Wing", bush_a, (12.65, 9.9)), ("Plant_WingN", bush_b, (11.0, 12.35))):
+                          ("Plant_SW", bush_b, (0.35, 0.35)), ("Plant_Wing", bush_b, (12.65, 9.9)), ("Plant_WingN", bush_b, (11.0, 12.35))):
         b.inst(me, name, (*loc, 0), rng.uniform(0, 360), coll="plants")
     hang = p("hang", lambda: K["hanging_plant"]("hanging_plant", 3))
     for name, loc in (("Hang_N", (2.0, 6.35)), ("Hang_Wing", (13.8, 12.25))):
