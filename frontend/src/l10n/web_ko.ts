@@ -28,12 +28,9 @@ export const webText = {
   roomsAll: '모든 공부방',
   statsLoading: '통계를 불러오는 중이에요',
   // 공부를 끝낸 뒤 "오늘의 공부" 시트(앱에 없는 화면, 사용자 결정 2026-11-23).
-  recapSheetTitle: '오늘의 공부',
-  recapSheetBrand: 'STUDY LOG',
   recapMe: '나!',
   recapScene: '오늘의 공부방',
   recapFields: {
-    time: '공부 시간',
     streak: '연속 공부',
     rank: '방 순위',
     session: '이번 공부',

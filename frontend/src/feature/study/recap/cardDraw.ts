@@ -1,6 +1,7 @@
 // "오늘의 공부" 시트: 스토리에 올려 오늘 공부한 결과를 자랑하는 클립보드 프로필 시트 한 장.
-// 구성은 사용자가 준 클립보드 프로필 레퍼런스(2026-11-23)를 따른다: 나무 판 + 금속 집게, 크림 종이, 큰 제목, 마스킹
-// 테이프로 붙인 내 사진("나!" 화살표), 오른쪽 큰 항목(공부 시간·연속 공부·방 순위), 아래 큰 항목(이번 공부·공부일),
+// 구성은 사용자가 준 클립보드 프로필 레퍼런스(2026-11-23)를 따른다: 나무 판 + 금속 집게, 크림 종이, 제목 자리에 오늘
+// 공부한 시간(가장 크게), 마스킹
+// 테이프로 붙인 내 사진("나!" 화살표), 오른쪽 큰 항목(연속 공부·방 순위), 아래 큰 항목(이번 공부·공부일),
 // 폴라로이드(오늘의 공부방), 티켓 스티커와 클립, 앱 스티커. 레퍼런스의 캐릭터·로고·문구는 쓰지 않는다.
 // 이름·목표·과목은 넣지 않고 남은 항목을 크게 쓴다(사용자 결정 2026-11-23).
 // 톤은 앱 공부 화면: 섬 팔레트 낮 값(tokens.css), 둥근 글꼴, 햇살 노랑 강조, 앱 스티커 아트(원본 PocketTime
@@ -50,7 +51,7 @@ export type CardAssets = Record<keyof typeof stickerUrls, HTMLImageElement>
 /** 글꼴과 스티커 그림을 미리 읽는다(웹 글꼴은 처음 쓰일 때 내려받아 첫 그림에 빠질 수 있다). */
 export async function loadCardAssets(recap: StudyRecap): Promise<CardAssets> {
   const sample = [
-    webText.recapSheetTitle, webText.recapSheetBrand, webText.recapMe, webText.recapScene, ...Object.values(webText.recapFields),
+    webText.recapMe, webText.recapScene, ...Object.values(webText.recapFields),
     formatStudyDuration(recap.todaySeconds), formatStudyDuration(recap.sessionSeconds), webText.recapBrand,
     '0123456789.·/!()시간분일등명월화수목금토일',
   ].join('')
@@ -81,18 +82,8 @@ export function drawSheet(ctx: CanvasRenderingContext2D, recap: StudyRecap, asse
   drawPaper(ctx)
   drawClip(ctx)
 
-  // 제목: 둥근 글꼴 호수 청록 + 흰 테두리, 아래 미세 글자.
-  const tx = board.width / 2 - 40
-  ctx.save()
-  ctx.font = `800 30px ${fonts.round}`
-  ctx.textAlign = 'center'
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = 6; ctx.strokeStyle = c.white
-  ctx.strokeText(webText.recapSheetTitle, tx, top + 82)
-  ctx.fillStyle = c.title
-  ctx.fillText(webText.recapSheetTitle, tx, top + 82)
-  ctx.restore()
-  text(ctx, `${webText.recapSheetBrand} · ${dateText(recap.studyDate)}`, tx, top + 100, { font: `700 8.5px ${fonts.mono}`, color: c.inkSoft, align: 'center', spacing: 0.8 })
+  // 제목 자리: 오늘 공부한 시간을 가장 크게(둥근 글꼴 호수 청록 + 흰 테두리, 숫자 크게·단위 작게).
+  titleDuration(ctx, recap.todaySeconds, 150, top + 96, 240)
 
   drawTicket(ctx, recap, 322, top + 76)
   drawPortrait(ctx, recap)
@@ -222,12 +213,13 @@ function drawPortrait(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
   photo(ctx, recap.photo, -portraitSize.width / 2, -portraitSize.height / 2, portraitSize.width, portraitSize.height)
   tape(ctx, -fw / 2 + 10, -fh / 2 + 4, -38, 64)
   ctx.restore()
-  // "나!" 와 휜 화살표.
-  text(ctx, webText.recapMe, cx + 40, top + 112, { font: `800 15px ${fonts.round}`, color: c.title })
+  // "나!" 와 휜 화살표: 사진 오른쪽 아래에서 사진을 가리킨다(위는 큰 공부 시간 자리).
+  const by = cy + fh / 2
+  text(ctx, webText.recapMe, cx + 48, by + 26, { font: `800 15px ${fonts.round}`, color: c.title })
   ctx.save()
   ctx.strokeStyle = c.title; ctx.lineWidth = 1.8; ctx.lineCap = 'round'
-  ctx.beginPath(); ctx.moveTo(cx + 36, top + 108); ctx.quadraticCurveTo(cx + 18, top + 104, cx + 12, top + 124); ctx.stroke()
-  ctx.beginPath(); ctx.moveTo(cx + 8, top + 118); ctx.lineTo(cx + 12, top + 125); ctx.lineTo(cx + 18, top + 120); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx + 44, by + 20); ctx.quadraticCurveTo(cx + 26, by + 22, cx + 22, by + 4); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx + 17, by + 9); ctx.lineTo(cx + 22, by + 3); ctx.lineTo(cx + 27, by + 9); ctx.stroke()
   ctx.restore()
 }
 
@@ -250,7 +242,6 @@ function rows(ctx: CanvasRenderingContext2D, list: Row[], x: number, right: numb
 function drawTopRows(ctx: CanvasRenderingContext2D, recap: StudyRecap) {
   const big = `800 28px ${fonts.round}`
   const list: Row[] = [
-    { label: webText.recapFields.time, draw: (x, b) => highlight(ctx, formatStudyDuration(recap.todaySeconds), x, b, big) },
     { label: webText.recapFields.streak, draw: (x, b) => {
       flame(ctx, x, b - 25, 28, recap.streakDays > 0)
       highlight(ctx, t('studyStatsStreakValue', { count: recap.streakDays }), x + 30, b, big, recap.streakDays > 0 ? c.ink : c.inkSoft)
@@ -348,6 +339,34 @@ function photo(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement | null, x: 
     ctx.translate(x, y); paintClockField(ctx, w, h, c.muted, c.dash, true)
   }
   ctx.restore()
+}
+
+/** 제목 자리 공부 시간: 숫자는 크게, 단위는 작게, 흰 테두리. 폭을 넘으면 함께 줄인다. */
+function titleDuration(ctx: CanvasRenderingContext2D, seconds: number, mid: number, base: number, maxWidth: number) {
+  const parts = formatStudyDuration(seconds).match(/\d+|\D+/g) ?? []
+  let big = 60
+  const layout = () => parts.map((p) => {
+    const digit = /\d/.test(p)
+    const value = digit ? p : p.trim()
+    return { value, font: digit ? `800 ${big}px ${fonts.round}` : `800 ${Math.round(big * 0.42)}px ${fonts.round}`, digit }
+  }).map((it) => ({ ...it, width: measure(ctx, it.value, it.font) }))
+  let items = layout()
+  const gap = (i: number) => (i === 0 ? 0 : items[i]!.digit ? 8 : 3)
+  const total = () => items.reduce((sum, it, i) => sum + it.width + gap(i), 0)
+  while (total() > maxWidth && big > 28) { big -= 2; items = layout() }
+  let x = mid - total() / 2
+  items.forEach((it, i) => {
+    x += gap(i)
+    ctx.save()
+    ctx.font = it.font
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = it.digit ? 7 : 5; ctx.strokeStyle = c.white
+    ctx.strokeText(it.value, x, base)
+    ctx.fillStyle = c.title
+    ctx.fillText(it.value, x, base)
+    ctx.restore()
+    x += it.width
+  })
 }
 
 /** 숫자에 햇살 형광펜을 긋고 쓴다. */
