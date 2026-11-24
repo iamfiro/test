@@ -86,7 +86,7 @@
   height: 54px; border-radius: 999px; cursor: pointer; border: 0;
   font: inherit; font-family: var(--font-round); font-size: 17px; font-weight: 800;
 }
-.primary { flex: 1 1 auto; background: var(--i-sun); color: #3a2e1c; }
+.primary { flex: 1 1 auto; background: #fff; color: #1d1a16; }
 .primary { transition: opacity 200ms ease-out, transform 200ms ease-out; }
 .primaryHidden.primaryHidden { visibility: hidden; opacity: 0; transform: translateY(6px); transition: none; }
 .primary:disabled { background: rgb(255 255 255 / 0.18); color: rgb(255 255 255 / 0.45); cursor: default; }

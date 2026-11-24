@@ -169,9 +169,9 @@ export class OnboardingScene {
     }
     const focus = this.step === 'pick'
       // 두 캐릭터와 발밑 이름 알약.
-      ? frontCamera(new Vector3(standX + 0.2, lawnY + 0.42, doorZ), 1.12, 1.8, size, this.free(size))
+      ? frontCamera(new Vector3(standX + 0.2, lawnY + 0.5, doorZ), 0.95, 1.5, size, this.free(size))
       // 머리 위 이름표(목표 단계는 태그까지)가 칸 안에 들어오게 위를 더 남긴다.
-      : frontCamera(new Vector3(standX + 0.4, lawnY + (this.step === 'goal' ? 0.68 : 0.62), doorZ), this.step === 'goal' ? 1.5 : 1.3, 1.2, size, this.free(size))
+      : frontCamera(new Vector3(standX + 0.4, lawnY + (this.step === 'goal' ? 0.68 : 0.62), doorZ), this.step === 'goal' ? 1.0 : 1.1, 0.8, size, this.free(size))
     this.camera = this.camera && !this.reduceMotion ? StudyRoomSeatCamera.lerp(this.camera, focus, 1 - Math.exp(-dt * 4)) : focus
     return { camera: this.camera, actors, hiddenSeat: 0 }
   }
