@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.4.0
+  version: 0.5.0
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -197,6 +197,20 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/CsrfRejected' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /users/me/onboarding:
+    put:
+      tags: [profile]
+      operationId: completeOnboarding
+      summary: 첫 가입 온보딩을 끝냈다고 남긴다
+      description: |
+        끝까지 보거나 건너뛰었을 때 부른다. 이미 남겼으면 처음 시각을 그대로 둔다(덮어쓰지 않는다).
+        응답은 바뀐 `Me`.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/MeOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
   /users/me/study-settings:
     get:
       tags: [timer]
@@ -472,7 +486,7 @@ paths:
     get:
       tags: [tags]
       operationId: getMyTags
-      summary: 내 태그(남에게 보이지 않고 추천에만 쓴다)
+      summary: 내 태그(공개. 프로필에 보이고 추천에 쓴다)
       responses:
         '200': { $ref: '#/components/responses/TagsOk' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -592,11 +606,17 @@ components:
     Me:
       type: object
       additionalProperties: false
-      required: [id, profile, created_at]
+      required: [id, profile, created_at, onboarding_completed_at]
       properties:
         id: { type: string, format: uuid }
         profile: { $ref: '#/components/schemas/Profile' }
         created_at: { type: string, format: date-time }
+        onboarding_completed_at:
+          description: |
+            첫 가입 온보딩(캐릭터·이름·목표 태그 고르기 → 공부방 둘러보기)을 끝내거나 건너뛴 서버 시각. 아직이면
+            null이고, 웹은 이때 온보딩을 보여 준다. 본인에게만 보인다(`Profile`에 넣지 않는다).
+          type: [string, 'null']
+          format: date-time
     Nickname:
       type: string
       description: 앞뒤 공백을 지운 뒤 1–12자(grapheme), UTF-8 48바이트 이하, 제어 문자 금지. 같은 닉네임을 여러 사람이 쓸 수 있다.
@@ -618,12 +638,17 @@ components:
     Profile:
       type: object
       additionalProperties: false
-      required: [nickname, avatar, gender]
+      required: [nickname, avatar, gender, tags]
       properties:
         nickname: { $ref: '#/components/schemas/Nickname' }
         avatar: { $ref: '#/components/schemas/Avatar' }
+        tags:
+          type: array
+          maxItems: 5
+          description: 내 태그(공개, 카탈로그 순서). 바꾸기는 `PUT /users/me/tags`로만 한다.
+          items: { $ref: '#/components/schemas/Tag' }
         gender:
-          description: 아직 고르지 않았으면 null. 웹은 이때 공부방 첫 방문 소개를 보여 준다.
+          description: 아직 고르지 않았으면 null. 온보딩을 보일지는 `Me.onboarding_completed_at`으로 정한다.
           oneOf:
             - { $ref: '#/components/schemas/Gender' }
             - { type: 'null' }
@@ -805,6 +830,18 @@ components:
             required: [data, error, meta]
             properties:
               data: { $ref: '#/components/schemas/Session' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    MeOk:
+      description: 내 계정
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data: { $ref: '#/components/schemas/Me' }
               error: { type: 'null' }
               meta: { $ref: '#/components/schemas/Meta' }
     ProfileOk:

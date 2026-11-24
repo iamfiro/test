@@ -46,9 +46,10 @@ export const tagByName = (name: string): Tag => {
 
 const norm = (s: string) => s.normalize('NFC').replace(/#/g, '').trim().toLowerCase()
 
-/** 내 태그(목 메모리). 처음엔 비어 있다. */
+/** 내 태그(목 메모리). 처음엔 비어 있다. 새 목 계정으로 로그인하면 비운다. */
 let myTagIds: string[] = []
 export const myTags = () => catalog.filter((t) => myTagIds.includes(t.id))
+export const resetMyTags = () => { myTagIds = [] }
 
 export const tagHandlers = [
   http.get(`${API}/tags`, ({ request }) => {

@@ -17,6 +17,9 @@ last_verified: 2026-11-23
 - 관리형 PostgreSQL. 마이그레이션은 `server/drizzle/` 순서대로 적용.
 - 공부방 태그(계약 0.4.0, 서버 미구현): `tags`·`tag_aliases`·`user_tags`·`room_tags`·`tag_suggestions`,
   인덱스 `room_tags(tag_id)`. 배포 뒤 서버 CLI로 초기 카탈로그 시드(`docs/plan/study-tags.md` 2절).
+- 첫 가입 온보딩(계약 0.5.0, 서버 미구현): 사용자 테이블에 `onboarding_completed_at timestamptz null`. 이 열이 생기기
+  전에 가입한 사람(기존 사용자)은 성별을 골랐으면 그때 시각으로 채워 온보딩을 다시 보지 않게 한다(백필 방법은 서버 단계에서 확정).
+  공개 프로필 응답에 `tags`(내 태그, 카탈로그 순서)가 실린다.
 
 ## 환경 변수
 
