@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.4
+  version: 0.5.5
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -482,13 +482,15 @@ paths:
     post:
       tags: [moderation]
       operationId: createReport
-      summary: 신고하기(닉네임)
+      summary: 신고하기(닉네임·방 이름)
       description: |
         다른 사람의 닉네임을 신고한다. `target_id`는 그 사람의 사용자 id다. 한 사람은 같은 사람의 같은 닉네임을
         한 번만 신고한다: 다시 보내면(다른 키여도) 처음 신고를 그대로 200으로 돌려주고 더 세지 않는다. 서로 다른
         사람의 신고가 기준(`REPORT_HIDE_THRESHOLD`, 기본 3)에 닿으면 서버가 그 닉네임을 무작위 닉네임으로 바로
         되돌린다(신고자에게 결과를 알리지 않는다). 내 닉네임은 신고할 수 없다(422, `field: target_id`).
-        메시지 신고는 실시간 채널(`docs/contracts/study-room-chat.md`, L5), 방 이름 신고는 방(L4)이 생기면 붙인다.
+        방 이름도 신고할 수 있다(`target_type: room_name`, `target_id`는 방 id, 주인은 방장). 같은 이름에 대한 서로 다른
+        사람의 신고가 기준에 닿으면 서버가 방 이름을 앱 기본 이름(`<방장 닉네임>의 공부방`)으로 바로 바꾼다. 내 방 이름은
+        신고할 수 없다(422). 메시지 신고는 실시간 채널(`docs/contracts/study-room-chat.md`, L5)에서 한다.
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
@@ -512,7 +514,7 @@ paths:
         `mine`은 내가 멤버인 방(비밀번호 방 포함), `all`은 모든 방. `recommended`는 방 태그가 내 태그와 하나라도
         겹치는 방이다(비밀번호 방·꽉 찬 방 포함, 내 태그가 없으면 빈 목록). `recommended`의 순서는 겹친 태그 수
         많은 순 → `studying_count` 많은 순 → 최신 순이고, 다른 scope는 최신 순이다. `q`가 있으면 서버가 방 이름에
-        그 글자가 들어간 방만 돌려준다(대소문자 무시, 앞뒤 공백 제거, 1–40자). 비밀번호는 목록에 싣지 않는다.
+        그 글자가 들어간 방만 돌려준다(대소문자 무시, 앞뒤 공백 제거, 1–40자. 공백뿐이면 422 `q`). 비밀번호는 목록에 싣지 않는다.
         `studying_count`는 서버가 presence로 본 "지금 공부 중"인 멤버 수다.
       parameters:
         - name: scope
@@ -543,6 +545,282 @@ paths:
                   meta: { $ref: '#/components/schemas/Meta' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [rooms]
+      operationId: createStudyRoom
+      summary: 공부방 만들기
+      description: |
+        만든 사람이 방장 겸 첫 멤버가 된다. 한 사람은 방 하나에만 속하므로 이미 다른 방의
+        멤버면 `409 STUDY_ROOM_ALREADY_MEMBER`다(화면은 앱처럼 "공부방은 하나만" 안내를 띄운다). 안 산 유료 맵이면
+        `403 STUDY_ROOM_MAP_NOT_OWNED`(지금은 `cafe` 말고는 모두 거절, 유료 맵 도입 전). `capacity`는 2 이상, 맵 자리 수
+        (33)와 50 중 작은 값 이하(벗어나면 422 `capacity`). 배너·로고는 방이 생긴 뒤 `PUT /study-rooms/{id}/images/{slot}`로 올린다.
+        응답은 방장이 받는 상세(`password` 포함)다.
+
+        이름·소개에 금칙어(닉네임과 같은 서버 목록)가 있으면 422(`field: name`·`description`, 무엇이 걸렸는지는 말하지 않는다).
+        운영자가 방 만들기를 잠시 끄면 503 `ROOM_CREATE_DISABLED`, 이 계정이나 IP의 방 만들기를 정지했으면
+        403 `ROOM_CREATE_RESTRICTED`, 같은 IP에서 하루(24시간)에 만든 방이 상한(`ROOM_CREATE_PER_IP_PER_DAY`, 기본 10)에
+        닿으면 429 `ROOM_CREATE_RATE_LIMITED`(`Retry-After`)다. 이 세 가지는 만들기에만 적용한다(수정·참여는 막지 않는다).
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomCreate' }
+      responses:
+        '201': { $ref: '#/components/responses/RoomDetailOk' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '409': { $ref: '#/components/responses/RoomConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RoomCreateRateLimited' }
+        '503': { $ref: '#/components/responses/RoomCreateDisabled' }
+  /study-rooms/{room_id}:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+    get:
+      tags: [rooms]
+      operationId: getStudyRoom
+      summary: 공부방 상세
+      description: |
+        멤버는 `members`(전체 명단)를 받고, 멤버가 아니면 `members`가 null이다(미리보기).
+        `password`는 비밀번호 방의 방장에게만 오고, 그 밖에는 null이다. 없는 방이면 404.
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [rooms]
+      operationId: updateStudyRoom
+      summary: 공부방 수정(방장만)
+      description: |
+        보낸 키만 바꾼다. `description`이 null이거나 공백뿐이면 지운다. `password`는 문자열이면
+        설정·변경, null이면 지운다(기존 멤버는 그대로). `capacity`는 지금 멤버 수보다 작게 줄일 수 없다
+        (`409 STUDY_ROOM_CAPACITY_BELOW_MEMBERS`). 방장이 아니면 `403 STUDY_ROOM_HOST_ONLY`. 이름·소개의 금칙어 규칙은
+        만들기와 같다. 응답은 방장 상세.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoomUpdate' }
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RoomConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [rooms]
+      operationId: deleteStudyRoom
+      summary: 공부방 삭제(방장만)
+      description: 모든 멤버십·초대·올린 사진을 함께 지운다. 이미 없는 방이면(재시도) 204.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '204': { description: 지웠다 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+  /study-rooms/{room_id}/join:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+    post:
+      tags: [rooms]
+      operationId: joinStudyRoom
+      summary: 공부방 참여
+      description: |
+        비밀번호 방은 `password`(대소문자 구분)가 맞아야 한다(`403 STUDY_ROOM_WRONG_PASSWORD`).
+        이미 이 방 멤버면 비밀번호 없이 성공한다(멱등). 정원이 차면 `409 STUDY_ROOM_FULL`. 다른 방 멤버인데
+        `leave_current_room`이 true가 아니면 `409 STUDY_ROOM_ALREADY_MEMBER`다. true면 서버가 비밀번호·정원을 먼저
+        확인한 뒤 한 트랜잭션에서 지금 방을 나가고(내가 방장이면 그 방은 삭제) 이 방에 들어간다. 그래서 비밀번호가
+        틀리거나 정원이 차 있으면 지금 방은 그대로다. 참여·초대 수락을 합쳐 사용자당 시간당 30회(`429`).
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                password: { type: string, minLength: 4, maxLength: 20 }
+                leave_current_room: { type: boolean, default: false }
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RoomConflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /study-rooms/{room_id}/leave:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+    post:
+      tags: [rooms]
+      operationId: leaveStudyRoom
+      summary: 공부방 나가기
+      description: 방장이 나가면 방이 삭제된다(삭제와 같은 정리). 이미 멤버가 아니면(재시도) 204.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '204': { description: 나갔다 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /study-rooms/{room_id}/members/{user_id}:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [rooms]
+      operationId: removeStudyRoomMember
+      summary: 멤버 내보내기(방장만)
+      description: 차단이 아니다(다시 참여할 수 있다). 방장 자신은 내보낼 수 없다(422). 이미 멤버가 아니면(재시도) 그대로 성공한다. 응답은 바뀐 방장 상세.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study-rooms/{room_id}/images/{slot}:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+      - name: slot
+        in: path
+        required: true
+        schema: { type: string, enum: [banner, logo] }
+    put:
+      tags: [rooms]
+      operationId: putStudyRoomImage
+      summary: 배너·로고 올리기(방장만)
+      description: |
+        JPEG·PNG·WebP, 10MB 이하(PocketTime 업로드 규칙과 같다). 서버는 보낸 형식을 믿지 않고 파일 앞부분(매직 바이트)과
+        이미지 머리(가로·세로)를 읽어 다시 확인한다(아니면 422 `file`). 요청 전체가 11MB를 넘으면 413. 파일은 미디어 저장소
+        (운영 R2 `media.pocket-time.study`)에 `rooms/<room_id>/<slot>/<id>` 키로 두고, 바꾸면 새 id·URL이 생기고 이전 파일은
+        지운다. 방을 지우거나 방장이 계정을 지우면 파일도 지운다. 응답은 방장 상세.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [rooms]
+      operationId: deleteStudyRoomImage
+      summary: 배너·로고 지우기(방장만)
+      description: 이미 없으면 그대로 성공. 응답은 방장 상세.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /study-rooms/{room_id}/invite:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+    post:
+      tags: [rooms]
+      operationId: issueStudyRoomInvite
+      summary: 초대 링크 발급(방장만)
+      description: |
+        7일 동안 쓰는 링크 `https://<웹>/r#<token>`을 새로 만든다(`<웹>`은 서버 설정 `INVITE_WEB_ORIGIN`). 새로 만들면 이전 링크는 무효다.
+        토큰은 조각(`#`) 뒤에만 있어 웹 서버·API 접근 로그에 닿지 않는다. 서버는 토큰의 SHA-256 다이제스트만 저장하고
+        토큰을 로그에 남기지 않는다. 발급은 멱등 영수증을 쓰지 않는다(재시도하면 새 링크, 이전 링크는 무효).
+      responses:
+        '201':
+          description: 새 링크
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/RoomInvite' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /invites/preview:
+    post:
+      tags: [rooms]
+      operationId: previewStudyRoomInvite
+      summary: 초대 링크가 가리키는 방 미리보기
+      security: [{}, { session: [] }]
+      description: |
+        로그인하지 않아도 된다. 토큰은 경로·쿼리가 아니라 본문으로만 받는다. 만료·무효·삭제된 방이면
+        `404 RESOURCE_NOT_FOUND`(원인을 구분하지 않는다). 비로그인 응답에는 이름·맵·인원·비밀번호 방 여부만 있고,
+        로그인했으면 `is_member`도 채운다. 같은 IP 기준 시간당 60회(`429`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteToken' }
+      responses:
+        '200':
+          description: 미리보기
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/InvitePreview' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /invites/accept:
+    post:
+      tags: [rooms]
+      operationId: acceptStudyRoomInvite
+      summary: 초대 링크로 참여
+      description: |
+        의미는 `joinStudyRoom`과 같다(비밀번호 방은 링크로도 `password`가 필요, `leave_current_room`
+        규칙도 같다). 링크는 방을 찾아 줄 뿐이다. 만료·무효면 404. 참여와 같은 시간당 30회 제한을 쓴다.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token: { type: string, minLength: 16, maxLength: 128 }
+                password: { type: string, minLength: 4, maxLength: 20 }
+                leave_current_room: { type: boolean, default: false }
+      responses:
+        '200': { $ref: '#/components/responses/RoomDetailOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RoomConflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /tags:
     get:
       tags: [tags]
@@ -596,7 +874,9 @@ paths:
       tags: [tags]
       operationId: suggestTag
       summary: 카탈로그에 없는 태그 제안
-      description: 바로 태그가 되지 않는다. 운영자가 서버 CLI로 검토해 새 태그나 기존 태그의 별칭으로 넣는다.
+      description: |
+        바로 태그가 되지 않는다. 운영자가 서버 CLI로 검토해 새 태그나 기존 태그의 별칭으로 넣는다. 같은 사람이 같은 이름을
+        다시 보내면 한 건으로 둔다. 금칙어가 있으면 422 `name`. 사용자당 시간당 10회(`429`).
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
@@ -644,6 +924,11 @@ components:
       required: true
       description: 클라이언트가 만든 UUID. 응답을 못 받으면 같은 키로 다시 보낸다.
       schema: { type: string, format: uuid }
+    RoomId:
+      name: room_id
+      in: path
+      required: true
+      schema: { type: string }
     SessionId:
       name: session_id
       in: path
@@ -758,11 +1043,11 @@ components:
       properties:
         target_type:
           type: string
-          enum: [nickname]
+          enum: [nickname, room_name]
         target_id:
           type: string
           format: uuid
-          description: 닉네임이면 그 사람의 사용자 id.
+          description: 닉네임이면 그 사람의 사용자 id, 방 이름이면 방 id.
         reason: { $ref: '#/components/schemas/ReportReason' }
         detail:
           type: [string, 'null']
@@ -773,7 +1058,7 @@ components:
       additionalProperties: false
       required: [target_type, target_id, reason, created_at]
       properties:
-        target_type: { type: string, enum: [nickname] }
+        target_type: { type: string, enum: [nickname, room_name] }
         target_id: { type: string, format: uuid }
         reason: { $ref: '#/components/schemas/ReportReason' }
         created_at: { type: string, format: date-time }
@@ -882,7 +1167,7 @@ components:
       required: [id, url]
       properties:
         id: { type: string }
-        url: { type: string, description: API 호스트가 내주는 고정 공개 URL(오래 캐시) }
+        url: { type: string, format: uri, description: '미디어 저장소의 절대 공개 URL(운영은 `https://media.pocket-time.study/rooms/...`). 파일이 바뀌면 URL도 바뀌므로 오래 캐시해도 된다' }
     Room:
       type: object
       additionalProperties: false
@@ -909,6 +1194,92 @@ components:
             - { $ref: '#/components/schemas/RoomImage' }
             - { type: 'null' }
         tags: { type: array, maxItems: 3, items: { $ref: '#/components/schemas/Tag' }, description: 방장이 고른 태그(카탈로그 순서) }
+    RoomPassword:
+      type: string
+      pattern: '^[A-Za-z0-9]{4,20}$'
+      description: 비밀번호 방의 비밀번호. 영문·숫자 4–20자, 대소문자 구분(PocketTime과 같다).
+    RoomCreate:
+      type: object
+      additionalProperties: false
+      required: [name, map, capacity, tag_ids]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40, description: 앞뒤 공백을 지운 뒤 1–40자 }
+        description: { type: [string, 'null'], maxLength: 100, description: 앞뒤 공백을 지운다. 비면 없음 }
+        map: { $ref: '#/components/schemas/RoomMap' }
+        capacity: { type: integer, minimum: 2, maximum: 50 }
+        password:
+          description: 있으면 비밀번호 방. 없거나 null이면 누구나 참여.
+          oneOf:
+            - { $ref: '#/components/schemas/RoomPassword' }
+            - { type: 'null' }
+        tag_ids: { type: array, maxItems: 3, uniqueItems: true, items: { type: string }, description: 카탈로그 태그, 최대 3개 }
+    RoomUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 40 }
+        description: { type: [string, 'null'], maxLength: 100 }
+        map: { $ref: '#/components/schemas/RoomMap' }
+        capacity: { type: integer, minimum: 2, maximum: 50 }
+        password:
+          oneOf:
+            - { $ref: '#/components/schemas/RoomPassword' }
+            - { type: 'null' }
+        tag_ids: { type: array, maxItems: 3, uniqueItems: true, items: { type: string } }
+    RoomMember:
+      type: object
+      additionalProperties: false
+      required: [user_id, nickname, avatar, is_host, tags]
+      properties:
+        user_id: { type: string }
+        nickname: { $ref: '#/components/schemas/Nickname' }
+        avatar: { $ref: '#/components/schemas/Avatar' }
+        is_host: { type: boolean }
+        tags: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/Tag' }, description: 그 사람의 공개 태그 }
+    RoomDetail:
+      type: object
+      additionalProperties: false
+      required: [room, members, password]
+      properties:
+        room: { $ref: '#/components/schemas/Room' }
+        members:
+          description: 멤버면 전체 명단(방장 먼저, 들어온 순). 멤버가 아니면 null.
+          oneOf:
+            - { type: array, maxItems: 50, items: { $ref: '#/components/schemas/RoomMember' } }
+            - { type: 'null' }
+        password:
+          description: |
+            비밀번호 방의 방장에게만 온다. 그 밖에는 null. 서버는 같은 `Idempotency-Key` 재전송에 돌려줄 기록에 비밀번호를
+            남기지 않으므로, 재전송으로 받은 응답(`Idempotent-Replayed: true`)에서는 null이다(`GET`으로 다시 읽는다).
+          oneOf:
+            - { $ref: '#/components/schemas/RoomPassword' }
+            - { type: 'null' }
+    RoomInvite:
+      type: object
+      additionalProperties: false
+      required: [url, expires_at]
+      properties:
+        url: { type: string, format: uri, description: '`https://<웹>/r#<token>`' }
+        expires_at: { type: string, format: date-time }
+    InviteToken:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { type: string, minLength: 16, maxLength: 128 }
+    InvitePreview:
+      type: object
+      additionalProperties: false
+      required: [room_id, name, map, member_count, capacity, has_password, is_member]
+      properties:
+        room_id: { type: string }
+        name: { type: string, minLength: 1, maxLength: 40 }
+        map: { $ref: '#/components/schemas/RoomMap' }
+        member_count: { type: integer, minimum: 1, maximum: 50 }
+        capacity: { type: integer, minimum: 2, maximum: 50 }
+        has_password: { type: boolean }
+        is_member: { type: boolean, description: 로그인했고 이미 이 방 멤버면 true. 비로그인은 false }
     Tag:
       type: object
       additionalProperties: false
@@ -918,6 +1289,32 @@ components:
         kind: { type: string, enum: [exam, kind], description: exam은 시험·목표, kind는 공부 종류 }
         name: { type: string, minLength: 1, maxLength: 20, description: 정규 이름(별칭이 아니다) }
   responses:
+    RoomDetailOk:
+      description: 공부방 상세
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data: { $ref: '#/components/schemas/RoomDetail' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    RoomForbidden:
+      description: |
+        `STUDY_ROOM_HOST_ONLY`(방장만 할 수 있음), `STUDY_ROOM_WRONG_PASSWORD`(비밀번호가 틀림),
+        `STUDY_ROOM_MAP_NOT_OWNED`(안 산 유료 맵), `ROOM_CREATE_RESTRICTED`(운영자가 이 계정·IP의 방 만들기를 정지), `CSRF_REJECTED`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RoomConflict:
+      description: |
+        `STUDY_ROOM_FULL`(정원 참), `STUDY_ROOM_ALREADY_MEMBER`(다른 방 멤버, `details.room_id`·`details.is_host`),
+        `STUDY_ROOM_CAPACITY_BELOW_MEMBERS`(정원을 멤버 수 아래로), `IDEMPOTENCY_KEY_REUSED`.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
     TagsOk:
       description: 태그 목록
       content:
@@ -1072,6 +1469,16 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     AccountCreateDisabled:
       description: 운영자가 새 계정 생성을 잠시 끔(긴급 스위치, `ACCOUNT_CREATE_DISABLED`). 나중에 다시 시도한다.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RoomCreateRateLimited:
+      description: 이 IP에서 오늘 방을 너무 많이 만듦(`ROOM_CREATE_RATE_LIMITED`). `Retry-After` 헤더.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RoomCreateDisabled:
+      description: 운영자가 방 만들기를 잠시 끔(긴급 스위치, `ROOM_CREATE_DISABLED`). 나중에 다시 시도한다.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
