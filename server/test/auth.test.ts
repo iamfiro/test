@@ -259,18 +259,21 @@ describe('익명 계정·세션', () => {
       expect(after.statusCode).toBe(401);
     });
 
-    it('user_id 열이 있는 모든 테이블에 이 사용자의 흔적이 남지 않는다', async () => {
+    it('사용자 id 열(user_id, *_user_id)이 있는 모든 테이블에 이 사용자의 흔적이 남지 않는다', async () => {
       const session = await startAnonymous(app);
       await app.inject({ method: 'DELETE', url: '/users/me', headers: authHeaders(session) });
-      const tables = (
+      const columns = (
         await app.db.execute(
-          sql`select table_name from information_schema.columns where table_schema = 'public' and column_name = 'user_id'`,
+          sql`select table_name, column_name from information_schema.columns
+              where table_schema = 'public' and (column_name = 'user_id' or column_name like '%\_user\_id')`,
         )
-      ).rows as { table_name: string }[];
-      for (const { table_name: table } of tables) {
-        const rows = (await app.db.execute(sql.raw(`select count(*)::int as n from "${table}" where user_id = '${session.userId}'`)))
-          .rows as { n: number }[];
-        expect(rows[0]!.n, table).toBe(0);
+      ).rows as { table_name: string; column_name: string }[];
+      expect(columns.map((c) => `${c.table_name}.${c.column_name}`)).toContain('reports.reporter_user_id');
+      for (const { table_name: table, column_name: column } of columns) {
+        const rows = (
+          await app.db.execute(sql.raw(`select count(*)::int as n from "${table}" where "${column}" = '${session.userId}'`))
+        ).rows as { n: number }[];
+        expect(rows[0]!.n, `${table}.${column}`).toBe(0);
       }
     });
 

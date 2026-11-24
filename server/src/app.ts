@@ -17,6 +17,7 @@ import { registerTimerRoutes } from './study/routes.js';
 import { registerStatsRoutes } from './study/stats.js';
 import { TimerService } from './study/timer.js';
 import { SettingsService } from './moderation/settings.js';
+import { registerReportRoutes } from './moderation/routes.js';
 import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
@@ -138,6 +139,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerStudySettingsRoutes(app);
   registerTimerRoutes(app);
   registerStatsRoutes(app);
+  registerReportRoutes(app);
   await options.registerExtraRoutes?.(app);
 
   if (config.env !== 'test') startMaintenance(app);

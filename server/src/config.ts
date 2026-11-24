@@ -28,6 +28,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).optional(),
   TRUST_PROXY: booleanString.default(false),
   ACCOUNT_CREATE_PER_IP_PER_HOUR: z.coerce.number().int().min(1).default(30),
+  REPORT_HIDE_THRESHOLD: z.coerce.number().int().min(1).default(3),
   SETTINGS_CACHE_MS: z.coerce.number().int().min(0).default(5000),
 });
 
@@ -41,6 +42,8 @@ export interface Config {
   trustProxy: boolean;
   /** IP 하나가 한 시간에 새로 만들 수 있는 익명 계정 수. 이동통신 공유 IP를 감안해 넉넉히 둔다. */
   accountCreatePerIpPerHour: number;
+  /** 같은 내용에 대한 서로 다른 사람의 미처리 신고가 이 수에 닿으면 바로 처리한다(메시지 숨김·닉네임 되돌리기). */
+  reportHideThreshold: number;
   /** 운영 설정(긴급 스위치)을 메모리에 두는 시간. CLI로 바꾼 값이 이 시간 안에 모든 서버에 적용된다. */
   settingsCacheMs: number;
 }
@@ -67,6 +70,7 @@ export function loadConfig(env: Env): Config {
     logLevel: value.LOG_LEVEL ?? (value.NODE_ENV === 'production' ? 'warn' : 'info'),
     trustProxy: value.TRUST_PROXY,
     accountCreatePerIpPerHour: value.ACCOUNT_CREATE_PER_IP_PER_HOUR,
+    reportHideThreshold: value.REPORT_HIDE_THRESHOLD,
     settingsCacheMs: value.SETTINGS_CACHE_MS,
   };
 }
