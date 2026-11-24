@@ -177,3 +177,30 @@ export function selectMotion(g: ActorGender, t: number, k: number): ActorMotion 
   }
   return { pose: StudyRoomPose.lerp(idle.pose, pose, env), lift: idle.lift + (lift - idle.lift) * env, yaw: idle.yaw * (1 - env) + yaw * env }
 }
+
+/**
+ * 머리 위 이름표를 의식하듯 올려다본다(이름 정하기 단계). amount 0–1로 원래 자세와 섞는다. 고개를 들고 몸을 살짝
+ * 젖히며, 이름표를 확인하듯 고개를 아주 조금씩 끄덕이고 좌우로 갸웃한다.
+ */
+export function lookUpAt(pose: StudyRoomPose, amount: number, t: number): StudyRoomPose {
+  if (amount <= 0) return pose
+  const neck = pose.joint('neck')
+  const torso = pose.joint('torso')
+  const mix = (from: number, to: number) => from + (to - from) * amount
+  return new StudyRoomPose({
+    joints: {
+      ...pose.joints,
+      neck: new A({
+        pitch: mix(neck.pitch, -0.4 + 0.05 * sin(t * 2.3)),
+        yaw: mix(neck.yaw, 0.12 * sin(t * 1.1)),
+        roll: mix(neck.roll, 0.1 * sin(t * 0.9 + 1)),
+      }),
+      torso: new A({ pitch: mix(torso.pitch, -0.04), yaw: torso.yaw, roll: torso.roll }),
+    },
+    props: pose.props,
+    lift: pose.lift,
+    eyeOpen: pose.eyeOpen,
+    mouthOpen: pose.mouthOpen,
+    leaf: pose.leaf,
+  })
+}

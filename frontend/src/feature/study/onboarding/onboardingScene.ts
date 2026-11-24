@@ -6,7 +6,7 @@ import { MathUtils, Vector3 } from 'three'
 import { StudyRoomCamera, type StudyRoomSeat } from '../room3d/model/scene'
 import { StudyRoomSeatCamera } from '../room3d/domain/seatCamera'
 import { StudyRoomPose } from '../room3d/domain/motion'
-import { idleMotion, selectMotion, selectSeconds, standingLift, standingPose, walkBob, walkingPose } from '../room3d/domain/actorMotion'
+import { idleMotion, lookUpAt, selectMotion, selectSeconds, standingLift, standingPose, walkBob, walkingPose } from '../room3d/domain/actorMotion'
 import type { StudyRoomCharacter } from '../room3d/model/character'
 import type { StudyRoomActor } from '../room3d/three/ThreeStudyRoomRenderer'
 import type { StudyRoomCinematicFrame } from '../room3d/StudyRoom3dView'
@@ -29,7 +29,7 @@ const stepsPerMeter = 2.2
 
 export type OnboardingStep = 'pick' | 'name' | 'goal' | 'enter'
 
-type ActorState = { x: number; z: number; yaw: number; phase: number; walk: number; selectAt: number | null }
+type ActorState = { x: number; z: number; yaw: number; phase: number; walk: number; selectAt: number | null; look: number }
 
 const groundAt = (x: number) => (x >= floorEdgeX ? floorY : x <= floorEdgeX - 0.25 ? lawnY : lawnY + ((x - (floorEdgeX - 0.25)) / 0.25) * (floorY - lawnY))
 const angleDelta = (from: number, to: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from))
@@ -111,8 +111,8 @@ export class OnboardingScene {
   private step: OnboardingStep = 'pick'
   private gender: Gender | null = null
   private readonly actors: Record<Gender, ActorState> = {
-    male: { x: standX, z: pickZ.male, yaw: faceCamera, phase: 0, walk: 0, selectAt: null },
-    female: { x: standX, z: pickZ.female, yaw: faceCamera, phase: 0, walk: 0, selectAt: null },
+    male: { x: standX, z: pickZ.male, yaw: faceCamera, phase: 0, walk: 0, selectAt: null, look: 0 },
+    female: { x: standX, z: pickZ.female, yaw: faceCamera, phase: 0, walk: 0, selectAt: null, look: 0 },
   }
   private camera: StudyRoomCamera | null = null
   private lastMs: number | null = null
@@ -164,6 +164,9 @@ export class OnboardingScene {
       const a = this.actors[g]
       const target = this.step === 'pick' ? { x: g === chosen ? standX + 0.4 : standX, z: pickZ[g] } : { x: standX + 0.4, z: doorZ }
       this.moveToward(a, target.x, target.z, faceCamera, dt)
+      // 이름 정하기: 머리 위 이름표를 의식하듯 올려다본다(줄인 움직임이면 바로).
+      const wantLook = this.step === 'name' && g === chosen ? 1 : 0
+      a.look = this.reduceMotion ? wantLook : a.look + (wantLook - a.look) * Math.min(1, dt * 4)
       // 고른 동작은 한 걸음 앞으로 나와 멈춘 뒤에 시작한다.
       if (a.selectAt === -1 && a.walk < 0.05) a.selectAt = nowMs
       actors.push(this.actorOf(g, a, t, nowMs, this.step === 'pick' && g === chosen ? 1.06 : 1))
@@ -182,7 +185,8 @@ export class OnboardingScene {
     const clock = this.reduceMotion ? 0 : t + (g === 'female' ? 1.7 : 0)
     const k = a.selectAt != null && a.selectAt >= 0 ? (nowMs - a.selectAt) / 1000 / selectSeconds : 1
     const motion = k < 1 && !this.reduceMotion && a.walk < 0.05 ? selectMotion(g, clock, k) : idleMotion(g, clock)
-    const pose = a.walk > 0.02 ? StudyRoomPose.lerp(motion.pose, walkingPose(a.phase), a.walk) : motion.pose
+    const looking = lookUpAt(motion.pose, a.look, clock)
+    const pose = a.walk > 0.02 ? StudyRoomPose.lerp(looking, walkingPose(a.phase), a.walk) : looking
     const ground = groundAt(a.x)
     const lift = motion.lift * (1 - a.walk)
     return { id: g, character: this.characters[g], x: a.x, y: ground + standingLift + lift + walkBob(a.phase, a.walk), z: a.z, yaw: a.yaw + motion.yaw * (1 - a.walk), pose, scale }
