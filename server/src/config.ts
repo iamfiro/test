@@ -27,6 +27,7 @@ const envSchema = z.object({
   DEV_LOGIN_ENABLED: booleanString.default(false),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent']).optional(),
   TRUST_PROXY: booleanString.default(false),
+  ACCOUNT_CREATE_PER_IP_PER_HOUR: z.coerce.number().int().min(1).default(30),
 });
 
 export interface Config {
@@ -37,6 +38,8 @@ export interface Config {
   devLoginEnabled: boolean;
   logLevel: string;
   trustProxy: boolean;
+  /** IP 하나가 한 시간에 새로 만들 수 있는 익명 계정 수. 이동통신 공유 IP를 감안해 넉넉히 둔다. */
+  accountCreatePerIpPerHour: number;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -60,5 +63,6 @@ export function loadConfig(env: Env): Config {
     devLoginEnabled: value.DEV_LOGIN_ENABLED,
     logLevel: value.LOG_LEVEL ?? (value.NODE_ENV === 'production' ? 'warn' : 'info'),
     trustProxy: value.TRUST_PROXY,
+    accountCreatePerIpPerHour: value.ACCOUNT_CREATE_PER_IP_PER_HOUR,
   };
 }

@@ -28,6 +28,10 @@ export const errors = {
     new AppError(429, 'RATE_LIMIT_EXCEEDED', '요청이 너무 잦아요. 잠시 뒤 다시 시도해 주세요', undefined, {
       'retry-after': String(retryAfterSeconds),
     }),
+  accountRateLimited: (retryAfterSeconds: number) =>
+    new AppError(429, 'ACCOUNT_RATE_LIMITED', '이 네트워크에서 새로 시작한 사람이 너무 많아요. 잠시 뒤 다시 시도해 주세요', undefined, {
+      'retry-after': String(retryAfterSeconds),
+    }),
   payloadTooLarge: () => new AppError(413, 'PAYLOAD_TOO_LARGE', '요청이 너무 커요'),
   serviceUnavailable: () => new AppError(503, 'SERVICE_UNAVAILABLE', '서비스를 잠시 쓸 수 없어요'),
   internal: () => new AppError(500, 'INTERNAL_ERROR', '문제가 생겼어요. 잠시 뒤 다시 시도해 주세요'),

@@ -8,7 +8,11 @@ import type { Config } from './config.js';
 import { createDb, type Db } from './db/client.js';
 import { registerEnvelope } from './http/envelope.js';
 import { errors } from './http/errors.js';
-import { purgeExpiredIdempotencyKeys, registerIdempotency } from './http/idempotency.js';
+import { registerIdempotency } from './http/idempotency.js';
+import { registerAuth } from './auth/hook.js';
+import { registerAuthRoutes } from './auth/routes.js';
+import { registerProfileRoutes } from './profile/routes.js';
+import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -54,6 +58,16 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   registerEnvelope(app);
 
+  // 본문 없는 쓰기(예: PUT /users/me/onboarding)가 JSON 헤더를 달고 와도 받는다. 깨진 JSON은 그대로 거절한다.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
+    if (body === '') return done(null, undefined);
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(Object.assign(new Error('invalid json'), { code: 'FST_ERR_CTP_INVALID_JSON_BODY', statusCode: 400 }));
+    }
+  });
+
   await app.register(cookie);
   await app.register(cors, {
     origin: config.webOrigins,
@@ -79,6 +93,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
   });
 
+  registerAuth(app);
   registerIdempotency(app);
 
   app.addHook('onResponse', async (request, reply) => {
@@ -90,7 +105,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     else request.log.info(line);
   });
 
-  app.get('/healthz', { config: { rateLimit: false } }, async (_request, reply) => {
+  app.get('/healthz', { config: { auth: 'none', rateLimit: false } }, async (_request, reply) => {
     try {
       await app.db.execute(sql`select 1`);
     } catch {
@@ -99,11 +114,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     return reply.ok({ status: 'ok' });
   });
 
+  registerAuthRoutes(app);
+  registerProfileRoutes(app);
   await options.registerExtraRoutes?.(app);
 
-  if (config.env !== 'test') {
-    purgeExpiredIdempotencyKeys(app.db).catch((error: unknown) => app.log.warn({ err: error }, 'idempotency purge failed'));
-  }
+  if (config.env !== 'test') startMaintenance(app);
 
   return app;
 }

@@ -4,6 +4,9 @@ import * as schema from './schema.js';
 
 export type Db = NodePgDatabase<typeof schema>;
 
+/** `Db`와 트랜잭션 안의 `tx` 모두에서 쓸 수 있는 실행자. */
+export type DbExecutor = Pick<Db, 'insert' | 'select' | 'update' | 'delete' | 'execute'>;
+
 export interface DbHandle {
   db: Db;
   pool: pg.Pool;

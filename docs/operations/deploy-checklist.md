@@ -15,6 +15,9 @@ last_verified: 2026-11-23
 ## 데이터베이스
 
 - 관리형 PostgreSQL. 마이그레이션은 `server/drizzle/` 순서대로 적용.
+- 서버 골격·익명 계정(launch.md L1·L2, 구현됨): `idempotency_keys`(24시간 뒤 만료)·`users`·`sessions`·`account_creations`
+  (IP당 시간당 새 계정 수 제한용, 24시간 뒤 서버가 지움). 사용자에 딸린 테이블은 모두 `user_id`로 `users`를
+  가리키고 `ON DELETE CASCADE`다(내 데이터 지우기 = `users` 행 삭제). 만료된 세션·기록은 서버가 한 시간마다 정리한다.
 - 공부방 태그(계약 0.4.0, 서버 미구현): `tags`·`tag_aliases`·`user_tags`·`room_tags`·`tag_suggestions`,
   인덱스 `room_tags(tag_id)`. 배포 뒤 서버 CLI로 초기 카탈로그 시드(`docs/plan/study-tags.md` 2절).
 - 첫 가입 온보딩(계약 0.5.0, 서버 미구현): 사용자 테이블에 `onboarding_completed_at timestamptz null`. 이 열이 생기기

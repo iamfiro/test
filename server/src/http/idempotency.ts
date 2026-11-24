@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { and, eq, lt, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { idempotencyKeys } from '../db/schema.js';
@@ -31,7 +31,20 @@ function requestHash(request: FastifyRequest): string {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function claim(db: Db, scope: string, key: string, hash: string): Promise<boolean> {
+export interface StoredResult {
+  status: number;
+  body: string;
+  contentType: string;
+}
+
+export function readIdempotencyKey(request: FastifyRequest): string {
+  const key = request.headers['idempotency-key'];
+  if (typeof key !== 'string' || !KEY_PATTERN.test(key)) throw errors.idempotencyKeyRequired();
+  return key.toLowerCase();
+}
+
+/** 키를 차지한다. 이미 있으면 false. 만료된 기록은 먼저 치운다. */
+export async function claimKey(db: Db, scope: string, key: string, hash: string): Promise<boolean> {
   await db.delete(idempotencyKeys).where(and(eq(idempotencyKeys.scope, scope), eq(idempotencyKeys.key, key), lt(idempotencyKeys.expiresAt, sql`now()`)));
   const inserted = await db
     .insert(idempotencyKeys)
@@ -41,7 +54,19 @@ async function claim(db: Db, scope: string, key: string, hash: string): Promise<
   return inserted.length === 1;
 }
 
-async function replayOrWait(db: Db, scope: string, key: string, hash: string, reply: FastifyReply): Promise<'replayed' | 'retry'> {
+export async function completeKey(db: Db, scope: string, key: string, result: StoredResult): Promise<void> {
+  await db
+    .update(idempotencyKeys)
+    .set({ state: 'done', responseStatus: result.status, responseBody: result.body, responseContentType: result.contentType })
+    .where(and(eq(idempotencyKeys.scope, scope), eq(idempotencyKeys.key, key)));
+}
+
+export async function releaseKey(db: Db, scope: string, key: string): Promise<void> {
+  await db.delete(idempotencyKeys).where(and(eq(idempotencyKeys.scope, scope), eq(idempotencyKeys.key, key)));
+}
+
+/** 이미 차지된 키의 저장된 결과를 기다려 돌려준다. 기록이 사라졌거나 낡았으면 'retry'(다시 차지해 본다). */
+export async function awaitStored(db: Db, scope: string, key: string, hash: string): Promise<StoredResult | 'retry'> {
   const startedAt = Date.now();
   for (;;) {
     const [row] = await db
@@ -51,12 +76,11 @@ async function replayOrWait(db: Db, scope: string, key: string, hash: string, re
     if (!row) return 'retry';
     if (row.requestHash !== hash) throw errors.idempotencyKeyReused();
     if (row.state === 'done') {
-      reply
-        .code(row.responseStatus ?? 200)
-        .header('content-type', row.responseContentType ?? 'application/json; charset=utf-8')
-        .header('idempotent-replayed', 'true')
-        .send(row.responseBody ?? '');
-      return 'replayed';
+      return {
+        status: row.responseStatus ?? 200,
+        body: row.responseBody ?? '',
+        contentType: row.responseContentType ?? 'application/json; charset=utf-8',
+      };
     }
     if (Date.now() - row.createdAt.getTime() > STALE_IN_PROGRESS_MS) {
       // 처리하던 프로세스가 사라진 기록. 지우고 다시 차지한다.
@@ -74,18 +98,23 @@ export function registerIdempotency(app: FastifyInstance): void {
 
   app.addHook('preHandler', async (request, reply) => {
     if (!request.routeOptions.config.idempotent) return;
-    const key = request.headers['idempotency-key'];
-    if (typeof key !== 'string' || !KEY_PATTERN.test(key)) throw errors.idempotencyKeyRequired();
-    const normalizedKey = key.toLowerCase();
+    const key = readIdempotencyKey(request);
     const scope = request.idempotencyScope ?? `ip:${request.ip}`;
     const hash = requestHash(request);
 
     for (;;) {
-      if (await claim(app.db, scope, normalizedKey, hash)) {
-        request.idempotencyClaim = { scope, key: normalizedKey };
+      if (await claimKey(app.db, scope, key, hash)) {
+        request.idempotencyClaim = { scope, key };
         return;
       }
-      if ((await replayOrWait(app.db, scope, normalizedKey, hash, reply)) === 'replayed') return reply;
+      const stored = await awaitStored(app.db, scope, key, hash);
+      if (stored === 'retry') continue;
+      reply
+        .code(stored.status)
+        .header('content-type', stored.contentType)
+        .header('idempotent-replayed', 'true')
+        .send(stored.body);
+      return reply;
     }
   });
 
@@ -95,27 +124,17 @@ export function registerIdempotency(app: FastifyInstance): void {
     request.idempotencyClaim = undefined;
     try {
       if (reply.statusCode >= 500) {
-        await app.db.delete(idempotencyKeys).where(and(eq(idempotencyKeys.scope, claimed.scope), eq(idempotencyKeys.key, claimed.key)));
+        await releaseKey(app.db, claimed.scope, claimed.key);
       } else {
-        await app.db
-          .update(idempotencyKeys)
-          .set({
-            state: 'done',
-            responseStatus: reply.statusCode,
-            responseBody: typeof payload === 'string' ? payload : String(payload ?? ''),
-            responseContentType: String(reply.getHeader('content-type') ?? 'application/json; charset=utf-8'),
-          })
-          .where(and(eq(idempotencyKeys.scope, claimed.scope), eq(idempotencyKeys.key, claimed.key)));
+        await completeKey(app.db, claimed.scope, claimed.key, {
+          status: reply.statusCode,
+          body: typeof payload === 'string' ? payload : String(payload ?? ''),
+          contentType: String(reply.getHeader('content-type') ?? 'application/json; charset=utf-8'),
+        });
       }
     } catch (error) {
       request.log.error({ err: error }, 'idempotency record update failed');
     }
     return payload;
   });
-}
-
-/** 만료된 멱등 기록을 지운다. 서버 시작 때와 주기적으로 부른다. */
-export async function purgeExpiredIdempotencyKeys(db: Db): Promise<number> {
-  const deleted = await db.delete(idempotencyKeys).where(lt(idempotencyKeys.expiresAt, sql`now()`)).returning({ key: idempotencyKeys.key });
-  return deleted.length;
 }

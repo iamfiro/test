@@ -15,17 +15,17 @@ describe('HTTP 골격', () => {
     app = await createTestApp({
       registerExtraRoutes: async (instance) => {
         // 멱등 키 동작을 보려는 테스트 전용 경로. 실제 API에는 없다.
-        instance.post('/__test/idem', { config: { idempotent: true } }, async (request, reply) => {
+        instance.post('/__test/idem', { config: { idempotent: true, auth: 'none' } }, async (request, reply) => {
           calls += 1;
           await new Promise((resolve) => setTimeout(resolve, 80));
           return reply.ok({ call: calls, echo: (request.body as { n?: number })?.n ?? null }, 201);
         });
-        instance.post('/__test/idem-fail', { config: { idempotent: true } }, async (_request, reply) => {
+        instance.post('/__test/idem-fail', { config: { idempotent: true, auth: 'none' } }, async (_request, reply) => {
           calls += 1;
           if (calls === 1) throw new Error('boom');
           return reply.ok({ call: calls });
         });
-        instance.get('/__test/limited', { config: { rateLimit: { max: 2, timeWindow: '1 minute' } } }, async (_r, reply) =>
+        instance.get('/__test/limited', { config: { auth: 'none', rateLimit: { max: 2, timeWindow: '1 minute' } } }, async (_r, reply) =>
           reply.ok({ ok: true }),
         );
       },
