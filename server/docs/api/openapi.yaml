@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.6
+  version: 0.5.7
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -23,6 +23,7 @@ tags:
   - name: rooms
   - name: tags
   - name: moderation
+  - name: league
 paths:
   /healthz:
     get:
@@ -449,6 +450,116 @@ paths:
                   error: { type: 'null' }
                   meta: { $ref: '#/components/schemas/Meta' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study/league:
+    get:
+      tags: [league]
+      operationId: getStudyLeague
+      summary: 이번 주 리그와 내 그룹 순위표
+      description: |
+        내 리그, 이번 리그 주(`Asia/Seoul` 월요일 04:00 ~ 다음 월요일 04:00)의 시작·마감, 내 그룹 순위표를 서버가
+        계산해 내려준다. 순위·구역(승급·강등)·내 순위·위 순위까지 남은 초는 모두 서버 판정이고 화면은 다시 계산하지
+        않는다. 점수는 서버가 presence로 인정한 공부 시간(초)만이고, 인정 구간의 절대 시각이 주 안에 든 부분만 센다
+        (주 경계를 걸친 구간은 경계에서 자른다). 그 주에 인정 시간이 처음 생기는 순간 그 리그의 열린 그룹(30명 미만 중
+        가장 먼저 만든 것)에 들어가고, 아직 없으면 `group`은 null이다. 같은 점수면 그 점수에 먼저 닿은 사람이 위다.
+        주 마감 뒤 그 주 정산이 끝나기 전에는(마감 + `LEAGUE_SETTLE_DELAY`, 기본 10분) **지난 주**를 `status:
+        settling`으로 보여 주고 화면은 "집계 중"으로 보인다. 정산이 끝나면 새 주(`open`)를 보여 준다. 탈퇴한 사람은
+        순위표에서 빠지고 아래 순위가 당겨지지만 `size`는 줄지 않는다. `ETag`를 주고 `If-None-Match`면 304.
+      responses:
+        '200':
+          description: 리그 현황
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/LeagueStanding' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '304': { description: 바뀐 것 없음 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /study/streak:
+    get:
+      tags: [league]
+      operationId: getStudyStreak
+      summary: 연속 공부일(스트릭)
+      description: |
+        서버가 presence로 인정한 공부 시간 기준 연속일이다(기록 시간이 아니다, study-league.md L2). 하루 인정 시간이
+        10분 이상이면 그날을 공부한 날로 친다. 인정 구간의 공부일은 그 세션을 시작할 때의 시간대 04:00 경계로 정해져
+        있고(`ranked_segments.study_date`), "오늘"은 `timezone`의 04:00 경계로 정한다. 진행 중 세션도 서버가 마지막으로
+        본 때까지의 인정 시간이 들어간다. 현재 스트릭은 오늘(오늘이 아직 10분 미만이면 어제)까지 빠짐없이 이어진 날
+        수, `longest`는 지금까지 가장 길었던 연속일이다. 스트릭 보호는 없다(하루라도 놓치면 0). `recent_days`는 오늘을
+        포함한 최근 7일, 오래된 날부터. `ETag`를 주고 `If-None-Match`면 304.
+      parameters:
+        - name: timezone
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 스트릭
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/StudyStreak' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '304': { description: 바뀐 것 없음 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study/league/results/latest:
+    get:
+      tags: [league]
+      operationId: getLatestLeagueResult
+      summary: 아직 안 본 최근 정산 결과
+      description: |
+        내 가장 최근 리그 정산 결과가 아직 본 것으로 기록되지 않았으면 그것을, 봤거나 결과가 없으면 204. 결과는 주
+        정산(마감 + `LEAGUE_SETTLE_DELAY`) 때 그 주 그룹에 있던 사람에게, 그리고 그 주 공부하지 않아 그룹에 없던
+        카페인 리그(`top`) 소속에게(강등) 생긴다. 더 오래된 안 본 결과는 보여 주지 않는다. 보상(도토리)은 없다
+        (launch.md M1, 상점과 함께 붙인다).
+      responses:
+        '200':
+          description: 안 본 결과
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data: { $ref: '#/components/schemas/LeagueResult' }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '204': { description: 볼 결과 없음 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /study/league/results/{week_start}/seen:
+    parameters:
+      - name: week_start
+        in: path
+        required: true
+        description: 결과의 `week_start` 값 그대로(ISO 시각).
+        schema: { type: string, format: date-time }
+    post:
+      tags: [league]
+      operationId: markLeagueResultSeen
+      summary: 정산 결과를 봤다고 기록
+      description: |
+        결과 시트를 닫을 때 부른다. 이미 봤어도(재시도·다른 탭) 204. 내 결과가 없는 주면 404, 시각 형식이 아니면 422
+        `field: week_start`.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '204': { description: 기록했다 }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /study/records:
     get:
@@ -1208,6 +1319,110 @@ components:
       properties:
         date: { type: string, format: date }
         seconds: { type: integer, minimum: 0 }
+    LeagueStanding:
+      type: object
+      additionalProperties: false
+      required: [league, week_start, week_end, status, group]
+      properties:
+        league:
+          type: string
+          enum: [general, top]
+          description: 이 주의 내 리그(그룹이 있으면 그 그룹의 리그). 화면에는 `top`만 "카페인 리그"로 보인다(결정 L3).
+        week_start: { type: string, format: date-time, description: 리그 주 시작(ISO, 월요일 04:00 KST) }
+        week_end: { type: string, format: date-time, description: 리그 주 마감(ISO, 다음 월요일 04:00 KST) }
+        status:
+          type: string
+          enum: [open, settling]
+        group:
+          description: 내 그룹. 이번 주 인정 시간이 아직 없으면 null.
+          oneOf:
+            - { $ref: '#/components/schemas/LeagueGroup' }
+            - { type: 'null' }
+    LeagueGroup:
+      type: object
+      additionalProperties: false
+      required: [size, my_rank, gap_to_next_seconds, entries]
+      properties:
+        size: { type: integer, minimum: 1, maximum: 30, description: 이번 주 그룹 인원(탈퇴해도 줄지 않는다) }
+        my_rank: { type: integer, minimum: 1 }
+        gap_to_next_seconds:
+          description: |
+            바로 위 순위를 앞지르는 데 남은 초(점수 차 + 1. 같은 점수면 먼저 닿은 사람이 위라서 1초를 더 해야 올라간다). 1위면 null.
+          type: [integer, 'null']
+          minimum: 1
+        entries:
+          type: array
+          maxItems: 30
+          description: 순위 순서
+          items: { $ref: '#/components/schemas/LeagueEntry' }
+    LeagueEntry:
+      type: object
+      additionalProperties: false
+      required: [id, rank, nickname, avatar, score_seconds, zone, is_me]
+      properties:
+        id: { type: string, description: 불투명 항목 id(HMAC). 사용자 id가 아니다. }
+        rank: { type: integer, minimum: 1 }
+        nickname: { $ref: '#/components/schemas/Nickname' }
+        avatar: { $ref: '#/components/schemas/Avatar' }
+        score_seconds: { type: integer, minimum: 0, description: 이번 주 인정 공부 시간(초) }
+        zone:
+          type: string
+          enum: [promote, stay, relegate]
+          description: 지금 순위로 주를 마치면 가는 곳(서버 판정)
+        is_me: { type: boolean }
+    StudyStreak:
+      type: object
+      additionalProperties: false
+      required: [current, longest, today_seconds, today_remaining_seconds, recent_days]
+      properties:
+        current: { type: integer, minimum: 0 }
+        longest: { type: integer, minimum: 0 }
+        today_seconds: { type: integer, minimum: 0, description: 오늘 공부일의 인정 공부 시간(초) }
+        today_remaining_seconds: { type: integer, minimum: 0, description: 오늘을 공부한 날로 치기까지 남은 초. 이미 채웠으면 0. }
+        recent_days:
+          type: array
+          minItems: 7
+          maxItems: 7
+          description: 오늘을 포함한 최근 7일, 오래된 날부터
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, state]
+            properties:
+              date: { type: string, format: date }
+              state:
+                type: string
+                enum: [studied, missed, open]
+                description: 공부한 날·놓친 날·아직 끝나지 않은 오늘(10분 미만)
+    LeagueResult:
+      type: object
+      additionalProperties: false
+      required: [week_start, week_end, league, outcome, next_league, rank, group_size, score_seconds]
+      properties:
+        week_start: { type: string, format: date-time, description: 정산한 리그 주 시작(ISO) }
+        week_end: { type: string, format: date-time }
+        league:
+          type: string
+          enum: [general, top]
+          description: 그 주에 속했던 리그
+        outcome:
+          type: string
+          enum: [promoted, stayed, relegated]
+          description: 일반 → 카페인 리그 승급, 잔류, 카페인 리그 → 일반 강등
+        next_league:
+          type: string
+          enum: [general, top]
+          description: 다음 주 리그
+        rank:
+          description: 그룹 안 최종 순위. 그 주 그룹에 없었으면(공부 0, 카페인 리그 강등) null.
+          type: [integer, 'null']
+          minimum: 1
+        group_size:
+          description: 그 주 그룹 인원. 그룹에 없었으면 null.
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 30
+        score_seconds: { type: integer, minimum: 0, description: 그 주 인정 공부 시간(초) }
     StudyStats:
       type: object
       additionalProperties: false
