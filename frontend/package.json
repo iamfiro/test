@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite --port 5190 --strictPort",
     "dev:mock": "VITE_DATA_SOURCE=mock vite --port 5190 --strictPort",
-    "build": "npm run api:types && tsc --noEmit && vite build",
+    "build": "npm run api:types && tsc --noEmit && vite build && node scripts/security-headers.mjs",
     "typecheck": "npm run api:types && tsc --noEmit",
     "test": "vitest run",
     "api:types": "openapi-typescript ../server/docs/api/openapi.yaml -o src/core/api/schema.d.ts"
