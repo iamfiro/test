@@ -216,10 +216,10 @@ export function ThoughtBubble(props: { placement: ActorPlacement; tags: Tag[] })
   const m = cloudMargin
   return (
     <span className={s.thought} style={{ left: head.x, top: head.y }} aria-hidden>
-      {/* 머리에서 구름까지 점점 커지는 생각 방울 셋 */}
+      {/* 머리에서 구름까지 살짝 휘어 오르며 간격과 크기가 점점 커지는 생각 방울 셋(둘레: (3,-6)→(24,-14)→(21,-45) 곡선 위) */}
       <svg className={s.thoughtTrail} viewBox="-2 -60 52 62" width="52" height="62">
-        {[[8, -7, 3.5], [19, -22, 5.5], [33, -42, 8]].map(([x, y, r], i) => (
-          <g key={i} className={s.trailBead} style={{ animationDelay: `${i * 0.22}s` }}>
+        {[[5.4, -7.0, 3.0], [16.4, -16.8, 5.2], [21.4, -36.8, 8.6]].map(([x, y, r], i) => (
+          <g key={i} className={s.trailBead} style={{ animationDelay: `${i * 0.25}s`, animationDuration: `${2.2 + i * 0.35}s` }}>
             <circle cx={x} cy={y} r={r} className={s.cloudFace} />
           </g>
         ))}
