@@ -191,11 +191,11 @@ export function lookUpAt(pose: StudyRoomPose, amount: number, t: number): StudyR
     joints: {
       ...pose.joints,
       neck: new A({
-        pitch: mix(neck.pitch, -0.4 + 0.05 * sin(t * 2.3)),
+        pitch: mix(neck.pitch, -0.17 + 0.03 * sin(t * 2.3)),
         yaw: mix(neck.yaw, 0.12 * sin(t * 1.1)),
         roll: mix(neck.roll, 0.1 * sin(t * 0.9 + 1)),
       }),
-      torso: new A({ pitch: mix(torso.pitch, -0.04), yaw: torso.yaw, roll: torso.roll }),
+      torso: new A({ pitch: mix(torso.pitch, -0.13 + 0.015 * sin(t * 2.3)), yaw: torso.yaw, roll: torso.roll }),
     },
     props: pose.props,
     lift: pose.lift,
