@@ -12,6 +12,7 @@ import { registerIdempotency } from './http/idempotency.js';
 import { registerAuth } from './auth/hook.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { registerProfileRoutes } from './profile/routes.js';
+import { registerStudySettingsRoutes } from './study/settings.js';
 import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
@@ -116,6 +117,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   registerAuthRoutes(app);
   registerProfileRoutes(app);
+  registerStudySettingsRoutes(app);
   await options.registerExtraRoutes?.(app);
 
   if (config.env !== 'test') startMaintenance(app);

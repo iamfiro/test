@@ -67,3 +67,16 @@ export const accountCreations = pgTable(
   },
   (table) => [index('account_creations_ip_created_idx').on(table.ip, table.createdAt)],
 );
+
+/** 하루 목표·과목 목록·고른 과목(앱에서는 기기 설정, 웹은 브라우저 저장소에 사용자 데이터를 두지 않아 서버에 둔다). 행이 없으면 기본값. */
+export const studySettings = pgTable('study_settings', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  dailyGoalMinutes: integer('daily_goal_minutes'),
+  subjects: jsonb('subjects').$type<string[]>().notNull(),
+  subject: text('subject'),
+  /** 과목 이름 → 색 번호(0–7, 앱 StudySubjectPalette 순서). */
+  subjectColors: jsonb('subject_colors').$type<Record<string, number>>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
