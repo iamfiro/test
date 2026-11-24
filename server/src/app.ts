@@ -14,6 +14,7 @@ import { registerAuthRoutes } from './auth/routes.js';
 import { registerProfileRoutes } from './profile/routes.js';
 import { registerStudySettingsRoutes } from './study/settings.js';
 import { registerTimerRoutes } from './study/routes.js';
+import { registerStatsRoutes } from './study/stats.js';
 import { TimerService } from './study/timer.js';
 import { startMaintenance } from './maintenance.js';
 
@@ -132,6 +133,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerProfileRoutes(app);
   registerStudySettingsRoutes(app);
   registerTimerRoutes(app);
+  registerStatsRoutes(app);
   await options.registerExtraRoutes?.(app);
 
   if (config.env !== 'test') startMaintenance(app);
