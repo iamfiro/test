@@ -1,4 +1,5 @@
-.region { position: fixed; left: 24px; right: 24px; bottom: 120px; display: flex; justify-content: center; pointer-events: none; z-index: 100; }
+.region { position: fixed; left: 24px; right: 24px; bottom: 120px; display: flex; justify-content: center; pointer-events: none; z-index: 400; }
+/* 시트(200)·알림창(300) 위에 뜬다: 채팅 시트 안 보내기 실패처럼 시트가 열린 채 알리는 토스트가 가려지지 않게. */
 .toast {
   pointer-events: auto; max-width: 480px; display: flex; align-items: center; gap: 12px;
   padding: 12px 20px; border-radius: 999px; background: rgb(0 0 0 / 0.62); color: #fff;
