@@ -220,15 +220,13 @@ export function ThoughtBubble(props: { placement: ActorPlacement; tags: Tag[] })
       <svg className={s.thoughtTrail} viewBox="-2 -60 52 62" width="52" height="62">
         {[[8, -7, 3.5], [19, -22, 5.5], [33, -42, 8]].map(([x, y, r], i) => (
           <g key={i} className={s.trailBead} style={{ animationDelay: `${i * 0.22}s` }}>
-            <circle cx={x} cy={y! + 2.5} r={r} className={s.cloudLedge} />
             <circle cx={x} cy={y} r={r} className={s.cloudFace} />
           </g>
         ))}
       </svg>
       <span className={s.thoughtCloud}>
         {path && box && (
-          <svg className={s.cloudSvg} viewBox={`${-m} ${-m} ${box.w + 2 * m} ${box.h + 2 * m + 4}`} style={{ left: -m, top: -m, width: box.w + 2 * m, height: box.h + 2 * m + 4 }}>
-            <path d={path} transform="translate(0 3)" className={s.cloudLedge} />
+          <svg className={s.cloudSvg} viewBox={`${-m} ${-m} ${box.w + 2 * m} ${box.h + 2 * m}`} style={{ left: -m, top: -m, width: box.w + 2 * m, height: box.h + 2 * m }}>
             <path d={path} className={s.cloudFace} />
           </svg>
         )}
