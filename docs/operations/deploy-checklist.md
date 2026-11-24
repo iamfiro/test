@@ -18,8 +18,10 @@ last_verified: 2026-11-23
 - 서버 골격·익명 계정(launch.md L1·L2, 구현됨): `idempotency_keys`(24시간 뒤 만료)·`users`·`sessions`·`account_creations`
   (IP당 시간당 새 계정 수 제한용, 24시간 뒤 서버가 지움). 사용자에 딸린 테이블은 모두 `user_id`로 `users`를
   가리키고 `ON DELETE CASCADE`다(내 데이터 지우기 = `users` 행 삭제). 만료된 세션·기록은 서버가 한 시간마다 정리한다.
-- 공부방 태그(계약 0.4.0, 서버 미구현): `tags`·`tag_aliases`·`user_tags`·`room_tags`·`tag_suggestions`,
-  인덱스 `room_tags(tag_id)`. 배포 뒤 서버 CLI로 초기 카탈로그 시드(`docs/plan/study-tags.md` 2절).
+- 공부방 태그(launch.md L4, 구현됨): `tags`(고유 `tags_name_key (name_key)`), `tag_aliases`(PK `alias_key`, 인덱스 `(tag_id)`),
+  `user_tags`(PK `(user_id, tag_id)`, 인덱스 `(tag_id)`), `tag_suggestions`(고유 `(user_id, name_key)`, 인덱스 `(status, created_at)`).
+  `user_id`는 모두 `ON DELETE CASCADE`. 배포 뒤 `dist/cli.js tags seed`로 초기 카탈로그를 넣는다(`docs/plan/study-tags.md` 2절,
+  [cli.md](cli.md)). 방 태그 `room_tags`는 공부방 항목에.
 - 첫 가입 온보딩(계약 0.5.0, 서버 미구현): 사용자 테이블에 `onboarding_completed_at timestamptz null`. 이 열이 생기기
   전에 가입한 사람(기존 사용자)은 성별을 골랐으면 그때 시각으로 채워 온보딩을 다시 보지 않게 한다(백필 방법은 서버 단계에서 확정).
   공개 프로필 응답에 `tags`(내 태그, 카탈로그 순서)가 실린다.

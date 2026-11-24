@@ -14,12 +14,12 @@ const DEV_SUBJECT = /^[a-z0-9_-]{1,32}$/;
 export function registerAuthRoutes(app: FastifyInstance): void {
   app.get('/auth/session', { config: { touchSession: true } }, async (request, reply) => {
     const { user, csrfToken } = request.auth!;
-    return reply.ok(serializeSession(user, csrfToken));
+    return reply.ok(await serializeSession(app.db, user, csrfToken));
   });
 
   app.post('/auth/start', { config: { auth: 'optional', csrf: false } }, async (request, reply) => {
     const key = readIdempotencyKey(request);
-    if (request.auth) return reply.ok(serializeSession(request.auth.user, request.auth.csrfToken));
+    if (request.auth) return reply.ok(await serializeSession(app.db, request.auth.user, request.auth.csrfToken));
 
     for (;;) {
       if (await claimKey(app.db, START_SCOPE, key, 'start')) {
@@ -34,7 +34,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
             contentType: 'application/json',
           });
           setSessionCookie(reply, created.token);
-          return reply.ok(serializeSession(created.user, created.csrfToken));
+          return reply.ok(await serializeSession(app.db, created.user, created.csrfToken));
         } catch (error) {
           await releaseKey(app.db, START_SCOPE, key);
           throw error;
@@ -52,7 +52,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       }
       const session = await createSession(app.db, user.id);
       setSessionCookie(reply, session.token);
-      return reply.ok(serializeSession(user, session.csrfToken));
+      return reply.ok(await serializeSession(app.db, user, session.csrfToken));
     }
   });
 
@@ -63,7 +63,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     const user = await findOrCreateDevAccount(app.db, subject);
     const session = await createSession(app.db, user.id);
     setSessionCookie(reply, session.token);
-    return reply.ok(serializeSession(user, session.csrfToken));
+    return reply.ok(await serializeSession(app.db, user, session.csrfToken));
   });
 
   app.post('/auth/logout', { config: { auth: 'optional' } }, async (request, reply) => {

@@ -238,3 +238,69 @@ export const reports = pgTable(
     index('reports_created_idx').on(table.createdAt),
   ],
 );
+
+/**
+ * 태그 카탈로그(study-tags.md). `name_key`는 비교용 정규화 이름(NFC·`#` 제거·앞뒤 공백·소문자)이고,
+ * 정규 이름과 별칭(`tag_aliases.alias_key`)은 서로 겹치지 않는다(겹침 검사는 CLI가 한다).
+ */
+export const tags = pgTable(
+  'tags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind', { enum: ['exam', 'kind'] }).notNull(),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('tags_name_key').on(table.nameKey)],
+);
+
+/** 태그 별칭(`정처기` → 정보처리기사). 자동완성에서 정규 태그로 바꿔 보인다. */
+export const tagAliases = pgTable(
+  'tag_aliases',
+  {
+    aliasKey: text('alias_key').primaryKey(),
+    alias: text('alias').notNull(),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index('tag_aliases_tag_idx').on(table.tagId)],
+);
+
+/** 내 태그(공개, 최대 5개는 서버가 확인). */
+export const userTags = pgTable(
+  'user_tags',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.tagId] }), index('user_tags_tag_idx').on(table.tagId)],
+);
+
+/** 카탈로그에 없는 태그 제안. 운영자가 CLI로 새 태그·별칭으로 받거나 거절한다. 같은 사람의 같은 이름은 한 건. */
+export const tagSuggestions = pgTable(
+  'tag_suggestions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    status: text('status', { enum: ['pending', 'accepted', 'rejected'] }).notNull().default('pending'),
+    /** 처리 결과: `tag:<이름>`(새 태그), `alias:<정규 이름>`(별칭), 거절이면 null. */
+    resolution: text('resolution'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('tag_suggestions_one_per_user').on(table.userId, table.nameKey),
+    index('tag_suggestions_status_created_idx').on(table.status, table.createdAt),
+  ],
+);

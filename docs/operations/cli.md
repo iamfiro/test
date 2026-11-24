@@ -5,7 +5,7 @@ last_verified: 2026-11-24
 
 # 운영 CLI
 
-관리자 화면이 없다(결정 9). 긴급 스위치·정지·신고 확인은 서버 CLI로 한다. CLI는 `DATABASE_URL`만 읽고
+관리자 화면이 없다(결정 9). 긴급 스위치·정지·신고 확인·태그 카탈로그 관리는 서버 CLI로 한다. CLI는 `DATABASE_URL`만 읽고
 DB에 바로 쓴다. 서버는 설정을 짧게(`SETTINGS_CACHE_MS`, 기본 5초) 캐시하므로 바꾼 값은 그 안에 모든 서버에 적용된다.
 정지·신고는 캐시 없이 바로 적용된다.
 
@@ -65,3 +65,28 @@ npm run cli -- reports list --handled --type nickname --limit 100
   `handled_at`·`action`을 남긴다. 닉네임은 `nickname_reset`(무작위 닉네임으로 되돌림). 메시지 숨김(L5)·복구는 채팅이 붙으면 추가한다.
 - 신고자·신고당한 사람이 "내 데이터 지우기"를 하면 그 신고도 함께 지워진다.
 - 반복 악용이면 위 정지 명령으로 계정·IP를 정지한다.
+
+## 태그 카탈로그·제안
+
+카탈로그는 서버 DB에 있다(`docs/plan/study-tags.md`). 배포 뒤 한 번 `tags seed`로 2절 초기 목록을 넣는다(다시 해도 늘지 않는다).
+이름·별칭은 비교 키(NFC, `#` 제거, 앞뒤 공백 제거, 소문자)로 서로 겹칠 수 없다. 태그를 이름으로 가리킨다(정규 이름이나 같은 키).
+
+```sh
+npm run cli -- tags seed
+npm run cli -- tags list                             # 태그·별칭(JSON 한 줄씩)
+npm run cli -- tags add exam 정보보안기사
+npm run cli -- tags alias 정보보안기사 정보보안
+npm run cli -- tags merge "코딩 공부" 코딩             # 코딩 공부를 단 사람·방은 코딩으로, "코딩 공부"는 코딩의 별칭이 된다
+```
+
+사용자가 카탈로그에 없는 태그를 제안하면(`POST /tag-suggestions`) 바로 태그가 되지 않고 여기서 검토한다.
+같은 이름(비교 키)의 대기 중 제안은 한 번에 같은 결과로 닫힌다.
+
+```sh
+npm run cli -- suggestions list --pending            # id, created_at, name, user_id, status, resolution
+npm run cli -- suggestions accept <id> exam          # 제안 이름으로 새 태그
+npm run cli -- suggestions alias <id> 정보처리기사      # 제안 이름을 기존 태그의 별칭으로
+npm run cli -- suggestions reject <id>
+```
+
+제안한 사람이 "내 데이터 지우기"를 하면 그 제안도 지워진다.

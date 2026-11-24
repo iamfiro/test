@@ -14,9 +14,24 @@ import {
   type IpRestrictionKind,
   type UserRestrictionKind,
 } from '../moderation/restrictions.js';
+import {
+  acceptSuggestionAsAlias,
+  acceptSuggestionAsTag,
+  addAlias,
+  addTag,
+  catalogWithAliases,
+  listSuggestions,
+  mergeTags,
+  rejectSuggestion,
+  seedTags,
+  TAG_KINDS,
+  type TagKind,
+} from '../tags/catalog.js';
 
 export interface CliContext {
   db: Db;
+  /** `tags merge`가 방 태그도 옮기도록 방 모듈이 넘긴다. 없으면 사용자 태그만 옮긴다. */
+  moveTagRefs?: Parameters<typeof mergeTags>[3];
   now: () => Date;
   /** 명령 결과(표준 출력). */
   out: (line: string) => void;
@@ -32,7 +47,16 @@ export const USAGE = `사용법: npm run cli -- <명령>
   unrestrict user <user_id> <종류>
   unrestrict ip <ip> <종류>
   restrictions list
-  reports list [--pending | --handled] [--type message|nickname|room_name] [--limit N]`;
+  reports list [--pending | --handled] [--type message|nickname|room_name] [--limit N]
+  tags seed                                  study-tags.md 2절 초기 카탈로그(이미 있는 것은 건너뜀)
+  tags list
+  tags add <exam|kind> <이름>
+  tags alias <정규 이름> <별칭>
+  tags merge <없앨 이름> <남길 이름>          없앤 이름은 남길 태그의 별칭이 된다
+  suggestions list [--pending] [--limit N]
+  suggestions accept <제안 id> <exam|kind>   제안 이름으로 새 태그
+  suggestions alias <제안 id> <정규 이름>     제안 이름을 기존 태그의 별칭으로
+  suggestions reject <제안 id>`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HOUR_MS = 60 * 60 * 1000;
@@ -225,6 +249,96 @@ async function reportsCommand(ctx: CliContext, args: string[]): Promise<void> {
   }
 }
 
+function tagKind(raw: string | undefined): TagKind {
+  if (!(TAG_KINDS as readonly string[]).includes(raw ?? '')) throw new UsageError(`태그 종류는 ${TAG_KINDS.join(', ')} 중 하나: ${raw}`);
+  return raw as TagKind;
+}
+
+function exactly(args: string[], n: number, usage: string): void {
+  if (args.length !== n) throw new UsageError(usage);
+}
+
+async function tagsCommand(ctx: CliContext, args: string[]): Promise<void> {
+  const [action, ...rest] = args;
+  switch (action) {
+    case 'seed': {
+      exactly(rest, 0, 'tags seed');
+      const added = await seedTags(ctx.db);
+      ctx.out(`seeded tags: ${added.tags} aliases: ${added.aliases}`);
+      return;
+    }
+    case 'list':
+      exactly(rest, 0, 'tags list');
+      for (const tag of await catalogWithAliases(ctx.db)) ctx.out(JSON.stringify(tag));
+      return;
+    case 'add': {
+      exactly(rest, 2, 'tags add <exam|kind> <이름>');
+      const tag = await addTag(ctx.db, tagKind(rest[0]), rest[1]!);
+      ctx.out(`added tag ${tag.name} (${tag.kind}) ${tag.id}`);
+      return;
+    }
+    case 'alias': {
+      exactly(rest, 2, 'tags alias <정규 이름> <별칭>');
+      const tag = await addAlias(ctx.db, rest[0]!, rest[1]!);
+      ctx.out(`added alias ${rest[1]} -> ${tag.name}`);
+      return;
+    }
+    case 'merge': {
+      exactly(rest, 2, 'tags merge <없앨 이름> <남길 이름>');
+      const merged = await mergeTags(ctx.db, rest[0]!, rest[1]!, ctx.moveTagRefs);
+      ctx.out(`merged ${merged.from} -> ${merged.into}`);
+      return;
+    }
+    default:
+      throw new UsageError('tags seed|list|add|alias|merge');
+  }
+}
+
+async function suggestionsCommand(ctx: CliContext, args: string[]): Promise<void> {
+  const [action, ...rest] = args;
+  if (action === 'list') {
+    const { flags, rest: extra } = parseFlags(rest, ['pending', 'limit']);
+    if (extra.length > 0) throw new UsageError(`남는 인자: ${extra.join(' ')}`);
+    const limitRaw = stringFlag(flags, 'limit');
+    const limit = limitRaw === undefined ? 100 : Math.floor(positiveNumber(limitRaw, 'limit'));
+    for (const row of await listSuggestions(ctx.db, { pending: flags.has('pending'), limit })) {
+      ctx.out(
+        JSON.stringify({
+          id: row.id,
+          created_at: row.createdAt.toISOString(),
+          name: row.name,
+          user_id: row.userId,
+          status: row.status,
+          resolution: row.resolution,
+          reviewed_at: row.reviewedAt?.toISOString() ?? null,
+        }),
+      );
+    }
+    return;
+  }
+  const id = rest[0];
+  if (!id || !UUID.test(id)) throw new UsageError(`제안 id는 UUID여야 한다: ${id}`);
+  if (action === 'accept') {
+    exactly(rest, 2, 'suggestions accept <제안 id> <exam|kind>');
+    const tag = await acceptSuggestionAsTag(ctx.db, id.toLowerCase(), tagKind(rest[1]));
+    ctx.out(`accepted as tag ${tag.name} (${tag.kind})`);
+    return;
+  }
+  if (action === 'alias') {
+    exactly(rest, 2, 'suggestions alias <제안 id> <정규 이름>');
+    const tag = await acceptSuggestionAsAlias(ctx.db, id.toLowerCase(), rest[1]!);
+    ctx.out(`accepted as alias of ${tag.name}`);
+    return;
+  }
+  if (action === 'reject') {
+    exactly(rest, 1, 'suggestions reject <제안 id>');
+    await rejectSuggestion(ctx.db, id.toLowerCase());
+    ctx.out(`rejected ${id}`);
+    return;
+  }
+  throw new UsageError('suggestions list|accept|alias|reject');
+}
+
 /** 운영 CLI 진입점(테스트가 직접 부른다). 종료 코드: 0 성공, 1 실행 오류, 2 사용법 오류. */
 export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
   const [command, ...args] = argv;
@@ -244,6 +358,12 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
         break;
       case 'reports':
         await reportsCommand(ctx, args);
+        break;
+      case 'tags':
+        await tagsCommand(ctx, args);
+        break;
+      case 'suggestions':
+        await suggestionsCommand(ctx, args);
         break;
       default:
         throw new UsageError(command ? `모르는 명령: ${command}` : '명령이 없다');

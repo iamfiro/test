@@ -10,7 +10,7 @@ import { serializeMe, serializeProfile } from './serialize.js';
 const ALLOWED_FIELDS = new Set(['nickname', 'avatar', 'gender']);
 
 export function registerProfileRoutes(app: FastifyInstance): void {
-  app.get('/users/me/profile', async (request, reply) => reply.ok({ profile: serializeProfile(request.auth!.user) }));
+  app.get('/users/me/profile', async (request, reply) => reply.ok({ profile: await serializeProfile(app.db, request.auth!.user) }));
 
   app.patch('/users/me/profile', { config: { idempotent: true } }, async (request, reply) => {
     const body = request.body;
@@ -40,7 +40,7 @@ export function registerProfileRoutes(app: FastifyInstance): void {
     }
 
     const [updated] = await app.db.update(users).set(changes).where(eq(users.id, request.auth!.user.id)).returning();
-    return reply.ok({ profile: serializeProfile(updated!) });
+    return reply.ok({ profile: await serializeProfile(app.db, updated!) });
   });
 
   app.put('/users/me/onboarding', { config: { idempotent: true } }, async (request, reply) => {
@@ -50,6 +50,6 @@ export function registerProfileRoutes(app: FastifyInstance): void {
       .set({ onboardingCompletedAt: sql`coalesce(${users.onboardingCompletedAt}, now())` })
       .where(eq(users.id, request.auth!.user.id))
       .returning();
-    return reply.ok(serializeMe(updated!));
+    return reply.ok(await serializeMe(app.db, updated!));
   });
 }
