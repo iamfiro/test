@@ -5,6 +5,8 @@ import { errors } from '../http/errors.js';
 import { intersect, totalMs, union, type Interval } from './intervals.js';
 import { readStudySettings } from './settings.js';
 import { splitByStudyDate, studyDateOf } from './time.js';
+import { syncLeagueWeek } from '../league/scores.js';
+import { weeksOverlapping } from '../league/week.js';
 
 /**
  * 타이머 상태를 바꾸는 곳은 이 파일 하나다(시작·일시정지·재개·끝내기·presence). 모두 계정 단위 잠금을 잡은
@@ -67,7 +69,7 @@ const segmentIntervals = (segments: SegmentValue[], nowMs: number): Interval[] =
 const isRunning = (segments: SegmentValue[]) => segments[segments.length - 1]?.ended_at === null;
 
 /** 같은 계정의 타이머 요청을 한 줄로 세운다(두 탭 동시 시작·끝내기). 트랜잭션이 끝나면 풀린다. */
-async function lockAccount(tx: DbExecutor, userId: string): Promise<void> {
+export async function lockAccount(tx: DbExecutor, userId: string): Promise<void> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`study-timer:${userId}`}, 0))`);
 }
 
@@ -105,13 +107,17 @@ async function observe(tx: DbExecutor, session: SessionRow, nowMs: number, mayOp
 
 /**
  * 세션의 인정 구간을 처음부터 다시 계산해 바꾼다: 공부 구간(열린 구간은 지금까지) ∩ (관측 구간 ± 45초).
- * 더하지 않고 다시 계산하므로 같은 신호를 여러 번 받아도 늘지 않는다.
+ * 더하지 않고 다시 계산하므로 같은 신호를 여러 번 받아도 늘지 않는다. 같은 트랜잭션에서 이 세션이 걸친 리그 주의
+ * 점수도 다시 계산한다(첫 인정 시간이면 그 주 그룹에 들어간다, study-league.md §4).
  */
 async function recomputeRanked(tx: DbExecutor, session: SessionRow, nowMs: number): Promise<void> {
   const spans = await tx.select().from(presenceSpans).where(eq(presenceSpans.sessionId, session.id));
   const windows = spans.map((s) => [s.startedAt.getTime() - PRESENCE_GRACE_MS, s.endedAt.getTime() + PRESENCE_GRACE_MS] as const);
   const ranked = intersect(segmentIntervals(session.segments, nowMs), windows);
-  await tx.delete(rankedSegments).where(eq(rankedSegments.sessionId, session.id));
+  const previous = await tx
+    .delete(rankedSegments)
+    .where(eq(rankedSegments.sessionId, session.id))
+    .returning({ startedAt: rankedSegments.startedAt, endedAt: rankedSegments.endedAt });
   const pieces = splitByStudyDate(ranked, session.timezone).filter((p) => p.end > p.start);
   if (pieces.length > 0) {
     await tx.insert(rankedSegments).values(
@@ -125,6 +131,11 @@ async function recomputeRanked(tx: DbExecutor, session: SessionRow, nowMs: numbe
       })),
     );
   }
+  const weeks = new Set<number>();
+  for (const [start, end] of [...ranked, ...previous.map((p) => [p.startedAt.getTime(), p.endedAt.getTime()] as const)]) {
+    if (end > start) for (const week of weeksOverlapping(start, end)) weeks.add(week);
+  }
+  for (const week of [...weeks].sort((a, b) => a - b)) await syncLeagueWeek(tx, session.userId, week);
 }
 
 /** 서버 시계가 뒤로 가도 구간이 뒤집히지 않게 세션의 마지막 경계보다 앞서지 않는 시각을 쓴다. */

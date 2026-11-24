@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppOptions } from '../../src/app.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import { sql } from 'drizzle-orm';
-import { TEST_DATABASE_URL, TEST_MEDIA_DIR, TEST_ROOM_PASSWORD_KEY, TEST_WEB_ORIGIN } from './env.js';
+import { TEST_DATABASE_URL, TEST_ENTRY_ID_HMAC_SECRET, TEST_MEDIA_DIR, TEST_ROOM_PASSWORD_KEY, TEST_WEB_ORIGIN } from './env.js';
 
 export function testConfig(overrides: Record<string, string | undefined> = {}): Config {
   return loadConfig({
@@ -14,6 +14,7 @@ export function testConfig(overrides: Record<string, string | undefined> = {}): 
     MEDIA_STORAGE: 'disk',
     MEDIA_DIR: TEST_MEDIA_DIR,
     MEDIA_PUBLIC_BASE_URL: 'http://localhost:5191/media',
+    ENTRY_ID_HMAC_SECRET: TEST_ENTRY_ID_HMAC_SECRET,
     ...overrides,
   });
 }

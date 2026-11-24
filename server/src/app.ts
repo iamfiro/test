@@ -16,6 +16,8 @@ import { registerStudySettingsRoutes } from './study/settings.js';
 import { registerTimerRoutes } from './study/routes.js';
 import { registerStatsRoutes } from './study/stats.js';
 import { registerStreakRoutes } from './study/streak.js';
+import { LeagueService } from './league/service.js';
+import { registerLeagueRoutes, startLeagueJob } from './league/routes.js';
 import { TimerService } from './study/timer.js';
 import { SettingsService } from './moderation/settings.js';
 import { registerReportRoutes } from './moderation/routes.js';
@@ -53,6 +55,8 @@ declare module 'fastify' {
     sockets: SocketHub;
     /** 방 실시간 상태(구독 중인 방). */
     live: LiveRooms;
+    /** 리그 순위표·정산·결과. */
+    league: LeagueService;
   }
 }
 
@@ -105,6 +109,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     'timer',
     new TimerService(handle.db, now, (error) => app.log.error({ err: error }, 'timer change listener failed')),
   );
+  app.decorate('league', new LeagueService(handle.db, now, config.league, config.entryIdSecret));
   app.decorate('settings', new SettingsService(handle.db, now, config.settingsCacheMs));
   const media = options.media ?? createMediaStorage(config);
   app.decorate('media', media);
@@ -208,6 +213,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerTimerRoutes(app);
   registerStatsRoutes(app);
   registerStreakRoutes(app);
+  registerLeagueRoutes(app);
   registerReportRoutes(app);
   registerTagRoutes(app);
   registerRoomRoutes(app);
@@ -217,6 +223,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   if (config.env !== 'test') {
     startMaintenance(app);
+    startLeagueJob(app);
     sockets.startHeartbeat();
     // 자리 비움(presence 75초 끊김)·순위 앞지름을 몇 초마다 다시 본다. 테스트는 시계를 옮긴 뒤 `app.live.sweep()`을 직접 부른다.
     const sweep = setInterval(() => {

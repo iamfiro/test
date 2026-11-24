@@ -6,6 +6,7 @@ const base = {
   WEB_ORIGIN: 'http://localhost:5190',
   ROOM_PASSWORD_KEY: Buffer.alloc(32, 1).toString('base64'),
   MEDIA_PUBLIC_BASE_URL: 'https://media.example.test',
+  ENTRY_ID_HMAC_SECRET: 'x'.repeat(32),
 };
 const r2 = {
   MEDIA_STORAGE: 'r2',
@@ -79,5 +80,20 @@ describe('설정 검증', () => {
     const { R2_BUCKET: _bucket, ...noBucket } = r2;
     expect(() => loadConfig({ ...base, ...noBucket, NODE_ENV: 'production' })).toThrow(/R2_BUCKET/);
     expect(loadConfig({ ...base, ...r2, NODE_ENV: 'production' }).media).toMatchObject({ storage: 'r2', bucket: 'bucket' });
+  });
+
+  it('리그: 항목 id 키는 32자 이상 필수, 상수는 초 단위 환경 변수(기본 7시간·3시간 30분·10분)', () => {
+    const { ENTRY_ID_HMAC_SECRET: _omit, ...noSecret } = base;
+    expect(() => loadConfig({ ...noSecret, NODE_ENV: 'development' })).toThrow(/ENTRY_ID_HMAC_SECRET/);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'development', ENTRY_ID_HMAC_SECRET: 'short' })).toThrow(/ENTRY_ID_HMAC_SECRET/);
+    expect(loadConfig({ ...base, NODE_ENV: 'development' }).league).toEqual({
+      promoteMinSeconds: 25_200,
+      stayMinSeconds: 12_600,
+      settleDelayMs: 600_000,
+    });
+    expect(
+      loadConfig({ ...base, NODE_ENV: 'development', LEAGUE_PROMOTE_MIN: '3600', LEAGUE_STAY_MIN: '60', LEAGUE_SETTLE_DELAY: '0' }).league,
+    ).toEqual({ promoteMinSeconds: 3600, stayMinSeconds: 60, settleDelayMs: 0 });
+    expect(() => loadConfig({ ...base, NODE_ENV: 'development', LEAGUE_PROMOTE_MIN: '7h' })).toThrow(/LEAGUE_PROMOTE_MIN/);
   });
 });

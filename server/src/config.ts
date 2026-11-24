@@ -64,11 +64,25 @@ const envSchema = z.object({
   R2_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   R2_BUCKET: z.string().min(1).optional(),
+  ENTRY_ID_HMAC_SECRET: z.string().min(32, '32자 이상이어야 한다(`openssl rand -base64 32`)'),
+  LEAGUE_PROMOTE_MIN: z.coerce.number().int().min(0).default(7 * 3600),
+  LEAGUE_STAY_MIN: z.coerce.number().int().min(0).default(3 * 3600 + 30 * 60),
+  LEAGUE_SETTLE_DELAY: z.coerce.number().int().min(0).default(600),
 });
 
 export type MediaConfig =
   | { storage: 'disk'; publicBaseUrl: string; dir: string }
   | { storage: 'r2'; publicBaseUrl: string; accountId: string; accessKeyId: string; secretAccessKey: string; bucket: string };
+
+/** 리그 상수(study-league.md §1). 환경 변수 값은 모두 초다. */
+export interface LeagueConfig {
+  /** 일반 리그 승급 최소 주 점수(`LEAGUE_PROMOTE_MIN`, 기본 7시간). */
+  promoteMinSeconds: number;
+  /** 카페인 리그 잔류 최소 주 점수(`LEAGUE_STAY_MIN`, 기본 3시간 30분). */
+  stayMinSeconds: number;
+  /** 주 마감 뒤 정산까지 기다리는 시간(`LEAGUE_SETTLE_DELAY`, 기본 10분. presence 늦음 허용보다 넉넉히). */
+  settleDelayMs: number;
+}
 
 export interface Config {
   env: 'development' | 'test' | 'production';
@@ -92,6 +106,9 @@ export interface Config {
   inviteWebOrigin: string;
   /** 미디어 저장소(방 배너·로고). 운영은 R2만. */
   media: MediaConfig;
+  /** 리그 순위표 항목 id(HMAC) 키. 사용자 id를 내보내지 않으려고 쓴다. */
+  entryIdSecret: string;
+  league: LeagueConfig;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -143,5 +160,11 @@ export function loadConfig(env: Env): Config {
     roomPasswordKey: value.ROOM_PASSWORD_KEY,
     inviteWebOrigin: value.INVITE_WEB_ORIGIN ?? value.WEB_ORIGIN[0]!,
     media,
+    entryIdSecret: value.ENTRY_ID_HMAC_SECRET,
+    league: {
+      promoteMinSeconds: value.LEAGUE_PROMOTE_MIN,
+      stayMinSeconds: value.LEAGUE_STAY_MIN,
+      settleDelayMs: value.LEAGUE_SETTLE_DELAY * 1000,
+    },
   };
 }

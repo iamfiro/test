@@ -59,6 +59,14 @@ last_verified: 2026-11-23
   API와 같은 호스트·포트로 넘겨야 하고, 유휴 제한이 서버 ping 25초보다 길어야 한다(Cloudflare 100초). 채팅 IP 쓰기 제한·IP 정지도
   `TRUST_PROXY`에 달려 있다. 서버 1대 전제(결정 M7): 늘리면 실시간 이벤트를 `LISTEN/NOTIFY`로 바꿔야 하므로, Supabase는 세션 모드
   연결을 쓴다.
+- 리그·스트릭(launch.md L6, 구현됨): `league_memberships`(사용자당 한 행, 리그·적용 시작 주), `league_weeks`(PK `week_start`,
+  `open`→`settled`), `league_groups`(주·리그마다 최대 30명, 인덱스 `(week_start, league, created_at)`, `member_count`는 탈퇴해도 줄지
+  않음), `league_group_members`(PK `(week_start, user_id)`, 인덱스 `(group_id, score_seconds desc, last_scored_at)`·`(user_id)`),
+  `league_results`(PK `(week_start, user_id)`로 정산 멱등, 인덱스 `(user_id, week_start)`). 사용자 행은 모두 `user_id` `ON DELETE CASCADE`.
+  스트릭은 테이블 없이 `ranked_segments`로 계산한다. 새 환경 변수: `ENTRY_ID_HMAC_SECRET`(필수, 32자 이상, 순위표 항목 id HMAC 키.
+  바꾸면 그 주 항목 id만 바뀐다), `LEAGUE_PROMOTE_MIN`(초, 기본 25200)·`LEAGUE_STAY_MIN`(초, 기본 12600)·`LEAGUE_SETTLE_DELAY`(초, 기본 600).
+  정산은 서버가 시작할 때(밀린 주를 순서대로)와 1분마다 확인해 돈다(`pg_advisory_xact_lock`으로 하나만). 서버가 마감 뒤 오래
+  꺼져 있으면 다시 켤 때 밀린 주가 한꺼번에 정산된다.
 
 ## 환경 변수
 

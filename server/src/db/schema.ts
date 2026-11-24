@@ -436,3 +436,93 @@ export const chatBlocks = pgTable(
     index('chat_blocks_blocked_user_idx').on(table.blockedUserId),
   ],
 );
+
+/**
+ * 리그 소속(study-league.md §1). 행이 없으면 일반 리그다. 그 주에 인정 시간이 처음 생겨 그룹에 들어갈 때 만들고,
+ * 리그는 주 정산 때만 바뀐다. `since_week`는 이 리그가 적용되기 시작한 리그 주 시작 시각이다.
+ */
+export const leagueMemberships = pgTable('league_memberships', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  league: text('league', { enum: ['general', 'top'] }).notNull(),
+  sinceWeek: timestamp('since_week', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * 리그 주(`Asia/Seoul` 월요일 04:00 시작). 인정 시간이 처음 생기거나 정산할 때 행을 만든다. 정산은 한 트랜잭션에서
+ * 결과·리그 이동을 쓰고 `settled`로 바꾼다(두 번 돌아도 한 번만). `settled`인 주의 점수는 더 바뀌지 않는다.
+ */
+export const leagueWeeks = pgTable('league_weeks', {
+  weekStart: timestamp('week_start', { withTimezone: true }).primaryKey(),
+  status: text('status', { enum: ['open', 'settled'] }).notNull(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+});
+
+/** 주마다 리그 안 최대 30명 그룹. `member_count`는 들어온 사람 수이고 탈퇴해도 줄지 않는다(그 주 그룹 크기 고정). */
+export const leagueGroups = pgTable(
+  'league_groups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    weekStart: timestamp('week_start', { withTimezone: true })
+      .notNull()
+      .references(() => leagueWeeks.weekStart),
+    league: text('league', { enum: ['general', 'top'] }).notNull(),
+    memberCount: integer('member_count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('league_groups_week_league_idx').on(table.weekStart, table.league, table.createdAt),
+    check('league_groups_member_count_range', sql`${table.memberCount} between 0 and 30`),
+  ],
+);
+
+/**
+ * 그룹 멤버와 그 주 점수. 점수는 `ranked_segments`의 절대 시각이 주 안에 든 부분의 합(초)이고, 타이머가 인정 구간을
+ * 다시 계산하는 같은 트랜잭션에서 다시 계산해 바꾼다. `last_scored_at`은 그 점수에 닿은 시각(동점이면 이른 사람이 위).
+ */
+export const leagueGroupMembers = pgTable(
+  'league_group_members',
+  {
+    weekStart: timestamp('week_start', { withTimezone: true }).notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => leagueGroups.id),
+    scoreSeconds: integer('score_seconds').notNull(),
+    lastScoredAt: timestamp('last_scored_at', { withTimezone: true, precision: 3 }),
+    joinedAt: timestamp('joined_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.weekStart, table.userId] }),
+    index('league_group_members_group_score_idx').on(table.groupId, table.scoreSeconds.desc(), table.lastScoredAt),
+    index('league_group_members_user_idx').on(table.userId),
+  ],
+);
+
+/**
+ * 주 정산 결과. (week_start, user_id)마다 하나라 정산을 다시 돌려도 한 번만 남는다. 그 주 그룹에 없던 카페인 리그
+ * 소속(강등)은 `group_id`·`rank`·`group_size`가 null이다. `seen_at`은 결과 시트를 닫은 시각. 보상은 없다(M1).
+ */
+export const leagueResults = pgTable(
+  'league_results',
+  {
+    weekStart: timestamp('week_start', { withTimezone: true }).notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    league: text('league', { enum: ['general', 'top'] }).notNull(),
+    groupId: uuid('group_id').references(() => leagueGroups.id),
+    rank: integer('rank'),
+    groupSize: integer('group_size'),
+    scoreSeconds: integer('score_seconds').notNull(),
+    outcome: text('outcome', { enum: ['promoted', 'stayed', 'relegated'] }).notNull(),
+    nextLeague: text('next_league', { enum: ['general', 'top'] }).notNull(),
+    seenAt: timestamp('seen_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.weekStart, table.userId] }), index('league_results_user_week_idx').on(table.userId, table.weekStart)],
+);
