@@ -22,9 +22,15 @@ export type RoomChange =
   | { type: 'room_updated'; roomId: string }
   | { type: 'room_deleted'; roomId: string; memberIds: string[] }
   | { type: 'member_joined'; roomId: string; userId: string }
+  | { type: 'member_moved'; roomId: string; userId: string }
   | { type: 'member_left'; roomId: string; userId: string; reason: 'left' | 'removed' | 'account_deleted' };
 
 export const FREE_MAPS = new Set(['cafe']);
+/**
+ * 맵 자리 수(세 맵 모두 33석, 계약 RoomMap). 자리 번호는 0–32로 웹 `room3d/scenes.ts`의 `cafeSeats`(원본 GLB `seat_NN`)
+ * 순서와 같다. 정원은 이 수를 넘지 않으므로 멤버는 늘 자기 자리가 있다.
+ */
+export const MAP_SEATS = 33;
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const IP_WINDOW_SECONDS = 24 * 60 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -99,6 +105,14 @@ async function membershipOf(tx: DbExecutor, userId: string): Promise<{ roomId: s
 async function memberCount(tx: DbExecutor, roomId: string): Promise<number> {
   const [row] = await tx.select({ n: count() }).from(studyRoomMembers).where(eq(studyRoomMembers.roomId, roomId));
   return row!.n;
+}
+
+/** 비어 있는 가장 작은 자리 번호. 방 행이 잠겨 있어야 한다(같은 자리에 두 사람이 앉지 않게). */
+async function freeSeat(tx: DbExecutor, roomId: string): Promise<number> {
+  const rows = await tx.select({ seat: studyRoomMembers.seat }).from(studyRoomMembers).where(eq(studyRoomMembers.roomId, roomId));
+  const taken = new Set(rows.map((row) => row.seat));
+  for (let seat = 0; seat < MAP_SEATS; seat += 1) if (!taken.has(seat)) return seat;
+  throw errors.roomFull();
 }
 
 async function setRoomTags(tx: DbExecutor, roomId: string, tagIds: string[]): Promise<void> {
@@ -223,7 +237,7 @@ export class RoomService {
           passwordCiphertext: this.encrypt(input.password),
         })
         .returning({ id: studyRooms.id });
-      await tx.insert(studyRoomMembers).values({ roomId: room!.id, userId });
+      await tx.insert(studyRoomMembers).values({ roomId: room!.id, userId, seat: 0 });
       await setRoomTags(tx, room!.id, input.tagIds);
       await tx.insert(roomCreations).values({ ip: address });
       pending.changes.push({ type: 'room_created', roomId: room!.id, userId });
@@ -253,7 +267,7 @@ export class RoomService {
         if (!options.leaveCurrent) throw errors.roomAlreadyMember(current.roomId, current.isHost);
         await this.leaveInTx(tx, pending, userId, current);
       }
-      await tx.insert(studyRoomMembers).values({ roomId, userId });
+      await tx.insert(studyRoomMembers).values({ roomId, userId, seat: await freeSeat(tx, roomId) });
       pending.changes.push({ type: 'member_joined', roomId, userId });
     });
   }
@@ -292,6 +306,23 @@ export class RoomService {
         .where(and(eq(studyRoomMembers.roomId, roomId), eq(studyRoomMembers.userId, targetId.toLowerCase())))
         .returning({ userId: studyRoomMembers.userId });
       if (removed.length > 0) pending.changes.push({ type: 'member_left', roomId, userId: removed[0]!.userId, reason: 'removed' });
+    });
+  }
+
+  /**
+   * 자리 옮기기(멤버 본인). 같은 자리면 그대로 성공(재시도). 다른 사람이 앉은 자리면 409. 방 행을 잠가 참여·다른
+   * 사람의 자리 옮기기와 한 줄로 세운다.
+   */
+  async moveSeat(userId: string, roomId: string, seat: number): Promise<void> {
+    await this.run(async (tx, pending) => {
+      if (!(await lockRooms(tx, [roomId])).has(roomId)) throw errors.notFound('공부방을 찾을 수 없어요');
+      const rows = await tx.select({ userId: studyRoomMembers.userId, seat: studyRoomMembers.seat }).from(studyRoomMembers).where(eq(studyRoomMembers.roomId, roomId));
+      const mine = rows.find((row) => row.userId === userId);
+      if (!mine) throw errors.roomNotMember();
+      if (mine.seat === seat) return;
+      if (rows.some((row) => row.seat === seat)) throw errors.roomSeatTaken();
+      await tx.update(studyRoomMembers).set({ seat }).where(and(eq(studyRoomMembers.roomId, roomId), eq(studyRoomMembers.userId, userId)));
+      pending.changes.push({ type: 'member_moved', roomId, userId });
     });
   }
 

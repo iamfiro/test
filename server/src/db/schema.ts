@@ -344,10 +344,14 @@ export const studyRoomMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     joinedAt: timestamp('joined_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    /** 3D 맵의 자리 번호(0부터, 웹 `scenes.ts` `cafeSeats`·GLB `seat_NN` 순서). 방 안에서 겹치지 않는다. */
+    seat: integer('seat').notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.roomId, table.userId] }),
     uniqueIndex('study_room_members_one_room_per_user').on(table.userId),
+    uniqueIndex('study_room_members_room_seat').on(table.roomId, table.seat),
+    check('study_room_members_seat_nonnegative', sql`${table.seat} >= 0`),
   ],
 );
 

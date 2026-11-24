@@ -57,6 +57,13 @@
       "when": 1795528672029,
       "tag": "0007_room_images",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795529919696,
+      "tag": "0008_room_seats",
+      "breakpoints": true
     }
   ]
 }

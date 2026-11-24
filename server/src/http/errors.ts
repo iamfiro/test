@@ -44,6 +44,8 @@ export const errors = {
   roomFull: () => new AppError(409, 'STUDY_ROOM_FULL', '정원이 찼어요'),
   roomAlreadyMember: (roomId: string, isHost: boolean) =>
     new AppError(409, 'STUDY_ROOM_ALREADY_MEMBER', '공부방은 하나만 참여할 수 있어요', { room_id: roomId, is_host: isHost }),
+  roomNotMember: () => new AppError(403, 'STUDY_ROOM_NOT_MEMBER', '이 공부방 멤버가 아니에요'),
+  roomSeatTaken: () => new AppError(409, 'STUDY_ROOM_SEAT_TAKEN', '다른 사람이 앉은 자리예요'),
   roomCapacityBelowMembers: () =>
     new AppError(409, 'STUDY_ROOM_CAPACITY_BELOW_MEMBERS', '지금 멤버 수보다 정원을 작게 할 수 없어요'),
   roomCreateDisabled: () => new AppError(503, 'ROOM_CREATE_DISABLED', '지금은 공부방을 만들 수 없어요. 잠시 뒤 다시 시도해 주세요'),

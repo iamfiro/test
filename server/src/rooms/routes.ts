@@ -7,14 +7,12 @@ import { parseTagIds } from '../tags/routes.js';
 import { ROOM_PASSWORD } from './password.js';
 import { sniffImage } from '../media/image.js';
 import type { UploadBody } from '../media/routes.js';
-import { FREE_MAPS, IMAGE_SLOTS, type ImageSlot, type RoomCreateInput, type RoomPatch } from './service.js';
+import { FREE_MAPS, IMAGE_SLOTS, MAP_SEATS, type ImageSlot, type RoomCreateInput, type RoomPatch } from './service.js';
 import { invitePreview, listRooms, roomDetail, type RoomDetail, type RoomScope, type ViewContext } from './views.js';
 
 const NAME_MAX = 40;
 const DESCRIPTION_MAX = 100;
 const CAPACITY_MIN = 2;
-/** 맵 자리 수(세 맵 모두 33석, 계약 RoomMap). 계약 상한 50보다 작다. */
-const MAP_SEATS = 33;
 const ROOM_TAGS_MAX = 3;
 const MAPS = ['cafe', 'library', 'rooftop'] as const;
 const SCOPES: RoomScope[] = ['mine', 'all', 'recommended'];
@@ -230,6 +228,17 @@ export function registerRoomRoutes(app: FastifyInstance): void {
     await app.rooms.kick(request.auth!.user.id, roomId, targetId);
     request.log.info(`study room member removed room: ${shortId(roomId)} user: ${shortId(targetId)}`);
     return sendDetail(request, reply, await detailOf(request, roomId));
+  });
+
+  app.put('/study-rooms/:room_id/seat', { config: { idempotent: true } }, async (request, reply) => {
+    const roomId = roomIdParam(request);
+    const { seat } = objectBody(request.body, ['seat']);
+    if (typeof seat !== 'number' || !Number.isInteger(seat) || seat < 0 || seat >= MAP_SEATS) {
+      throw errors.validation(`자리 번호는 0–${MAP_SEATS - 1}이에요`, 'seat');
+    }
+    await app.rooms.moveSeat(request.auth!.user.id, roomId, seat);
+    request.log.info(`study room seat moved room: ${shortId(roomId)} seat: ${seat}`);
+    return reply.ok({ seat });
   });
 
   const slotParam = (request: FastifyRequest): ImageSlot => {

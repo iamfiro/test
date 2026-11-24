@@ -733,6 +733,64 @@ describe('공부방', () => {
     });
   });
 
+  describe('자리(3D 맵 자리 번호)', () => {
+    const seats = async (roomId: string) => {
+      const result = await app.db.execute(sql`select user_id, seat from study_room_members where room_id = ${roomId} order by seat`);
+      return (result.rows as { user_id: string; seat: number }[]).map((r) => [r.user_id, r.seat]);
+    };
+    const move = (who: TestSession, roomId: string, seat: unknown) => send(who, 'PUT', `/study-rooms/${roomId}/seat`, { seat });
+
+    it('방장은 0번, 들어오는 사람은 빈 자리 중 가장 작은 번호에 앉는다', async () => {
+      const host = await person();
+      const { room } = await createOk(host);
+      const a = await person();
+      const b = await person();
+      await join(a, room.id);
+      expect(await seats(room.id)).toEqual([[host.userId, 0], [a.userId, 1]]);
+      const moved = await move(a, room.id, 5);
+      expect(moved.statusCode, moved.body).toBe(200);
+      expectContract('/study-rooms/{room_id}/seat', 'put', 200, moved.json());
+      expect(moved.json().data).toEqual({ seat: 5 });
+      await join(b, room.id);
+      expect(await seats(room.id)).toEqual([[host.userId, 0], [b.userId, 1], [a.userId, 5]]);
+    });
+
+    it('자리 옮기기: 같은 자리는 그대로, 남의 자리 409, 범위 밖 422, 멤버 아님 403, 없는 방 404', async () => {
+      const host = await person();
+      const { room } = await createOk(host);
+      const a = await person();
+      await join(a, room.id);
+      expect((await move(a, room.id, 1)).statusCode).toBe(200);
+      const taken = await move(a, room.id, 0);
+      expect(taken.statusCode).toBe(409);
+      expectContract('/study-rooms/{room_id}/seat', 'put', 409, taken.json());
+      expect(taken.json().error.code).toBe('STUDY_ROOM_SEAT_TAKEN');
+      for (const bad of [-1, 33, 1.5, '3', null]) {
+        const res = await move(a, room.id, bad);
+        expect(res.statusCode, String(bad)).toBe(422);
+        expectContract('/study-rooms/{room_id}/seat', 'put', 422, res.json());
+      }
+      const stranger = await person();
+      const forbidden = await move(stranger, room.id, 3);
+      expect(forbidden.statusCode).toBe(403);
+      expectContract('/study-rooms/{room_id}/seat', 'put', 403, forbidden.json());
+      expect(forbidden.json().error.code).toBe('STUDY_ROOM_NOT_MEMBER');
+      expect((await move(a, randomUUID(), 3)).statusCode).toBe(404);
+      expect(await seats(room.id)).toEqual([[host.userId, 0], [a.userId, 1]]);
+    });
+
+    it('동시에 같은 빈자리로 옮기면 한 사람만 앉는다', async () => {
+      const host = await person();
+      const { room } = await createOk(host);
+      const a = await person();
+      const b = await person();
+      await join(a, room.id);
+      await join(b, room.id);
+      const results = await Promise.all([move(a, room.id, 9), move(b, room.id, 9)]);
+      expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    });
+  });
+
   describe('커밋 뒤 알림(L5 실시간 이벤트 자리)', () => {
     it('참여·수정·내보내기·나가기·삭제를 커밋 뒤에 알린다', async () => {
       const seen: RoomChange[] = [];
@@ -745,6 +803,7 @@ describe('공부방', () => {
         await join(a, room.id);
         await join(b, room.id);
         await send(host, 'PATCH', `/study-rooms/${room.id}`, { name: '바뀐 이름' });
+        await send(b, 'PUT', `/study-rooms/${room.id}/seat`, { seat: 4 });
         await send(host, 'DELETE', `/study-rooms/${room.id}/members/${a.userId}`);
         await send(b, 'POST', `/study-rooms/${room.id}/leave`);
         await send(host, 'DELETE', `/study-rooms/${room.id}`);
@@ -753,6 +812,7 @@ describe('공부방', () => {
           'member_joined',
           'member_joined',
           'room_updated',
+          'member_moved',
           'member_left:removed',
           'member_left:left',
           'room_deleted',
