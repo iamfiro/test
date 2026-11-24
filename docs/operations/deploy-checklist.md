@@ -28,6 +28,12 @@ last_verified: 2026-11-23
   `presence_spans`(서버가 받은 presence 시각으로 이은 관측 구간, 인덱스 `(session_id, ended_at)`),
   `ranked_segments`(인정 공부 구간 = 공부 구간 ∩ 관측 구간 ±45초, 리그·스트릭 L6의 원천. 인덱스 `(user_id, started_at)`·`(user_id, study_date)`·`(session_id)`).
   모두 `user_id` `ON DELETE CASCADE`. 새 환경 변수 없음(75초·45초는 코드 상수, PocketTimeServer와 같은 값).
+- 익명 악용 대비(launch.md L2b, 구현됨): `app_settings`(긴급 스위치 key/value, 행이 없으면 켜짐), `user_restrictions`
+  (계정 정지, PK `(user_id, kind)`, `user_id` `ON DELETE CASCADE`), `ip_restrictions`(IP 정지, PK `(ip, kind)`, 인덱스 `(until)`,
+  기한이 지나면 서버가 지움), `reports`(신고, `reporter_user_id`·`target_user_id` 모두 `ON DELETE CASCADE`, 고유 인덱스
+  `reports_one_per_reporter (reporter_user_id, target_type, target_id, content)`, 인덱스 `(target_type, target_id)`·`(target_user_id)`·`(created_at)`).
+  새 환경 변수 `REPORT_HIDE_THRESHOLD`(기본 3)·`SETTINGS_CACHE_MS`(기본 5000). 금칙어 목록 `server/data/banned_words.txt`를
+  서버 이미지에 함께 넣는다(없으면 서버가 시작을 거부). 운영 CLI(`dist/cli.js`) 사용법은 [cli.md](cli.md).
 
 ## 환경 변수
 

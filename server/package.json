@@ -14,7 +14,8 @@
     "db:up": "docker compose up -d --wait postgres",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "cli": "tsx --env-file-if-exists=.env src/cli.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
