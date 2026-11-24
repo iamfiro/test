@@ -1,0 +1,7 @@
+# Netlify 응답 헤더(docs/plan/study-landing.md §7, launch.md F7). 검색 노출은 랜딩(`/`)만 한다(결정 8).
+/room/*
+  X-Robots-Tag: noindex
+/r
+  X-Robots-Tag: noindex
+/login
+  X-Robots-Tag: noindex
