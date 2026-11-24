@@ -1,14 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
-import { users } from '../db/schema.js';
+import { studyRooms, users } from '../db/schema.js';
 import { errors } from '../http/errors.js';
 import { randomNickname } from '../profile/nickname.js';
 import { fileReport, REPORT_DETAIL_MAX, REPORT_REASONS, type ReportReason, type ReportRow } from './reports.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_FIELDS = ['target_type', 'target_id', 'reason', 'detail'];
-/** HTTP로 받는 대상 종류. 메시지는 L5 소켓 계약, 방 이름은 L4(방 테이블)에서 붙인다. */
-const HTTP_TARGET_TYPES = new Set(['nickname']);
+/** HTTP로 받는 대상 종류. 메시지 신고는 L5 소켓 계약에서 한다. */
+const HTTP_TARGET_TYPES = new Set(['nickname', 'room_name']);
 /** 줄바꿈·탭을 뺀 제어 문자. */
 const CONTROL = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/;
 
@@ -59,32 +59,61 @@ export function registerReportRoutes(app: FastifyInstance): void {
       throw errors.validation('신고 이유가 올바르지 않아요', 'reason');
     }
     const detail = parseDetail(reason as ReportReason, input.detail);
-    const targetUserId = input.target_id.toLowerCase();
-
-    const result = await fileReport(app.db, {
+    const targetId = input.target_id.toLowerCase();
+    const targetType = input.target_type as 'nickname' | 'room_name';
+    const common = {
       reporterUserId: request.auth!.user.id,
-      targetType: 'nickname',
-      targetId: targetUserId,
+      targetType,
+      targetId,
       reason: reason as ReportReason,
       detail,
       threshold: app.config.reportHideThreshold,
-      loadTarget: async (tx) => {
-        const [row] = await tx
-          .select({ id: users.id, nickname: users.nickname })
-          .from(users)
-          .where(eq(users.id, targetUserId))
-          .for('update');
-        return row ? { targetUserId: row.id, content: row.nickname } : null;
-      },
-      // 사람이 보기 전에 서로 다른 여러 명이 같은 닉네임을 신고했다: 바로 무작위 이름으로 되돌린다(신고 기록은 남는다).
-      onThreshold: async (tx, target) => {
-        await tx.update(users).set({ nickname: randomNickname() }).where(eq(users.id, target.targetUserId));
-        return 'nickname_reset';
-      },
-    });
+    };
+
+    const result =
+      targetType === 'nickname'
+        ? await fileReport(app.db, {
+            ...common,
+            loadTarget: async (tx) => {
+              const [row] = await tx
+                .select({ id: users.id, nickname: users.nickname })
+                .from(users)
+                .where(eq(users.id, targetId))
+                .for('update');
+              return row ? { targetUserId: row.id, content: row.nickname } : null;
+            },
+            // 사람이 보기 전에 서로 다른 여러 명이 같은 닉네임을 신고했다: 바로 무작위 이름으로 되돌린다(신고 기록은 남는다).
+            onThreshold: async (tx, target) => {
+              await tx.update(users).set({ nickname: randomNickname() }).where(eq(users.id, target.targetUserId));
+              return 'nickname_reset';
+            },
+          })
+        : await fileReport(app.db, {
+            ...common,
+            // 방 이름의 주인은 방장이다(내 방 이름은 신고할 수 없다).
+            loadTarget: async (tx) => {
+              const [row] = await tx
+                .select({ hostUserId: studyRooms.hostUserId, name: studyRooms.name })
+                .from(studyRooms)
+                .where(eq(studyRooms.id, targetId))
+                .for('update');
+              return row ? { targetUserId: row.hostUserId, content: row.name } : null;
+            },
+            // 같은 이유로 바로 앱 기본 이름(study_ko.arb studyRoomNameDefault "{nickname}의 공부방")으로 바꾼다.
+            // 방장은 수정에서 다시 이름을 지을 수 있다(금칙어 검사는 그대로).
+            onThreshold: async (tx, target) => {
+              const [host] = await tx.select({ nickname: users.nickname }).from(users).where(eq(users.id, target.targetUserId));
+              await tx
+                .update(studyRooms)
+                .set({ name: `${host!.nickname}의 공부방`, updatedAt: app.now() })
+                .where(eq(studyRooms.id, targetId));
+              return 'room_name_reset';
+            },
+          });
     if (result.action) {
+      if (result.action === 'room_name_reset') app.rooms.notify({ type: 'room_updated', roomId: targetId });
       request.log.warn(
-        `report threshold reached target_type: nickname target: ${shortId(targetUserId)} action: ${result.action} elapsed_ms: ${Date.now() - startedAt}`,
+        `report threshold reached target_type: ${targetType} target: ${shortId(targetId)} action: ${result.action} elapsed_ms: ${Date.now() - startedAt}`,
       );
     }
     return reply.ok({ report: serializeReport(result.report) });

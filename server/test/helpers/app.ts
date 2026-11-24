@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppOptions } from '../../src/app.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import { sql } from 'drizzle-orm';
-import { TEST_DATABASE_URL, TEST_WEB_ORIGIN } from './env.js';
+import { TEST_DATABASE_URL, TEST_ROOM_PASSWORD_KEY, TEST_WEB_ORIGIN } from './env.js';
 
 export function testConfig(overrides: Record<string, string | undefined> = {}): Config {
   return loadConfig({
@@ -10,6 +10,7 @@ export function testConfig(overrides: Record<string, string | undefined> = {}): 
     DATABASE_URL: TEST_DATABASE_URL,
     WEB_ORIGIN: TEST_WEB_ORIGIN,
     LOG_LEVEL: 'silent',
+    ROOM_PASSWORD_KEY: TEST_ROOM_PASSWORD_KEY,
     ...overrides,
   });
 }

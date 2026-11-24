@@ -80,7 +80,8 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
   app.delete('/users/me', async (request, reply) => {
     const userId = request.auth!.user.id;
-    await app.db.transaction(async (tx) => {
+    // 내가 방장인 방은 지우고 다른 방 자리는 비운다(방 서비스가 같은 트랜잭션에서 하고 커밋 뒤 알린다).
+    await app.rooms.deleteAccount(userId, async (tx) => {
       // 멱등 기록은 사용자 id를 열이 아닌 범위 문자열로 갖고 있어 따로 지운다.
       await tx.delete(idempotencyKeys).where(eq(idempotencyKeys.scope, `user:${userId}`));
       await tx.delete(users).where(eq(users.id, userId)); // 세션 등 사용자에 딸린 행은 cascade

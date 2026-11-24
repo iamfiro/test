@@ -14,6 +14,11 @@ declare module 'fastify' {
     /** 키를 묶는 범위. 로그인한 요청은 `user:<id>`, 아니면 `ip:<ip>`. 인증 훅이 정한다. */
     idempotencyScope?: string;
     idempotencyClaim?: { scope: string; key: string };
+    /**
+     * 재전송용 기록에 남길 본문을 바꾼다(없으면 응답 그대로). 응답에만 실어야 하고 DB에 24시간 두면 안 되는 값
+     * (방장 상세의 방 비밀번호)을 빼는 데 쓴다. 그래서 재전송 응답에는 그 값이 없다(계약에 적음).
+     */
+    idempotencyReceipt?: (payload: string) => string;
   }
 }
 
@@ -95,6 +100,7 @@ export async function awaitStored(db: Db, scope: string, key: string, hash: stri
 export function registerIdempotency(app: FastifyInstance): void {
   app.decorateRequest('idempotencyScope', undefined);
   app.decorateRequest('idempotencyClaim', undefined);
+  app.decorateRequest('idempotencyReceipt', undefined);
 
   app.addHook('preHandler', async (request, reply) => {
     if (!request.routeOptions.config.idempotent) return;
@@ -126,9 +132,10 @@ export function registerIdempotency(app: FastifyInstance): void {
       if (reply.statusCode >= 500) {
         await releaseKey(app.db, claimed.scope, claimed.key);
       } else {
+        const body = typeof payload === 'string' ? payload : String(payload ?? '');
         await completeKey(app.db, claimed.scope, claimed.key, {
           status: reply.statusCode,
-          body: typeof payload === 'string' ? payload : String(payload ?? ''),
+          body: request.idempotencyReceipt ? request.idempotencyReceipt(body) : body,
           contentType: String(reply.getHeader('content-type') ?? 'application/json; charset=utf-8'),
         });
       }

@@ -304,3 +304,85 @@ export const tagSuggestions = pgTable(
     index('tag_suggestions_status_created_idx').on(table.status, table.createdAt),
   ],
 );
+
+/**
+ * 공부방(study-room-detail.md). 방장은 첫 멤버이고 방장이 계정을 지우면 방도 지운다(cascade). 비밀번호는 방장이
+ * 다시 읽어야 해서 해시가 아니라 `ROOM_PASSWORD_KEY`로 암호화한 값만 둔다(`src/rooms/password.ts`).
+ */
+export const studyRooms = pgTable(
+  'study_rooms',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    hostUserId: uuid('host_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    map: text('map', { enum: ['cafe', 'library', 'rooftop'] }).notNull(),
+    capacity: integer('capacity').notNull(),
+    passwordCiphertext: text('password_ciphertext'),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('study_rooms_created_idx').on(table.createdAt),
+    check('study_rooms_capacity_range', sql`${table.capacity} between 2 and 50`),
+  ],
+);
+
+/** 방 멤버. 한 사람은 방 하나에만 속한다(고유 인덱스 `user_id`). 방장도 멤버 행이 있다. */
+export const studyRoomMembers = pgTable(
+  'study_room_members',
+  {
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => studyRooms.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    joinedAt: timestamp('joined_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roomId, table.userId] }),
+    uniqueIndex('study_room_members_one_room_per_user').on(table.userId),
+  ],
+);
+
+/** 방 태그(방장이 고름, 최대 3개는 서버가 확인). */
+export const roomTags = pgTable(
+  'room_tags',
+  {
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => studyRooms.id, { onDelete: 'cascade' }),
+    tagId: uuid('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.roomId, table.tagId] }), index('room_tags_tag_idx').on(table.tagId)],
+);
+
+/** 초대 링크. 방마다 마지막 것 하나만 유효하다. 토큰은 SHA-256 다이제스트만 둔다. */
+export const studyRoomInvites = pgTable(
+  'study_room_invites',
+  {
+    roomId: uuid('room_id')
+      .primaryKey()
+      .references(() => studyRooms.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('study_room_invites_token_hash_key').on(table.tokenHash)],
+);
+
+/** IP당 하루 방 만들기 수 제한용 기록. 24시간 뒤 지운다(접속 IP 보관 기간). */
+export const roomCreations = pgTable(
+  'room_creations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ip: text('ip').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('room_creations_ip_created_idx').on(table.ip, table.createdAt)],
+);

@@ -19,6 +19,8 @@ import { TimerService } from './study/timer.js';
 import { SettingsService } from './moderation/settings.js';
 import { registerReportRoutes } from './moderation/routes.js';
 import { registerTagRoutes } from './tags/routes.js';
+import { RoomService } from './rooms/service.js';
+import { registerRoomRoutes } from './rooms/routes.js';
 import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
@@ -30,6 +32,8 @@ declare module 'fastify' {
     timer: TimerService;
     /** 긴급 스위치(운영 설정) 읽기. */
     settings: SettingsService;
+    /** 공부방 상태 변경(커밋 뒤 `onChange` 알림). */
+    rooms: RoomService;
   }
 }
 
@@ -73,6 +77,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     new TimerService(handle.db, now, (error) => app.log.error({ err: error }, 'timer change listener failed')),
   );
   app.decorate('settings', new SettingsService(handle.db, now, config.settingsCacheMs));
+  app.decorate(
+    'rooms',
+    new RoomService(
+      handle.db,
+      now,
+      { passwordKey: config.roomPasswordKey, createPerIpPerDay: config.roomCreatePerIpPerDay },
+      (error) => app.log.error({ err: error }, 'room change listener failed'),
+    ),
+  );
   app.addHook('onClose', async () => {
     await handle.pool.end();
   });
@@ -142,6 +155,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerStatsRoutes(app);
   registerReportRoutes(app);
   registerTagRoutes(app);
+  registerRoomRoutes(app);
   await options.registerExtraRoutes?.(app);
 
   if (config.env !== 'test') startMaintenance(app);

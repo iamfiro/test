@@ -30,6 +30,16 @@ const envSchema = z.object({
   ACCOUNT_CREATE_PER_IP_PER_HOUR: z.coerce.number().int().min(1).default(30),
   REPORT_HIDE_THRESHOLD: z.coerce.number().int().min(1).default(3),
   SETTINGS_CACHE_MS: z.coerce.number().int().min(0).default(5000),
+  ROOM_CREATE_PER_IP_PER_DAY: z.coerce.number().int().min(1).default(10),
+  ROOM_PASSWORD_KEY: z
+    .string()
+    .min(1)
+    .transform((value) => Buffer.from(value, 'base64'))
+    .refine((key) => key.length === 32, '32바이트를 base64로 적어야 한다(`openssl rand -base64 32`)'),
+  INVITE_WEB_ORIGIN: originList
+    .refine((list) => list.length === 1, 'origin 하나여야 한다')
+    .transform((list) => list[0]!)
+    .optional(),
 });
 
 export interface Config {
@@ -46,6 +56,12 @@ export interface Config {
   reportHideThreshold: number;
   /** 운영 설정(긴급 스위치)을 메모리에 두는 시간. CLI로 바꾼 값이 이 시간 안에 모든 서버에 적용된다. */
   settingsCacheMs: number;
+  /** IP 하나가 24시간에 만들 수 있는 공부방 수. 공유 IP(학교·이동통신)를 감안해 넉넉히 둔다. */
+  roomCreatePerIpPerDay: number;
+  /** 방 비밀번호 암호화 키(AES-256-GCM). 방장이 비밀번호를 다시 읽어야 해서 해시가 아니라 암호화한다(PocketTime과 같음). */
+  roomPasswordKey: Buffer;
+  /** 초대 링크 `https://<웹>/r#<token>`의 웹 주소. */
+  inviteWebOrigin: string;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -61,6 +77,10 @@ export function loadConfig(env: Env): Config {
   if (value.NODE_ENV === 'production' && value.DEV_LOGIN_ENABLED) {
     throw new Error('운영(NODE_ENV=production)에서는 DEV_LOGIN_ENABLED=true로 시작할 수 없다');
   }
+  // 초대 링크 주소는 웹 주소가 하나뿐일 때만 WEB_ORIGIN에서 정한다. 여럿이면 어느 것인지 추측하지 않고 시작을 거부한다.
+  if (value.INVITE_WEB_ORIGIN === undefined && value.WEB_ORIGIN.length !== 1) {
+    throw new Error('WEB_ORIGIN이 여러 개면 INVITE_WEB_ORIGIN(초대 링크의 웹 주소)을 정해야 한다');
+  }
   return {
     env: value.NODE_ENV,
     port: value.PORT,
@@ -72,5 +92,8 @@ export function loadConfig(env: Env): Config {
     accountCreatePerIpPerHour: value.ACCOUNT_CREATE_PER_IP_PER_HOUR,
     reportHideThreshold: value.REPORT_HIDE_THRESHOLD,
     settingsCacheMs: value.SETTINGS_CACHE_MS,
+    roomCreatePerIpPerDay: value.ROOM_CREATE_PER_IP_PER_DAY,
+    roomPasswordKey: value.ROOM_PASSWORD_KEY,
+    inviteWebOrigin: value.INVITE_WEB_ORIGIN ?? value.WEB_ORIGIN[0]!,
   };
 }
