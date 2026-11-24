@@ -111,4 +111,18 @@ describe('chat store', () => {
     expect(t.store.get().status).toBe('closed')
     expect(t.timers).toHaveLength(0)
   })
+
+  it('차단을 서버가 받으면 그 사람의 말이 지금 채팅에서도 사라지고, 풀면 다시 받아 온다', () => {
+    const t = setup()
+    t.store.connect('lobby', me.id)
+    t.join([msg('a'), { ...msg('bb', me), body: '내 말' }])
+    t.store.hideAuthor(other.id)
+    expect(t.store.get().messages.map((m) => m.id)).toEqual(['bb'])
+    const joins = () => t.last().sent.filter((e) => (e as { type: string }).type === 'join').length
+    const before = joins()
+    expect(t.store.rejoin()).toBe(true)
+    expect(joins()).toBe(before + 1)
+    t.emit({ type: 'joined', topic: 'lobby', messages: [msg('a'), { ...msg('bb', me), body: '내 말' }] })
+    expect(t.store.get().messages.map((m) => m.id)).toEqual(['a', 'bb'])
+  })
 })

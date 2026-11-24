@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react'
 import { logger } from '../../../core/log/log'
 import { chatSocketFactory } from './chatSocket'
+import { isRoomLiveEvent, type RoomLiveEvent } from '../live/liveProtocol'
 import { chatBodyMax, chatCloseTooManyConnections, chatCloseUnauthorized, type ChatErrorCode, type ChatMessage, type ChatServerEvent, type ChatSocket, type ChatSocketFactory } from './chatProtocol'
 
 const log = logger('Chat')
@@ -58,11 +59,17 @@ export function createChatStore(deps: Deps) {
   let reconnectTimer: unknown = null
   let peekTimer: unknown = null
   let sheetOpen = false
+  /** 방 실시간 상태(room_state·member_* 등, study-room-live.md)를 받는 쪽(live/roomLiveStore.ts). */
+  const roomListeners = new Set<(event: RoomLiveEvent) => void>()
 
   function onEvent(event: ChatServerEvent) {
-    // 방 토픽에는 방 실시간 상태(room_state·member_* 등, study-room-live.md)도 온다. 여기서는 채팅 이벤트만 다룬다.
     // 프레임을 못 읽은 오류는 topic이 null이다(client_id로 내 보내기를 알아본다).
     if (event.topic !== state.topic && !(event.type === 'error' && event.topic === null)) return
+    // 방 토픽에는 방 실시간 상태도 온다. 채팅은 다루지 않고 받는 쪽에 그대로 넘긴다.
+    if (isRoomLiveEvent(event)) {
+      roomListeners.forEach((l) => l(event))
+      return
+    }
     switch (event.type) {
       case 'joined': {
         attempt = 0
@@ -177,6 +184,24 @@ export function createChatStore(deps: Deps) {
     },
 
     clearOutcome() { if (state.outcome) set({ outcome: null }) },
+
+    /** 방 실시간 이벤트를 받는다(지금 토픽 것만). 돌려준 함수로 끊는다. */
+    onRoomEvent(listener: (event: RoomLiveEvent) => void): () => void {
+      roomListeners.add(listener)
+      return () => { roomListeners.delete(listener) }
+    },
+
+    /** 같은 토픽에 다시 join해 스냅샷(room_state·joined)을 다시 받는다(seq 빈틈·차단 해제 뒤). 열려 있을 때만. */
+    rejoin(): boolean {
+      if (state.status !== 'open' || !socket || state.topic == null) return false
+      socket.send({ type: 'join', topic: state.topic })
+      return true
+    },
+
+    /** 서버가 차단을 받아들인 뒤: 그 사람의 말을 지금 화면에서도 지운다(그 뒤 말은 서버가 보내지 않는다). */
+    hideAuthor(userId: string) {
+      set({ messages: state.messages.filter((m) => m.author.id !== userId), peek: state.peek?.author.id === userId ? null : state.peek })
+    },
   }
 }
 

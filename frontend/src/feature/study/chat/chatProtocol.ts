@@ -1,4 +1,6 @@
-// 채팅 실시간 이벤트 모양. 계약: docs/contracts/study-room-chat.md (0.2.0). 방 실시간 상태(room_state 등)는 F3에서 붙인다.
+// 채팅 실시간 이벤트 모양. 계약: docs/contracts/study-room-chat.md (0.2.0). 같은 소켓·토픽으로 오는 방 실시간 상태
+// (room_state 등, study-room-live.md)는 live/liveProtocol.ts에 있고 채팅 저장소가 그대로 넘긴다(live/roomLiveStore.ts).
+import type { RoomLiveEvent } from '../live/liveProtocol'
 
 export type ChatAuthor = { id: string; nickname: string }
 
@@ -23,6 +25,7 @@ export type ChatServerEvent =
   | { type: 'message'; topic: string; message: ChatMessage }
   | { type: 'message_hidden'; topic: string; message_id: string }
   | { type: 'error'; topic: string | null; client_id: string | null; code: ChatErrorCode }
+  | RoomLiveEvent
 
 /** 결정 9: 메시지 200자. 앞뒤 공백을 지운 길이. */
 export const chatBodyMax = 200
