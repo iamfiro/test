@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.3
+  version: 0.5.4
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -22,6 +22,7 @@ tags:
   - name: timer
   - name: rooms
   - name: tags
+  - name: moderation
 paths:
   /healthz:
     get:
@@ -79,12 +80,17 @@ paths:
         세션을 만들어 `sv_session` 쿠키를 둔다. 닉네임·캐릭터는 무작위로 정한다. CSRF 토큰은 필요 없다
         (세션이 없을 수 있다). 같은 `Idempotency-Key`를 다시 보내면 같은 계정에 새 세션을 발급한다(쿠키를 못
         받은 응답의 재시도). IP당 시간당 새 계정 수에 상한이 있다.
+        운영자가 새 계정 생성을 끄면(긴급 스위치) 503 `ACCOUNT_CREATE_DISABLED`, 이 IP의 계정 생성을 정지했으면
+        403 `ACCOUNT_CREATE_RESTRICTED`다. 둘 다 새 계정을 만들 때만이고, 세션이 이미 있는 사람과 이미 만든 계정의
+        재시도(같은 키)는 그대로 200이다.
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       responses:
         '200': { $ref: '#/components/responses/LoggedIn' }
         '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '403': { $ref: '#/components/responses/AccountCreateRestricted' }
         '429': { $ref: '#/components/responses/AccountRateLimited' }
+        '503': { $ref: '#/components/responses/AccountCreateDisabled' }
   /auth/nonce:
     get:
       tags: [auth]
@@ -227,7 +233,9 @@ paths:
       tags: [profile]
       operationId: updateMyProfile
       summary: 닉네임·캐릭터·성별 바꾸기
-      description: 보낸 항목만 바꾼다. 하나도 없거나 규칙에 맞지 않으면 422(`error.details.field`).
+      description: |
+        보낸 항목만 바꾼다. 하나도 없거나 규칙에 맞지 않으면 422(`error.details.field`). 닉네임에 금칙어가 들어 있어도
+        422 `VALIDATION_ERROR`(`field: nickname`)이고, 메시지는 어떤 말이 걸렸는지 밝히지 않는다.
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
@@ -470,6 +478,31 @@ paths:
                   meta: { $ref: '#/components/schemas/Meta' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /reports:
+    post:
+      tags: [moderation]
+      operationId: createReport
+      summary: 신고하기(닉네임)
+      description: |
+        다른 사람의 닉네임을 신고한다. `target_id`는 그 사람의 사용자 id다. 한 사람은 같은 사람의 같은 닉네임을
+        한 번만 신고한다: 다시 보내면(다른 키여도) 처음 신고를 그대로 200으로 돌려주고 더 세지 않는다. 서로 다른
+        사람의 신고가 기준(`REPORT_HIDE_THRESHOLD`, 기본 3)에 닿으면 서버가 그 닉네임을 무작위 닉네임으로 바로
+        되돌린다(신고자에게 결과를 알리지 않는다). 내 닉네임은 신고할 수 없다(422, `field: target_id`).
+        메시지 신고는 실시간 채널(`docs/contracts/study-room-chat.md`, L5), 방 이름 신고는 방(L4)이 생기면 붙인다.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportCreate' }
+      responses:
+        '200': { $ref: '#/components/responses/ReportOk' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /study-rooms:
     get:
       tags: [rooms]
@@ -665,7 +698,10 @@ components:
           format: date-time
     Nickname:
       type: string
-      description: 앞뒤 공백을 지운 뒤 1–12자(grapheme), UTF-8 48바이트 이하, 제어 문자 금지. 같은 닉네임을 여러 사람이 쓸 수 있다.
+      description: |
+        앞뒤 공백을 지운 뒤 1–12자(grapheme), UTF-8 48바이트 이하, 제어 문자 금지. 같은 닉네임을 여러 사람이 쓸 수 있다.
+        금칙어(서버 목록, 공백·기호·대소문자를 무시하고 포함 검사)가 들어 있으면 쓸 수 없다. 서로 다른 여러 사람의
+        신고가 기준(`REPORT_HIDE_THRESHOLD`, 기본 3)에 닿으면 서버가 무작위 닉네임으로 되돌린다.
     Avatar:
       type: object
       additionalProperties: false
@@ -708,6 +744,39 @@ components:
         gender:
           $ref: '#/components/schemas/Gender'
           description: 고른 뒤에는 지울 수 없고 다른 값으로만 바꾼다.
+    ReportReason:
+      type: string
+      enum: [personal_info, defamation, profanity, sexual, impersonation, spam, other]
+      description: |
+        신고 사유(PocketTime 앱 `ReportReason`과 같은 값, 시간표용 `wrong_info` 제외). 앱 문구: 개인정보가 담겼어요 /
+        누군가를 비방해요 / 욕설이 있어요 / 성적인 내용이에요 / 사칭해요 / 장난이거나 도배예요 / 그 밖의 문제예요.
+        `other`는 `detail`이 필요하다.
+    ReportCreate:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, reason]
+      properties:
+        target_type:
+          type: string
+          enum: [nickname]
+        target_id:
+          type: string
+          format: uuid
+          description: 닉네임이면 그 사람의 사용자 id.
+        reason: { $ref: '#/components/schemas/ReportReason' }
+        detail:
+          type: [string, 'null']
+          maxLength: 1000
+          description: 무엇이 문제인지(앞뒤 공백을 지운 뒤 1000자 이하, 줄바꿈 외 제어 문자 금지). `reason`이 `other`면 필수.
+    Report:
+      type: object
+      additionalProperties: false
+      required: [target_type, target_id, reason, created_at]
+      properties:
+        target_type: { type: string, enum: [nickname] }
+        target_id: { type: string, format: uuid }
+        reason: { $ref: '#/components/schemas/ReportReason' }
+        created_at: { type: string, format: date-time }
     StudySettings:
       type: object
       additionalProperties: false
@@ -976,6 +1045,33 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     AccountRateLimited:
       description: 이 IP에서 새 계정을 너무 많이 만듦(`ACCOUNT_RATE_LIMITED`). `Retry-After` 헤더.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ReportOk:
+      description: 신고를 받음(처음이든 같은 신고의 반복이든 같은 모양).
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [report]
+                properties:
+                  report: { $ref: '#/components/schemas/Report' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    AccountCreateRestricted:
+      description: 운영자가 이 IP의 새 계정 생성을 정지함(`ACCOUNT_CREATE_RESTRICTED`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AccountCreateDisabled:
+      description: 운영자가 새 계정 생성을 잠시 끔(긴급 스위치, `ACCOUNT_CREATE_DISABLED`). 나중에 다시 시도한다.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
