@@ -1,6 +1,6 @@
 // 온보딩 1–3단계 화면(문밖 잔디 위). 카드 없이 화면 아래 검은 그라데이션 위에 흰 제목·설명과 단순한 알약 단추
 // (사용자 결정 2026-11-24: "쓸데없는 모달 UI 없애고 아래 배경에 검은색 그라디언트"), 위에 진행 표시·뒤로.
-import { useEffect, useRef, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { IconChevronLeft, IconGenderFemale, IconGenderMale } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
@@ -10,6 +10,7 @@ import { TagPicker } from '../tags/MyTagsSheet'
 import type { Tag } from '../tags/tagsStore'
 import type { Gender } from './onboardingScene'
 import type { NicknameProblem } from './onboardingSave'
+import { cloudMargin, cloudPath } from './thoughtCloud'
 import s from './onboarding.module.css'
 
 const genderLabel = (g: Gender) => (g === 'male' ? t('studyOnboardingGenderMale') : t('studyOnboardingGenderFemale'))
@@ -192,31 +193,61 @@ export function NamePlate(props: { placement: ActorPlacement; name: string }) {
 }
 
 /**
- * 3단계: 머리 위 생각 말풍선(사용자 요청 2026-11-24). 고른 태그 칩이 그 안에서 저마다 조금씩 둥실거리고, 아직 고른
- * 것이 없으면 점 세 개가 차례로 떠오른다. 말풍선에서 머리 쪽으로 작은 동그라미 둘이 이어진다. 고른 목록은 아래
+ * 3단계: 머리 위 생각 말풍선(사용자 요청 2026-11-24). 울퉁불퉁한 구름(SVG, thoughtCloud.ts) 안에서 고른 태그 칩이
+ * 저마다 조금씩 둥실거리고, 아직 고른 것이 없으면 점 세 개가 차례로 떠오른다. 머리에서 구름까지 점점 커지는 생각 방울
+ * 셋이 차례로 부풀었다 가라앉는다. 고른 목록은 아래
  * 글 칸에도 있으므로 화면 읽기에서는 숨긴다.
  */
 export function ThoughtBubble(props: { placement: ActorPlacement; tags: Tag[] }) {
   const { head } = props.placement
+  const content = useRef<HTMLSpanElement>(null)
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  // 내용 크기가 바뀌면(칩을 고르거나 뺌) 구름 테두리를 다시 그린다.
+  useLayoutEffect(() => {
+    const el = content.current
+    if (!el) return
+    const measure = () => setBox((prev) => (prev && prev.w === el.offsetWidth && prev.h === el.offsetHeight ? prev : { w: el.offsetWidth, h: el.offsetHeight }))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const path = useMemo(() => (box ? cloudPath(box.w, box.h) : null), [box])
+  const m = cloudMargin
   return (
     <span className={s.thought} style={{ left: head.x, top: head.y }} aria-hidden>
-      <span className={s.thoughtDotSmall} />
-      <span className={s.thoughtDotLarge} />
+      {/* 머리에서 구름까지 점점 커지는 생각 방울 셋 */}
+      <svg className={s.thoughtTrail} viewBox="-2 -60 52 62" width="52" height="62">
+        {[[8, -7, 3.5], [19, -22, 5.5], [33, -42, 8]].map(([x, y, r], i) => (
+          <g key={i} className={s.trailBead} style={{ animationDelay: `${i * 0.22}s` }}>
+            <circle cx={x} cy={y! + 2.5} r={r} className={s.cloudLedge} />
+            <circle cx={x} cy={y} r={r} className={s.cloudFace} />
+          </g>
+        ))}
+      </svg>
       <span className={s.thoughtCloud}>
-        {props.tags.length === 0 ? (
-          <span className={s.thinking}><i /><i /><i /></span>
-        ) : (
-          props.tags.map((tag, i) => (
-            <span key={tag.id} className={s.thoughtChipSlot}>
-              <span
-                className={s.thoughtChip}
-                style={{ animationDuration: `${2.3 + (i % 3) * 0.45}s`, animationDelay: `${-i * 0.7}s`, '--tilt': `${i % 2 ? -3 : 3}deg` } as CSSProperties}
-              >
-                #{tag.name}
-              </span>
-            </span>
-          ))
+        {path && box && (
+          <svg className={s.cloudSvg} viewBox={`${-m} ${-m} ${box.w + 2 * m} ${box.h + 2 * m + 4}`} style={{ left: -m, top: -m, width: box.w + 2 * m, height: box.h + 2 * m + 4 }}>
+            <path d={path} transform="translate(0 3)" className={s.cloudLedge} />
+            <path d={path} className={s.cloudFace} />
+          </svg>
         )}
+        <span ref={content} className={s.thoughtContent}>
+          {props.tags.length === 0 ? (
+            <span className={s.thinking}><i /><i /><i /></span>
+          ) : (
+            props.tags.map((tag, i) => (
+              <span key={tag.id} className={s.thoughtChipSlot}>
+                <span
+                  className={s.thoughtChip}
+                  style={{ animationDuration: `${2.3 + (i % 3) * 0.45}s`, animationDelay: `${-i * 0.7}s`, '--tilt': `${i % 2 ? -3 : 3}deg` } as CSSProperties}
+                >
+                  #{tag.name}
+                </span>
+              </span>
+            ))
+          )}
+        </span>
       </span>
     </span>
   )
