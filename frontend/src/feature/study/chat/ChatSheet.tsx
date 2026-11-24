@@ -6,6 +6,8 @@ import { IslandIconButton } from '../../../core/ui/IslandIconButton'
 import { useToast } from '../../../core/ui/Toast'
 import { chatBodyMax, type ChatMessage } from './chatProtocol'
 import { chatStore, useChat, type ChatState } from './chatStore'
+import { launchText } from '../../../l10n/web_launch_ko'
+import type { ChatErrorCode } from './chatProtocol'
 import s from './ChatSheet.module.css'
 
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' })
@@ -13,7 +15,8 @@ const timeFormat = new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '
 function statusText(status: ChatState['status']): string {
   switch (status) {
     case 'open': return t('studyChatCaption')
-    case 'offline': return t('studyChatOffline')
+    case 'offline':
+    case 'closed': return t('studyChatOffline')
     case 'idle':
     case 'connecting': return t('studyChatConnecting')
   }
@@ -49,7 +52,7 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
   useEffect(() => {
     if (!outcome) return
     if (outcome.kind === 'sent') { setDraft(''); stick.current = true }
-    else toast(outcome.code === 'RATE_LIMITED' ? t('studyChatRateLimited') : outcome.code === 'FORBIDDEN' ? t('studyActionFailed') : t('studyChatInvalid'), { type: 'error' })
+    else toast(chatFailureText(outcome.code), { type: 'error' })
     chatStore.clearOutcome()
   }, [outcome, toast])
 
@@ -74,8 +77,8 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
         }}
       >
         {chat.status !== 'open' && (
-          <p className={`${s.notice} ${chat.status === 'offline' ? s.noticeOffline : ''}`} role="status" aria-live="polite">
-            {chat.status !== 'offline' && <i className={s.dot} />}
+          <p className={`${s.notice} ${chat.status === 'offline' || chat.status === 'closed' ? s.noticeOffline : ''}`} role="status" aria-live="polite">
+            {chat.status !== 'offline' && chat.status !== 'closed' && <i className={s.dot} />}
             {statusText(chat.status)}
           </p>
         )}
@@ -144,4 +147,20 @@ function MessageRow(props: { message: ChatMessage; mine: boolean; first: boolean
       </span>
     </li>
   )
+}
+
+/** 보내기 실패 문구(계약 study-room-chat.md 0.2.0 오류 코드). */
+function chatFailureText(code: ChatErrorCode | 'INVALID_LOCAL' | 'TOO_MANY_CONNECTIONS'): string {
+  switch (code) {
+    case 'RATE_LIMITED': return t('studyChatRateLimited')
+    case 'FORBIDDEN': return t('studyActionFailed')
+    case 'CHAT_DISABLED': return launchText.chatDisabled
+    case 'RESTRICTED': return launchText.chatRestricted
+    case 'LINK_NOT_ALLOWED': return launchText.chatLink
+    case 'BANNED_WORD': return launchText.chatBannedWord
+    case 'REPEATED': return launchText.chatRepeated
+    case 'TOO_MANY_CONNECTIONS': return launchText.chatTooManyTabs
+    case 'INVALID':
+    case 'INVALID_LOCAL': return t('studyChatInvalid')
+  }
 }

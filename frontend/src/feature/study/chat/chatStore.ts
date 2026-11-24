@@ -4,11 +4,12 @@
 import { useSyncExternalStore } from 'react'
 import { logger } from '../../../core/log/log'
 import { chatSocketFactory } from './chatSocket'
-import { chatBodyMax, type ChatErrorCode, type ChatMessage, type ChatServerEvent, type ChatSocket, type ChatSocketFactory } from './chatProtocol'
+import { chatBodyMax, chatCloseTooManyConnections, chatCloseUnauthorized, type ChatErrorCode, type ChatMessage, type ChatServerEvent, type ChatSocket, type ChatSocketFactory } from './chatProtocol'
 
 const log = logger('Chat')
 
-export type ChatStatus = 'idle' | 'connecting' | 'open' | 'offline'
+/** closed: 서버가 다시 연결하지 말라고 닫았다(4401 세션 없음·4429 연결 수 초과). */
+export type ChatStatus = 'idle' | 'connecting' | 'open' | 'offline' | 'closed'
 
 export type ChatState = {
   status: ChatStatus
@@ -21,7 +22,7 @@ export type ChatState = {
   /** 채팅 단추 옆에 잠깐 띄울 남의 새 말. */
   peek: ChatMessage | null
   /** 보내기 결과(입력칸이 읽고 지운다). */
-  outcome: { kind: 'sent' } | { kind: 'failed'; code: ChatErrorCode | 'INVALID_LOCAL' } | null
+  outcome: { kind: 'sent' } | { kind: 'failed'; code: ChatErrorCode | 'INVALID_LOCAL' | 'TOO_MANY_CONNECTIONS' } | null
 }
 
 /** 다시 연결 간격(계약). 넷째 이후는 마지막 값. */
@@ -59,7 +60,9 @@ export function createChatStore(deps: Deps) {
   let sheetOpen = false
 
   function onEvent(event: ChatServerEvent) {
-    if (event.topic !== state.topic) return
+    // 방 토픽에는 방 실시간 상태(room_state·member_* 등, study-room-live.md)도 온다. 여기서는 채팅 이벤트만 다룬다.
+    // 프레임을 못 읽은 오류는 topic이 null이다(client_id로 내 보내기를 알아본다).
+    if (event.topic !== state.topic && !(event.type === 'error' && event.topic === null)) return
     switch (event.type) {
       case 'joined': {
         attempt = 0
@@ -88,6 +91,10 @@ export function createChatStore(deps: Deps) {
         }
         return
       }
+      case 'message_hidden': {
+        set({ messages: state.messages.filter((m) => m.id !== event.message_id), peek: state.peek?.id === event.message_id ? null : state.peek })
+        return
+      }
       case 'error': {
         log.warn('server error', { code: event.code })
         if (state.pending && event.client_id === state.pending.client_id) {
@@ -105,9 +112,18 @@ export function createChatStore(deps: Deps) {
     const s = deps.factory()({
       onOpen: () => s.send({ type: 'join', topic }),
       onEvent,
-      onClose: () => {
+      onClose: (code) => {
         if (socket !== s) return
         socket = null
+        if (code === chatCloseUnauthorized || code === chatCloseTooManyConnections) {
+          log.warn('closed by server', { code })
+          set({
+            status: 'closed',
+            pending: null,
+            outcome: state.pending ? { kind: 'failed', code: code === chatCloseTooManyConnections ? 'TOO_MANY_CONNECTIONS' : 'FORBIDDEN' } : state.outcome,
+          })
+          return
+        }
         set({ status: 'offline' })
         const delay = reconnectDelaysMs[Math.min(attempt, reconnectDelaysMs.length - 1)]!
         attempt++

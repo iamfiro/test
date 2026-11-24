@@ -1,4 +1,4 @@
-// 채팅 실시간 이벤트 모양. 계약: docs/contracts/study-room-chat.md (초안 0.1.0).
+// 채팅 실시간 이벤트 모양. 계약: docs/contracts/study-room-chat.md (0.2.0). 방 실시간 상태(room_state 등)는 F3에서 붙인다.
 
 export type ChatAuthor = { id: string; nickname: string }
 
@@ -10,7 +10,9 @@ export type ChatMessage = {
   sent_at: string
 }
 
-export type ChatErrorCode = 'RATE_LIMITED' | 'INVALID' | 'FORBIDDEN'
+export type ChatErrorCode =
+  | 'RATE_LIMITED' | 'INVALID' | 'FORBIDDEN'
+  | 'CHAT_DISABLED' | 'RESTRICTED' | 'LINK_NOT_ALLOWED' | 'BANNED_WORD' | 'REPEATED'
 
 export type ChatClientEvent =
   | { type: 'join'; topic: string }
@@ -19,7 +21,8 @@ export type ChatClientEvent =
 export type ChatServerEvent =
   | { type: 'joined'; topic: string; messages: ChatMessage[] }
   | { type: 'message'; topic: string; message: ChatMessage }
-  | { type: 'error'; topic: string; client_id: string | null; code: ChatErrorCode }
+  | { type: 'message_hidden'; topic: string; message_id: string }
+  | { type: 'error'; topic: string | null; client_id: string | null; code: ChatErrorCode }
 
 /** 결정 9: 메시지 200자. 앞뒤 공백을 지운 길이. */
 export const chatBodyMax = 200
@@ -33,7 +36,12 @@ export type ChatSocket = {
 export type ChatSocketHandlers = {
   onOpen: () => void
   onEvent: (event: ChatServerEvent) => void
-  onClose: () => void
+  /** code: WebSocket 닫힘 코드(계약: 4401 인증 없음·4429 연결 수 초과는 다시 연결하지 않는다). */
+  onClose: (code: number) => void
 }
 
 export type ChatSocketFactory = (handlers: ChatSocketHandlers) => ChatSocket
+
+/** 다시 연결하지 않는 닫힘 코드(계약 "연결"). */
+export const chatCloseUnauthorized = 4401
+export const chatCloseTooManyConnections = 4429

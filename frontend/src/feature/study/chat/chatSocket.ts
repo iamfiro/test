@@ -27,7 +27,7 @@ export const webSocketFactory: ChatSocketFactory = (handlers) => {
     if (closed) return
     closed = true
     log.info('closed', { code: e.code })
-    handlers.onClose()
+    handlers.onClose(e.code)
   })
   return {
     send: (event) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(event)) },
