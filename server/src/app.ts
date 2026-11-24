@@ -13,12 +13,17 @@ import { registerAuth } from './auth/hook.js';
 import { registerAuthRoutes } from './auth/routes.js';
 import { registerProfileRoutes } from './profile/routes.js';
 import { registerStudySettingsRoutes } from './study/settings.js';
+import { registerTimerRoutes } from './study/routes.js';
+import { TimerService } from './study/timer.js';
 import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     config: Config;
+    /** 서버 시각. 타이머·presence가 쓴다(테스트는 고정 시계를 넣는다). */
+    now: () => Date;
+    timer: TimerService;
   }
 }
 
@@ -26,6 +31,8 @@ export interface AppOptions {
   config: Config;
   /** 테스트가 경로를 더 붙일 때 쓴다. */
   registerExtraRoutes?: (app: FastifyInstance) => Promise<void> | void;
+  /** 서버 시각. 없으면 시스템 시계. */
+  now?: () => Date;
 }
 
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -53,6 +60,12 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const handle = createDb(config.databaseUrl);
   app.decorate('db', handle.db);
   app.decorate('config', config);
+  const now = options.now ?? (() => new Date());
+  app.decorate('now', now);
+  app.decorate(
+    'timer',
+    new TimerService(handle.db, now, (error) => app.log.error({ err: error }, 'timer change listener failed')),
+  );
   app.addHook('onClose', async () => {
     await handle.pool.end();
   });
@@ -118,6 +131,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerAuthRoutes(app);
   registerProfileRoutes(app);
   registerStudySettingsRoutes(app);
+  registerTimerRoutes(app);
   await options.registerExtraRoutes?.(app);
 
   if (config.env !== 'test') startMaintenance(app);

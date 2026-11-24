@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { check, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 /** 쓰기 요청의 Idempotency-Key 기록. (scope, key)가 같으면 같은 요청이다. */
 export const idempotencyKeys = pgTable(
@@ -80,3 +81,89 @@ export const studySettings = pgTable('study_settings', {
   subjectColors: jsonb('subject_colors').$type<Record<string, number>>().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export interface SegmentValue {
+  started_at: string;
+  /** 열린 구간이면 null(진행 중 세션의 마지막 구간만). */
+  ended_at: string | null;
+}
+
+/**
+ * 공부 세션. 진행 중(`active`)은 계정당 하나(부분 고유 인덱스, 결정 12). 끝내면 `finished`(기록)이고,
+ * 공부한 시간이 0초면 `discarded`(기록 아님, 같은 세션을 다시 끝내는 재시도에 같은 답을 주려고 남긴다).
+ * 시각은 모두 서버 시각이다.
+ */
+export const studySessions = pgTable(
+  'study_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: ['active', 'finished', 'discarded'] }).notNull(),
+    subject: text('subject'),
+    /** 이 세션의 공부일(04:00 경계)을 정하는 IANA 시간대. */
+    timezone: text('timezone').notNull(),
+    segments: jsonb('segments').$type<SegmentValue[]>().notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true, precision: 3 }).notNull(),
+    endedAt: timestamp('ended_at', { withTimezone: true, precision: 3 }),
+    focusedSeconds: integer('focused_seconds'),
+    /** 시작 시각의 공부일(세션 시간대 04:00 경계). 끝낼 때 정한다. */
+    studyDate: date('study_date', { mode: 'string' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('study_sessions_one_active_per_user').on(table.userId).where(sql`${table.status} = 'active'`),
+    index('study_sessions_user_study_date_idx').on(table.userId, table.studyDate),
+    index('study_sessions_user_ended_at_idx').on(table.userId, table.endedAt),
+  ],
+);
+
+/**
+ * presence 관측 구간: 화면이 열려 있다는 신호를 **서버가 받은 시각**으로 이은 구간. 신호 사이가 75초를 넘으면 새 구간.
+ * 인정 시간 계산에만 쓰고 응답에는 내보내지 않는다.
+ */
+export const presenceSpans = pgTable(
+  'presence_spans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => studySessions.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    startedAt: timestamp('started_at', { withTimezone: true, precision: 3 }).notNull(),
+    endedAt: timestamp('ended_at', { withTimezone: true, precision: 3 }).notNull(),
+  },
+  (table) => [index('presence_spans_session_ended_idx').on(table.sessionId, table.endedAt)],
+);
+
+/**
+ * 인정 공부 구간(리그 점수·스트릭의 원천): 세션의 공부 구간 ∩ (관측 구간 앞뒤 45초 여유), 지금을 넘지 않는다.
+ * 세션마다 관측·상태 변경 때 다시 계산해 통째로 바꾼다(더하지 않으므로 재전송해도 늘지 않는다). 계정당 진행 중
+ * 세션이 하나라 세션끼리 겹치지 않는다. 한 행은 세션 시간대의 공부일 하나 안에 있다(04:00에서 자름).
+ * 리그 주는 절대 시각(`started_at`·`ended_at`)으로, 스트릭은 `study_date`로 합한다.
+ */
+export const rankedSegments = pgTable(
+  'ranked_segments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => studySessions.id, { onDelete: 'cascade' }),
+    startedAt: timestamp('started_at', { withTimezone: true, precision: 3 }).notNull(),
+    endedAt: timestamp('ended_at', { withTimezone: true, precision: 3 }).notNull(),
+    studyDate: date('study_date', { mode: 'string' }).notNull(),
+    timezone: text('timezone').notNull(),
+  },
+  (table) => [
+    index('ranked_segments_user_started_idx').on(table.userId, table.startedAt),
+    index('ranked_segments_user_study_date_idx').on(table.userId, table.studyDate),
+    index('ranked_segments_session_idx').on(table.sessionId),
+    check('ranked_segments_positive', sql`${table.endedAt} > ${table.startedAt}`),
+  ],
+);

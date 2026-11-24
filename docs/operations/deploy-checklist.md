@@ -23,7 +23,11 @@ last_verified: 2026-11-23
 - 첫 가입 온보딩(계약 0.5.0, 서버 미구현): 사용자 테이블에 `onboarding_completed_at timestamptz null`. 이 열이 생기기
   전에 가입한 사람(기존 사용자)은 성별을 골랐으면 그때 시각으로 채워 온보딩을 다시 보지 않게 한다(백필 방법은 서버 단계에서 확정).
   공개 프로필 응답에 `tags`(내 태그, 카탈로그 순서)가 실린다.
-- 타이머·기록·presence(launch.md L3, 구현 중): `study_settings`(사용자당 한 행, 하루 목표·과목 목록·고른 과목·과목 색. 행이 없으면 기본값).
+- 타이머·기록·presence(launch.md L3, 구현됨): `study_settings`(사용자당 한 행, 하루 목표·과목 목록·고른 과목·과목 색. 행이 없으면 기본값),
+  `study_sessions`(진행 중·기록, 부분 고유 인덱스 `study_sessions_one_active_per_user`로 계정당 진행 중 하나, 인덱스 `(user_id, study_date)`·`(user_id, ended_at)`),
+  `presence_spans`(서버가 받은 presence 시각으로 이은 관측 구간, 인덱스 `(session_id, ended_at)`),
+  `ranked_segments`(인정 공부 구간 = 공부 구간 ∩ 관측 구간 ±45초, 리그·스트릭 L6의 원천. 인덱스 `(user_id, started_at)`·`(user_id, study_date)`·`(session_id)`).
+  모두 `user_id` `ON DELETE CASCADE`. 새 환경 변수 없음(75초·45초는 코드 상수, PocketTimeServer와 같은 값).
 
 ## 환경 변수
 

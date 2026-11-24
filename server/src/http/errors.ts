@@ -32,6 +32,8 @@ export const errors = {
     new AppError(429, 'ACCOUNT_RATE_LIMITED', '이 네트워크에서 새로 시작한 사람이 너무 많아요. 잠시 뒤 다시 시도해 주세요', undefined, {
       'retry-after': String(retryAfterSeconds),
     }),
+  sessionNotActive: () =>
+    new AppError(409, 'SESSION_NOT_ACTIVE', '진행 중인 공부가 아니에요. 화면을 새로 고쳐 주세요'),
   payloadTooLarge: () => new AppError(413, 'PAYLOAD_TOO_LARGE', '요청이 너무 커요'),
   serviceUnavailable: () => new AppError(503, 'SERVICE_UNAVAILABLE', '서비스를 잠시 쓸 수 없어요'),
   internal: () => new AppError(500, 'INTERNAL_ERROR', '문제가 생겼어요. 잠시 뒤 다시 시도해 주세요'),
