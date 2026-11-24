@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import type { MediaStorage } from '../media/storage.js';
 import { and, asc, count, eq, gt, inArray, sql } from 'drizzle-orm';
 import type { Db, DbExecutor } from '../db/client.js';
 import { roomCreations, roomTags, studyRoomInvites, studyRoomMembers, studyRooms } from '../db/schema.js';
@@ -43,7 +44,17 @@ export type RoomPatch = Partial<RoomCreateInput>;
 
 interface Pending {
   changes: RoomChange[];
+  /** 커밋 뒤 지울 미디어 키(교체된 사진, 지운 방의 사진). */
+  mediaKeys: string[];
 }
+
+export type ImageSlot = 'banner' | 'logo';
+export const IMAGE_SLOTS: readonly ImageSlot[] = ['banner', 'logo'];
+
+/** 방 사진의 미디어 키(launch.md L4a 접두사). */
+export const imageKey = (roomId: string, slot: ImageSlot, imageId: string) => `rooms/${roomId}/${slot}/${imageId}`;
+
+const slotColumn = (slot: ImageSlot) => (slot === 'banner' ? studyRooms.bannerId : studyRooms.logoId);
 
 interface LockedRoom {
   id: string;
@@ -110,8 +121,12 @@ export class RoomService {
   constructor(
     private readonly db: Db,
     private readonly now: () => Date,
+    private readonly media: MediaStorage,
     private readonly options: { passwordKey: Buffer; createPerIpPerDay: number },
-    private readonly onListenerError: (error: unknown) => void,
+    private readonly hooks: {
+      onListenerError: (error: unknown) => void;
+      onMediaDeleteError: (key: string, error: unknown) => void;
+    },
   ) {}
 
   /** 커밋된 방 변경을 받는다. 반환 함수로 구독을 끊는다. */
@@ -131,17 +146,25 @@ export class RoomService {
         try {
           listener(change);
         } catch (error) {
-          this.onListenerError(error);
+          this.hooks.onListenerError(error);
         }
       }
     }
   }
 
   private async run<T>(work: (tx: DbExecutor, pending: Pending) => Promise<T>): Promise<T> {
-    const pending: Pending = { changes: [] };
+    const pending: Pending = { changes: [], mediaKeys: [] };
     const result = await this.db.transaction((tx) => work(tx, pending));
     this.emit(pending.changes);
+    await this.deleteMedia(pending.mediaKeys);
     return result;
+  }
+
+  /** 커밋 뒤 파일을 지운다. 실패해도 요청은 성공이다(DB는 이미 그 파일을 가리키지 않는다). 키를 로그에 남긴다. */
+  private async deleteMedia(keys: string[]): Promise<void> {
+    await Promise.all(
+      keys.map((key) => this.media.delete(key).catch((error: unknown) => this.hooks.onMediaDeleteError(key, error))),
+    );
   }
 
   private encrypt(password: string | null): string | null {
@@ -150,7 +173,12 @@ export class RoomService {
 
   private async deleteRoomInTx(tx: DbExecutor, pending: Pending, roomId: string): Promise<void> {
     const members = await tx.select({ userId: studyRoomMembers.userId }).from(studyRoomMembers).where(eq(studyRoomMembers.roomId, roomId));
-    await tx.delete(studyRooms).where(eq(studyRooms.id, roomId)); // 멤버·태그·초대는 cascade
+    const [images] = await tx
+      .delete(studyRooms)
+      .where(eq(studyRooms.id, roomId))
+      .returning({ bannerId: studyRooms.bannerId, logoId: studyRooms.logoId }); // 멤버·태그·초대는 cascade
+    if (images?.bannerId) pending.mediaKeys.push(imageKey(roomId, 'banner', images.bannerId));
+    if (images?.logoId) pending.mediaKeys.push(imageKey(roomId, 'logo', images.logoId));
     pending.changes.push({ type: 'room_deleted', roomId, memberIds: members.map((m) => m.userId) });
   }
 
@@ -283,6 +311,49 @@ export class RoomService {
       if (patch.password !== undefined) changes.passwordCiphertext = this.encrypt(patch.password);
       await tx.update(studyRooms).set(changes).where(eq(studyRooms.id, roomId));
       if (patch.tagIds !== undefined) await setRoomTags(tx, roomId, patch.tagIds);
+      pending.changes.push({ type: 'room_updated', roomId });
+    });
+  }
+
+  private async requireHost(tx: DbExecutor, hostId: string, roomId: string): Promise<void> {
+    const room = (await lockRooms(tx, [roomId])).get(roomId);
+    if (!room) throw errors.notFound('공부방을 찾을 수 없어요');
+    if (room.hostUserId !== hostId) throw errors.roomHostOnly();
+  }
+
+  /**
+   * 배너·로고를 올린다(방장만). 새 키에 먼저 올리고, 방을 잠가 새 id로 바꾼 뒤 커밋되면 이전 파일을 지운다.
+   * 권한이 없거나 방이 그 사이 사라졌으면 올린 파일을 지운다(어디서도 가리키지 않는 파일을 남기지 않는다).
+   */
+  async setImage(hostId: string, roomId: string, slot: ImageSlot, bytes: Buffer, contentType: string): Promise<void> {
+    await this.db.transaction((tx) => this.requireHost(tx, hostId, roomId)); // 남의 방에 파일을 올리기 전에 거른다
+    const imageId = randomBytes(16).toString('hex');
+    const key = imageKey(roomId, slot, imageId);
+    await this.media.put(key, bytes, contentType);
+    try {
+      await this.run(async (tx, pending) => {
+        await this.requireHost(tx, hostId, roomId);
+        const column = slotColumn(slot);
+        const [before] = await tx.select({ id: column }).from(studyRooms).where(eq(studyRooms.id, roomId));
+        await tx.update(studyRooms).set({ [slot === 'banner' ? 'bannerId' : 'logoId']: imageId, updatedAt: this.now() }).where(eq(studyRooms.id, roomId));
+        if (before?.id) pending.mediaKeys.push(imageKey(roomId, slot, before.id));
+        pending.changes.push({ type: 'room_updated', roomId });
+      });
+    } catch (error) {
+      await this.deleteMedia([key]);
+      throw error;
+    }
+  }
+
+  /** 배너·로고를 지운다(방장만). 이미 없으면 그대로 성공. */
+  async clearImage(hostId: string, roomId: string, slot: ImageSlot): Promise<void> {
+    await this.run(async (tx, pending) => {
+      await this.requireHost(tx, hostId, roomId);
+      const column = slotColumn(slot);
+      const [before] = await tx.select({ id: column }).from(studyRooms).where(eq(studyRooms.id, roomId));
+      if (!before?.id) return;
+      await tx.update(studyRooms).set({ [slot === 'banner' ? 'bannerId' : 'logoId']: null, updatedAt: this.now() }).where(eq(studyRooms.id, roomId));
+      pending.mediaKeys.push(imageKey(roomId, slot, before.id));
       pending.changes.push({ type: 'room_updated', roomId });
     });
   }

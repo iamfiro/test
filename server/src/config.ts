@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
@@ -18,6 +19,22 @@ const originList = z
       }, 'origin(스킴+호스트[:포트], 경로 없음)이어야 한다'),
     ),
   );
+
+const baseUrl = z
+  .string()
+  .min(1)
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return (url.protocol === 'http:' || url.protocol === 'https:') && url.search === '' && url.hash === '';
+    } catch {
+      return false;
+    }
+  }, '절대 http(s) URL(쿼리·조각 없음)이어야 한다')
+  .transform((value) => value.replace(/\/+$/, ''));
+
+/** 디스크 미디어 기본 위치: `server/var/media`(src/와 dist/ 모두 같은 상대 경로, git 제외). */
+const DEFAULT_MEDIA_DIR = fileURLToPath(new URL('../var/media', import.meta.url));
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -40,7 +57,18 @@ const envSchema = z.object({
     .refine((list) => list.length === 1, 'origin 하나여야 한다')
     .transform((list) => list[0]!)
     .optional(),
+  MEDIA_STORAGE: z.enum(['disk', 'r2']).default('disk'),
+  MEDIA_PUBLIC_BASE_URL: baseUrl,
+  MEDIA_DIR: z.string().min(1).optional(),
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET: z.string().min(1).optional(),
 });
+
+export type MediaConfig =
+  | { storage: 'disk'; publicBaseUrl: string; dir: string }
+  | { storage: 'r2'; publicBaseUrl: string; accountId: string; accessKeyId: string; secretAccessKey: string; bucket: string };
 
 export interface Config {
   env: 'development' | 'test' | 'production';
@@ -62,6 +90,8 @@ export interface Config {
   roomPasswordKey: Buffer;
   /** 초대 링크 `https://<웹>/r#<token>`의 웹 주소. */
   inviteWebOrigin: string;
+  /** 미디어 저장소(방 배너·로고). 운영은 R2만. */
+  media: MediaConfig;
 }
 
 export type Env = Record<string, string | undefined>;
@@ -81,6 +111,23 @@ export function loadConfig(env: Env): Config {
   if (value.INVITE_WEB_ORIGIN === undefined && value.WEB_ORIGIN.length !== 1) {
     throw new Error('WEB_ORIGIN이 여러 개면 INVITE_WEB_ORIGIN(초대 링크의 웹 주소)을 정해야 한다');
   }
+  let media: MediaConfig;
+  if (value.MEDIA_STORAGE === 'r2') {
+    const missing = (['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET'] as const).filter((name) => !value[name]);
+    if (missing.length > 0) throw new Error(`MEDIA_STORAGE=r2에는 ${missing.join(', ')}이(가) 필요하다`);
+    media = {
+      storage: 'r2',
+      publicBaseUrl: value.MEDIA_PUBLIC_BASE_URL,
+      accountId: value.R2_ACCOUNT_ID!,
+      accessKeyId: value.R2_ACCESS_KEY_ID!,
+      secretAccessKey: value.R2_SECRET_ACCESS_KEY!,
+      bucket: value.R2_BUCKET!,
+    };
+  } else {
+    // 디스크는 서버 한 대의 로컬 파일이라 운영(재배포·여러 대)에서 사진을 잃는다. 운영은 R2만 받는다.
+    if (value.NODE_ENV === 'production') throw new Error('운영(NODE_ENV=production)에서는 MEDIA_STORAGE=r2여야 한다');
+    media = { storage: 'disk', publicBaseUrl: value.MEDIA_PUBLIC_BASE_URL, dir: value.MEDIA_DIR ?? DEFAULT_MEDIA_DIR };
+  }
   return {
     env: value.NODE_ENV,
     port: value.PORT,
@@ -95,5 +142,6 @@ export function loadConfig(env: Env): Config {
     roomCreatePerIpPerDay: value.ROOM_CREATE_PER_IP_PER_DAY,
     roomPasswordKey: value.ROOM_PASSWORD_KEY,
     inviteWebOrigin: value.INVITE_WEB_ORIGIN ?? value.WEB_ORIGIN[0]!,
+    media,
   };
 }

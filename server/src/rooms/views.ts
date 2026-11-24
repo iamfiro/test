@@ -4,6 +4,7 @@ import { roomTags, studyRoomMembers, studyRooms, tags, users } from '../db/schem
 import { PRESENCE_MAX_GAP_MS } from '../study/timer.js';
 import { sortCatalog, userTagsMany, type TagView } from '../tags/catalog.js';
 import { decryptRoomPassword } from './password.js';
+import { imageKey, type ImageSlot } from './service.js';
 
 export const ROOM_LIST_LIMIT = 100;
 
@@ -13,6 +14,8 @@ export interface ViewContext {
   viewerId: string | null;
   now: Date;
   passwordKey: Buffer;
+  /** 미디어 키 → 절대 공개 URL. */
+  mediaUrl: (key: string) => string;
 }
 
 /**
@@ -30,6 +33,8 @@ function roomColumns(ctx: ViewContext) {
     map: studyRooms.map,
     capacity: studyRooms.capacity,
     passwordCiphertext: studyRooms.passwordCiphertext,
+    bannerId: studyRooms.bannerId,
+    logoId: studyRooms.logoId,
     createdAt: studyRooms.createdAt,
     hostNickname: users.nickname,
     memberCount: sql<number>`(select count(*)::int from study_room_members m where m.room_id = ${studyRooms.id})`.mapWith(Number),
@@ -71,7 +76,12 @@ export async function roomTagsMany(db: DbExecutor, roomIds: string[]): Promise<M
   return result;
 }
 
-function serializeRoom(row: RoomRow, roomTagList: TagView[], viewerId: string | null) {
+function image(ctx: ViewContext, roomId: string, slot: ImageSlot, id: string | null) {
+  return id === null ? null : { id, url: ctx.mediaUrl(imageKey(roomId, slot, id)) };
+}
+
+function serializeRoom(ctx: ViewContext, row: RoomRow, roomTagList: TagView[]) {
+  const viewerId = ctx.viewerId;
   return {
     id: row.id,
     name: row.name,
@@ -85,8 +95,8 @@ function serializeRoom(row: RoomRow, roomTagList: TagView[], viewerId: string | 
     is_host: row.hostUserId === viewerId,
     host_nickname: row.hostNickname,
     created_at: row.createdAt.toISOString(),
-    banner: null,
-    logo: null,
+    banner: image(ctx, row.id, 'banner', row.bannerId),
+    logo: image(ctx, row.id, 'logo', row.logoId),
     tags: roomTagList,
   };
 }
@@ -95,7 +105,7 @@ export type RoomView = ReturnType<typeof serializeRoom>;
 
 async function serializeRows(ctx: ViewContext, rows: RoomRow[]): Promise<RoomView[]> {
   const tagMap = await roomTagsMany(ctx.db, rows.map((r) => r.id));
-  return rows.map((row) => serializeRoom(row, tagMap.get(row.id)!, ctx.viewerId));
+  return rows.map((row) => serializeRoom(ctx, row, tagMap.get(row.id)!));
 }
 
 export type RoomScope = 'mine' | 'all' | 'recommended';

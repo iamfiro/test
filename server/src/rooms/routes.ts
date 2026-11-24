@@ -5,7 +5,9 @@ import { containsBannedWord } from '../moderation/banned-words.js';
 import { activeIpRestriction, activeUserRestriction } from '../moderation/restrictions.js';
 import { parseTagIds } from '../tags/routes.js';
 import { ROOM_PASSWORD } from './password.js';
-import { FREE_MAPS, type RoomCreateInput, type RoomPatch } from './service.js';
+import { sniffImage } from '../media/image.js';
+import type { UploadBody } from '../media/routes.js';
+import { FREE_MAPS, IMAGE_SLOTS, type ImageSlot, type RoomCreateInput, type RoomPatch } from './service.js';
 import { invitePreview, listRooms, roomDetail, type RoomDetail, type RoomScope, type ViewContext } from './views.js';
 
 const NAME_MAX = 40;
@@ -21,6 +23,9 @@ const HOUR_MS = 60 * 60 * 1000;
 const JOINS_PER_HOUR = 30;
 /** 초대 미리보기: 같은 IP 기준 시간당 60회(계약). */
 const PREVIEWS_PER_HOUR = 60;
+/** 사진: PocketTime 업로드 규칙과 같은 10MB(계약). 요청 전체는 multipart 머리 여유를 두고 11MB까지 받는다. */
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const IMAGE_BODY_LIMIT = 11 * 1024 * 1024;
 const TOKEN_MIN = 16;
 const TOKEN_MAX = 128;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -146,6 +151,7 @@ export function registerRoomRoutes(app: FastifyInstance): void {
     viewerId,
     now: app.now(),
     passwordKey: app.config.roomPasswordKey,
+    mediaUrl: (key) => app.media.publicUrl(key),
   });
   const detailOf = async (request: FastifyRequest, roomId: string) => {
     const detail = await roomDetail(context(request.auth!.user.id), roomId);
@@ -223,6 +229,38 @@ export function registerRoomRoutes(app: FastifyInstance): void {
     const targetId = (request.params as { user_id?: string }).user_id ?? '';
     await app.rooms.kick(request.auth!.user.id, roomId, targetId);
     request.log.info(`study room member removed room: ${shortId(roomId)} user: ${shortId(targetId)}`);
+    return sendDetail(request, reply, await detailOf(request, roomId));
+  });
+
+  const slotParam = (request: FastifyRequest): ImageSlot => {
+    const slot = (request.params as { slot?: string }).slot;
+    if (!(IMAGE_SLOTS as readonly (string | undefined)[]).includes(slot)) throw errors.notFound();
+    return slot as ImageSlot;
+  };
+
+  app.put('/study-rooms/:room_id/images/:slot', { bodyLimit: IMAGE_BODY_LIMIT, config: { idempotent: true } }, async (request, reply) => {
+    const startedAt = Date.now();
+    const roomId = roomIdParam(request);
+    const slot = slotParam(request);
+    const body = request.body as UploadBody | undefined;
+    const bytes = body && typeof body === 'object' && 'file' in body ? body.file?.bytes : undefined;
+    if (!bytes) throw errors.validation('사진 파일을 보내 주세요', 'file');
+    if (bytes.length > IMAGE_MAX_BYTES) throw errors.validation('사진은 10MB까지 올릴 수 있어요', 'file');
+    // 보낸 형식(파일 이름·Content-Type)은 믿지 않는다.
+    const info = sniffImage(bytes);
+    if (!info) throw errors.validation('JPEG·PNG·WebP 사진만 올릴 수 있어요', 'file');
+    await app.rooms.setImage(request.auth!.user.id, roomId, slot, bytes, info.type);
+    request.log.info(
+      `study room image saved room: ${shortId(roomId)} slot: ${slot} type: ${info.type} bytes: ${bytes.length} elapsed_ms: ${Date.now() - startedAt}`,
+    );
+    return sendDetail(request, reply, await detailOf(request, roomId));
+  });
+
+  app.delete('/study-rooms/:room_id/images/:slot', { config: { idempotent: true } }, async (request, reply) => {
+    const roomId = roomIdParam(request);
+    const slot = slotParam(request);
+    await app.rooms.clearImage(request.auth!.user.id, roomId, slot);
+    request.log.info(`study room image removed room: ${shortId(roomId)} slot: ${slot}`);
     return sendDetail(request, reply, await detailOf(request, roomId));
   });
 

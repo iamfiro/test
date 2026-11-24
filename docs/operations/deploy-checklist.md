@@ -44,6 +44,13 @@ last_verified: 2026-11-23
   새 환경 변수: `ROOM_PASSWORD_KEY`(필수, `openssl rand -base64 32`. 방 비밀번호 암호화 키. 바꾸면 기존 방 비밀번호를 읽지 못하니
   비밀값 저장소에서 잃지 않게 둔다), `INVITE_WEB_ORIGIN`(초대 링크 `https://<웹>/r#<token>`의 웹 주소, `WEB_ORIGIN`이 하나면
   생략 가능하고 여럿이면 필수), `ROOM_CREATE_PER_IP_PER_DAY`(기본 10).
+- 방 배너·로고(launch.md L4a, 구현됨): `study_rooms.banner_id`·`logo_id`(파일 id). 파일은 R2 키 `rooms/<room_id>/{banner,logo}/<id>`에
+  `Content-Type`(서버가 파일 앞부분으로 정함)·`Cache-Control: public, max-age=31536000, immutable`로 올리고, 바꾸거나 방을 지우거나
+  방장이 계정을 지우면 이전 키를 지운다(지우기에 실패하면 서버 오류 로그 `media delete failed key: ...`에 키가 남는다).
+  새 환경 변수: `MEDIA_STORAGE`(`disk`|`r2`, 기본 `disk`, 운영은 `r2`가 아니면 시작 거부), `MEDIA_PUBLIC_BASE_URL`(필수, 응답에 싣는
+  미디어 절대 URL의 앞부분. 운영 `https://media.pocket-time.study`, 로컬 `http://localhost:5191/media`), `R2_ACCOUNT_ID`·
+  `R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY`·`R2_BUCKET`(`r2`일 때 필수. 토큰 권한은 그 버킷의 객체 읽기·쓰기만), `MEDIA_DIR`
+  (`disk`일 때 파일 위치, 기본 `server/var/media`, git 제외. 개발 서버가 `/media/*`로 내준다).
 
 ## 환경 변수
 

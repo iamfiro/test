@@ -321,6 +321,9 @@ export const studyRooms = pgTable(
     map: text('map', { enum: ['cafe', 'library', 'rooftop'] }).notNull(),
     capacity: integer('capacity').notNull(),
     passwordCiphertext: text('password_ciphertext'),
+    /** 배너·로고 파일 id. 미디어 키는 `rooms/<id>/<slot>/<파일 id>`이고, 바꾸면 새 id(새 키)다. 없으면 null. */
+    bannerId: text('banner_id'),
+    logoId: text('logo_id'),
     createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
   },

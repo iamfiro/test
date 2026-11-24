@@ -21,6 +21,10 @@ import { registerReportRoutes } from './moderation/routes.js';
 import { registerTagRoutes } from './tags/routes.js';
 import { RoomService } from './rooms/service.js';
 import { registerRoomRoutes } from './rooms/routes.js';
+import type { MediaStorage } from './media/storage.js';
+import { DiskStorage } from './media/disk.js';
+import { R2Storage } from './media/r2.js';
+import { registerDiskMediaRoute, registerMediaParsing } from './media/routes.js';
 import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
@@ -34,6 +38,8 @@ declare module 'fastify' {
     settings: SettingsService;
     /** 공부방 상태 변경(커밋 뒤 `onChange` 알림). */
     rooms: RoomService;
+    /** 미디어 저장소(방 배너·로고). */
+    media: MediaStorage;
   }
 }
 
@@ -43,6 +49,14 @@ export interface AppOptions {
   registerExtraRoutes?: (app: FastifyInstance) => Promise<void> | void;
   /** 서버 시각. 없으면 시스템 시계. */
   now?: () => Date;
+  /** 미디어 저장소 대역(테스트). 없으면 설정(`MEDIA_STORAGE`)대로 만든다. */
+  media?: MediaStorage;
+}
+
+function createMediaStorage(config: Config): MediaStorage {
+  const media = config.media;
+  if (media.storage === 'r2') return new R2Storage(media);
+  return new DiskStorage(media.dir, media.publicBaseUrl);
 }
 
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -77,14 +91,15 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     new TimerService(handle.db, now, (error) => app.log.error({ err: error }, 'timer change listener failed')),
   );
   app.decorate('settings', new SettingsService(handle.db, now, config.settingsCacheMs));
+  const media = options.media ?? createMediaStorage(config);
+  app.decorate('media', media);
   app.decorate(
     'rooms',
-    new RoomService(
-      handle.db,
-      now,
-      { passwordKey: config.roomPasswordKey, createPerIpPerDay: config.roomCreatePerIpPerDay },
-      (error) => app.log.error({ err: error }, 'room change listener failed'),
-    ),
+    new RoomService(handle.db, now, media, { passwordKey: config.roomPasswordKey, createPerIpPerDay: config.roomCreatePerIpPerDay }, {
+      onListenerError: (error) => app.log.error({ err: error }, 'room change listener failed'),
+      // 지우지 못한 파일은 공개 URL로 남지만 어디서도 가리키지 않는다. 키를 남겨 운영자가 지울 수 있게 한다.
+      onMediaDeleteError: (key, error) => app.log.error({ err: error }, `media delete failed key: ${key}`),
+    }),
   );
   app.addHook('onClose', async () => {
     await handle.pool.end();
@@ -101,6 +116,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       done(Object.assign(new Error('invalid json'), { code: 'FST_ERR_CTP_INVALID_JSON_BODY', statusCode: 400 }));
     }
   });
+
+  registerMediaParsing(app);
 
   await app.register(cookie);
   await app.register(cors, {
@@ -156,6 +173,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerReportRoutes(app);
   registerTagRoutes(app);
   registerRoomRoutes(app);
+  if (media instanceof DiskStorage) registerDiskMediaRoute(app, media);
   await options.registerExtraRoutes?.(app);
 
   if (config.env !== 'test') startMaintenance(app);
