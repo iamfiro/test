@@ -70,18 +70,18 @@
 
 /* 온보딩(검은 그라데이션 위): 흰 글자·얇은 테두리 알약. */
 .inputDark.inputDark {
-  border: 1.5px solid rgb(255 255 255 / 0.35); background: rgb(255 255 255 / 0.1); color: #fff;
+  border: 0; background: rgb(255 255 255 / 0.14); color: #fff;
 }
 .inputDark::placeholder { color: rgb(255 255 255 / 0.5); }
-.inputDark:focus-visible { box-shadow: none; border-color: #fff; }
+.inputDark:focus-visible { box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.6); }
 .dark .groupLabel { color: rgb(255 255 255 / 0.6); }
 .dark .empty { color: rgb(255 255 255 / 0.8); }
 .dark .chips { gap: 8px; }
 .dark .pickedTag { background: #fff; color: #1d1a16; }
 .darkChip {
   display: inline-flex; align-items: center; gap: 5px; height: 38px; padding: 0 14px 0 11px; border-radius: 999px; cursor: pointer;
-  border: 1.5px solid rgb(255 255 255 / 0.3); background: rgb(255 255 255 / 0.08); color: #fff;
+  border: 0; background: rgb(255 255 255 / 0.14); color: #fff;
   font: inherit; font-size: 15px; font-weight: 700;
 }
-.darkChipOn { background: var(--i-sun); border-color: var(--i-sun); color: #3a2e1c; }
+.darkChipOn { background: var(--i-sun); color: #3a2e1c; }
 .darkChip:focus-visible { outline: 3px solid var(--i-sun); outline-offset: 2px; }

@@ -81,7 +81,6 @@ export function OnboardingPanel(props: {
   useEffect(() => { card.current?.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true }) }, [phase])
 
   const title = phase === 'pick' ? t('studyOnboardingGenderTitle') : phase === 'name' ? webText.onboardingNameTitle : webText.onboardingGoalTitle
-  const description = phase === 'pick' ? t('studyOnboardingGenderDescription') : phase === 'name' ? webText.onboardingNameDescription : webText.onboardingGoalDescription
 
   return (
     <div className={s.root}>
@@ -105,7 +104,6 @@ export function OnboardingPanel(props: {
       >
         <div className={s.body} key={phase}>
           <h1 className={s.title} tabIndex={-1}>{title}</h1>
-          <p className={s.description}>{description}</p>
           {phase === 'pick' && (
             <div className={s.genders} role="radiogroup" aria-label={title}>
               {(['male', 'female'] as const).map((g) => (
