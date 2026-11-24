@@ -11,7 +11,7 @@ import type { ActorPlacement, StudyRoomCinematic } from '../room3d/StudyRoom3dVi
 import type { Tag } from '../tags/tagsStore'
 import { entranceSeats, OnboardingScene, type Gender } from './onboardingScene'
 import { OnboardingSaver, OnboardingSaveError, nicknameProblem } from './onboardingSave'
-import { OnboardingPanel, ActorHit, NamePlate, SkipEntrance } from './OnboardingPanel'
+import { OnboardingPanel, ActorHit, NamePlate, SkipEntrance, ThoughtBubble } from './OnboardingPanel'
 import { CoachMarks } from './CoachMarks'
 
 export type OnboardingPhase = 'pick' | 'name' | 'goal' | 'entering' | 'tour'
@@ -110,7 +110,8 @@ export function useOnboarding(enabled: boolean): Onboarding | null {
 
   const actorOverlay = (p: ActorPlacement): ReactNode | null => {
     if (phase === 'pick') return <ActorHit placement={p} gender={p.id as Gender} selected={gender === p.id} onPick={setGender} />
-    if (phase === 'name' || phase === 'goal') return <NamePlate placement={p} name={name.trim()} tags={phase === 'goal' ? tags : []} />
+    if (phase === 'name') return <NamePlate placement={p} name={name.trim()} />
+    if (phase === 'goal') return <ThoughtBubble placement={p} tags={tags} />
     return null
   }
 

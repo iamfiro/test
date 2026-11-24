@@ -37,6 +37,17 @@ const smooth = (t: number) => t * t * (3 - 2 * t)
 
 /** 캐릭터를 둘 화면 칸(px): 위 진행 표시 아래부터 온보딩 카드 위까지. */
 export type FreeArea = { top: number; bottom: number }
+/** 목표 단계에서 머리 위 생각 말풍선에 남기는 높이(px). 캐릭터는 그만큼 내려가 몸 아래쪽이 글 뒤에 가린다. */
+const goalBubbleRoom = 120
+/**
+ * 목표 단계에서 캐릭터(발~머리 1m)를 둘 칸: 머리 꼭대기는 말풍선 자리 아래, 턱은 글 칸 바로 위(머리가 키의 약 47%)에
+ * 오게 해 얼굴은 보이고 몸은 글·칩 뒤에 가린다.
+ */
+function goalArea(free: FreeArea): FreeArea {
+  const top = free.top + goalBubbleRoom
+  const height = Math.max(120, (free.bottom + 16 - top) / 0.47)
+  return { top, bottom: top + height }
+}
 /** 문밖 카메라가 캐릭터에서 물러나는 최대 거리(m). 이보다 멀면 잔디 위 나무·바위가 앞을 가린다. */
 const maxFrontDistance = 5.5
 
@@ -171,11 +182,15 @@ export class OnboardingScene {
       if (a.selectAt === -1 && a.walk < 0.05) a.selectAt = nowMs
       actors.push(this.actorOf(g, a, t, nowMs, this.step === 'pick' && g === chosen ? 1.06 : 1))
     }
+    const free = this.free(size)
     const focus = this.step === 'pick'
-      // 두 캐릭터와 발밑 이름 알약.
-      ? frontCamera(new Vector3(standX + 0.2, lawnY + 0.5, doorZ), 0.95, 1.5, size, this.free(size))
-      // 머리 위 이름표(목표 단계는 태그까지)가 칸 안에 들어오게 위를 더 남긴다.
-      : frontCamera(new Vector3(standX + 0.4, lawnY + (this.step === 'goal' ? 0.68 : 0.62), doorZ), this.step === 'goal' ? 1.0 : 1.1, 0.8, size, this.free(size))
+      ? frontCamera(new Vector3(standX + 0.2, lawnY + 0.5, doorZ), 0.95, 1.5, size, free)
+      : this.step === 'name'
+      // 머리 위 이름표가 칸 안에 들어오게 위를 남긴다.
+      ? frontCamera(new Vector3(standX + 0.4, lawnY + 0.62, doorZ), 1.1, 0.8, size, free)
+      // 목표 단계(사용자 요청 2026-11-24): 캐릭터를 아래로 내려 몸 아래쪽은 온보딩 글·칩 뒤에 가리고, 머리 위에는
+      // 생각 말풍선 자리(goalBubbleRoom)를 남긴다.
+      : frontCamera(new Vector3(standX + 0.4, lawnY + 0.5, doorZ), 1.0, 0.8, size, goalArea(free))
     this.camera = this.camera && !this.reduceMotion ? StudyRoomSeatCamera.lerp(this.camera, focus, 1 - Math.exp(-dt * 4)) : focus
     return { camera: this.camera, actors, hiddenSeat: 0 }
   }

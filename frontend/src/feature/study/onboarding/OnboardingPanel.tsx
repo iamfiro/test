@@ -1,6 +1,6 @@
 // 온보딩 1–3단계 화면(문밖 잔디 위). 카드 없이 화면 아래 검은 그라데이션 위에 흰 제목·설명과 단순한 알약 단추
 // (사용자 결정 2026-11-24: "쓸데없는 모달 UI 없애고 아래 배경에 검은색 그라디언트"), 위에 진행 표시·뒤로.
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 import { IconChevronLeft, IconGenderFemale, IconGenderMale } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
@@ -181,17 +181,43 @@ export function ActorHit(props: { placement: ActorPlacement; gender: Gender; sel
   )
 }
 
-/** 2·3단계: 머리 위 이름표. 입력하는 대로 바뀌고, 3단계에서는 고른 태그가 아래 붙는다. */
-export function NamePlate(props: { placement: ActorPlacement; name: string; tags: Tag[] }) {
+/** 2단계: 머리 위 이름표. 입력하는 대로 바뀐다. */
+export function NamePlate(props: { placement: ActorPlacement; name: string }) {
   const { head } = props.placement
   return (
     <span className={s.plate} style={{ left: head.x, top: head.y - 6 }} aria-hidden>
       <span className={`${s.plateName} ${props.name ? '' : s.plateEmpty}`}>{props.name || webText.onboardingNameLabel}</span>
-      {props.tags.length > 0 && (
-        <span className={s.plateTags}>
-          {props.tags.map((tag) => <span key={tag.id} className={s.plateTag}>#{tag.name}</span>)}
-        </span>
-      )}
+    </span>
+  )
+}
+
+/**
+ * 3단계: 머리 위 생각 말풍선(사용자 요청 2026-11-24). 고른 태그 칩이 그 안에서 저마다 조금씩 둥실거리고, 아직 고른
+ * 것이 없으면 점 세 개가 차례로 떠오른다. 말풍선에서 머리 쪽으로 작은 동그라미 둘이 이어진다. 고른 목록은 아래
+ * 글 칸에도 있으므로 화면 읽기에서는 숨긴다.
+ */
+export function ThoughtBubble(props: { placement: ActorPlacement; tags: Tag[] }) {
+  const { head } = props.placement
+  return (
+    <span className={s.thought} style={{ left: head.x, top: head.y }} aria-hidden>
+      <span className={s.thoughtDotSmall} />
+      <span className={s.thoughtDotLarge} />
+      <span className={s.thoughtCloud}>
+        {props.tags.length === 0 ? (
+          <span className={s.thinking}><i /><i /><i /></span>
+        ) : (
+          props.tags.map((tag, i) => (
+            <span key={tag.id} className={s.thoughtChipSlot}>
+              <span
+                className={s.thoughtChip}
+                style={{ animationDuration: `${2.3 + (i % 3) * 0.45}s`, animationDelay: `${-i * 0.7}s`, '--tilt': `${i % 2 ? -3 : 3}deg` } as CSSProperties}
+              >
+                #{tag.name}
+              </span>
+            </span>
+          ))
+        )}
+      </span>
     </span>
   )
 }
