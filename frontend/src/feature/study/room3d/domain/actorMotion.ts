@@ -179,8 +179,9 @@ export function selectMotion(g: ActorGender, t: number, k: number): ActorMotion 
 }
 
 /**
- * 머리 위 이름표를 의식하듯 올려다본다(이름 정하기 단계). amount 0–1로 원래 자세와 섞는다. 고개를 들고 몸을 살짝
- * 젖히며, 이름표를 확인하듯 고개를 아주 조금씩 끄덕이고 좌우로 갸웃한다.
+ * 머리 위 이름표를 의식하듯 올려다본다(이름 정하기 단계). amount 0–1로 원래 자세와 섞는다. 몸통을 뒤로 젖혀 올려다보고
+ * 고개는 조금만 든다(고개만 -0.4rad 넘게 젖히면 머리 모델의 아랫면이 목 위에 어두운 선으로 드러나 모델이 깨져 보인다).
+ * 이름표를 확인하듯 고개를 아주 조금씩 끄덕이고 좌우로 갸웃한다.
  */
 export function lookUpAt(pose: StudyRoomPose, amount: number, t: number): StudyRoomPose {
   if (amount <= 0) return pose
