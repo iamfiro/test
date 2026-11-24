@@ -21,7 +21,7 @@ const floorY = 0
 const floorEdgeX = -0.2
 const standX = -2.0
 /** 남자는 화면 왼쪽(카메라가 +X를 보면 +Z가 화면 오른쪽). */
-const pickZ: Record<Gender, number> = { male: doorZ - 0.45, female: doorZ + 0.45 }
+const pickZ: Record<Gender, number> = { male: doorZ - 0.3, female: doorZ + 0.3 }
 /** 카메라를 보는 쪽(-X). */
 const faceCamera = -Math.PI / 2
 const walkSpeed = 1.25
