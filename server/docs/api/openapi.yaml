@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.0
+  version: 0.5.1
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -16,12 +16,38 @@ servers:
 security:
   - session: []
 tags:
+  - name: ops
   - name: auth
   - name: profile
   - name: timer
   - name: rooms
   - name: tags
 paths:
+  /healthz:
+    get:
+      tags: [ops]
+      operationId: getHealth
+      summary: 가동 확인(DB 연결 포함)
+      security: []
+      responses:
+        '200':
+          description: 살아 있고 DB에 닿는다.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data, error, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties: false
+                    required: [status]
+                    properties:
+                      status: { type: string, enum: [ok] }
+                  error: { type: 'null' }
+                  meta: { $ref: '#/components/schemas/Meta' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /auth/session:
     get:
       tags: [auth]
@@ -910,6 +936,21 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     CsrfRejected:
       description: CSRF 토큰이 없거나 틀림, 또는 허용하지 않은 Origin(`CSRF_REJECTED`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ServiceUnavailable:
+      description: DB 등 필수 의존성에 닿지 않음(`SERVICE_UNAVAILABLE`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    IdempotencyKeyRequired:
+      description: 키가 필요한 쓰기에서 `Idempotency-Key`가 없거나 UUID가 아님(`IDEMPOTENCY_KEY_REQUIRED`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PayloadTooLarge:
+      description: 요청 본문이 64KB를 넘음(`PAYLOAD_TOO_LARGE`).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
