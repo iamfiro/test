@@ -16,6 +16,7 @@ import { registerStudySettingsRoutes } from './study/settings.js';
 import { registerTimerRoutes } from './study/routes.js';
 import { registerStatsRoutes } from './study/stats.js';
 import { TimerService } from './study/timer.js';
+import { SettingsService } from './moderation/settings.js';
 import { startMaintenance } from './maintenance.js';
 
 declare module 'fastify' {
@@ -25,6 +26,8 @@ declare module 'fastify' {
     /** 서버 시각. 타이머·presence가 쓴다(테스트는 고정 시계를 넣는다). */
     now: () => Date;
     timer: TimerService;
+    /** 긴급 스위치(운영 설정) 읽기. */
+    settings: SettingsService;
   }
 }
 
@@ -67,6 +70,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     'timer',
     new TimerService(handle.db, now, (error) => app.log.error({ err: error }, 'timer change listener failed')),
   );
+  app.decorate('settings', new SettingsService(handle.db, now, config.settingsCacheMs));
   app.addHook('onClose', async () => {
     await handle.pool.end();
   });

@@ -167,3 +167,74 @@ export const rankedSegments = pgTable(
     check('ranked_segments_positive', sql`${table.endedAt} > ${table.startedAt}`),
   ],
 );
+
+/**
+ * 운영 설정(긴급 스위치). 배포 없이 CLI로 바꾸고 서버는 짧은 캐시(`SETTINGS_CACHE_MS`) 뒤 바로 따른다.
+ * 키와 기본값은 `src/moderation/settings.ts`의 `SETTINGS`가 정한다. 행이 없으면 그 기본값이다.
+ */
+export const appSettings = pgTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<unknown>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** 운영자가 건 계정 단위 정지. 같은 종류를 다시 걸면 기한·사유를 바꾼다. */
+export const userRestrictions = pgTable(
+  'user_restrictions',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ['chat', 'room_create'] }).notNull(),
+    until: timestamp('until', { withTimezone: true }).notNull(),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.kind] })],
+);
+
+/** 운영자가 건 IP 단위 정지. 기한이 지나면 서버가 지운다(IP를 필요 이상 두지 않는다). */
+export const ipRestrictions = pgTable(
+  'ip_restrictions',
+  {
+    ip: text('ip').notNull(),
+    kind: text('kind', { enum: ['chat', 'room_create', 'account_create'] }).notNull(),
+    until: timestamp('until', { withTimezone: true }).notNull(),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.ip, table.kind] }), index('ip_restrictions_until_idx').on(table.until)],
+);
+
+/**
+ * 신고. `target_type`·`target_id`가 대상(메시지 id·사용자 id·방 id)이고 `target_user_id`는 그 내용의 주인이다
+ * (닉네임이면 본인, 메시지면 작성자). 신고자나 주인이 계정을 지우면 함께 지운다. `content`는 신고 시점 내용
+ * (닉네임·메시지·방 이름)이고, 같은 내용에 대한 미처리 신고 수가 기준(`REPORT_HIDE_THRESHOLD`)에 닿으면 처리하고
+ * `handled_at`·`action`을 남긴다. 한 사람은 같은 대상의 같은 내용을 한 번만 신고한다.
+ */
+export const reports = pgTable(
+  'reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    reporterUserId: uuid('reporter_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    targetType: text('target_type', { enum: ['message', 'nickname', 'room_name'] }).notNull(),
+    targetId: text('target_id').notNull(),
+    targetUserId: uuid('target_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    reason: text('reason').notNull(),
+    detail: text('detail'),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    handledAt: timestamp('handled_at', { withTimezone: true, precision: 3 }),
+    action: text('action'),
+  },
+  (table) => [
+    uniqueIndex('reports_one_per_reporter').on(table.reporterUserId, table.targetType, table.targetId, table.content),
+    index('reports_target_idx').on(table.targetType, table.targetId),
+    index('reports_target_user_idx').on(table.targetUserId),
+    index('reports_created_idx').on(table.createdAt),
+  ],
+);

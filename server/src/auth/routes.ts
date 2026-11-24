@@ -5,6 +5,7 @@ import { errors } from '../http/errors.js';
 import { awaitStored, claimKey, completeKey, readIdempotencyKey, releaseKey } from '../http/idempotency.js';
 import { serializeSession } from '../profile/serialize.js';
 import { createAnonymousAccount, findOrCreateDevAccount } from './accounts.js';
+import { activeIpRestriction } from '../moderation/restrictions.js';
 import { clearSessionCookie, createSession, SESSION_COOKIE, setSessionCookie } from './session.js';
 
 const START_SCOPE = 'auth-start';
@@ -23,6 +24,9 @@ export function registerAuthRoutes(app: FastifyInstance): void {
     for (;;) {
       if (await claimKey(app.db, START_SCOPE, key, 'start')) {
         try {
+          // 새 계정을 만들 때만 막는다. 세션이 있는 사람과 이미 만든 계정의 재시도(아래)는 지나간다.
+          if (!(await app.settings.isEnabled('account_create_enabled'))) throw errors.accountCreateDisabled();
+          if (await activeIpRestriction(app.db, request.ip, 'account_create', app.now())) throw errors.accountCreateRestricted();
           const created = await createAnonymousAccount(app.db, request.ip, app.config.accountCreatePerIpPerHour);
           await completeKey(app.db, START_SCOPE, key, {
             status: 200,

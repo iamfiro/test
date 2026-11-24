@@ -32,6 +32,10 @@ export const errors = {
     new AppError(429, 'ACCOUNT_RATE_LIMITED', '이 네트워크에서 새로 시작한 사람이 너무 많아요. 잠시 뒤 다시 시도해 주세요', undefined, {
       'retry-after': String(retryAfterSeconds),
     }),
+  accountCreateDisabled: () =>
+    new AppError(503, 'ACCOUNT_CREATE_DISABLED', '지금은 새로 시작할 수 없어요. 잠시 뒤 다시 시도해 주세요'),
+  accountCreateRestricted: () =>
+    new AppError(403, 'ACCOUNT_CREATE_RESTRICTED', '이 네트워크에서는 새로 시작할 수 없어요'),
   sessionNotActive: () =>
     new AppError(409, 'SESSION_NOT_ACTIVE', '진행 중인 공부가 아니에요. 화면을 새로 고쳐 주세요'),
   payloadTooLarge: () => new AppError(413, 'PAYLOAD_TOO_LARGE', '요청이 너무 커요'),
