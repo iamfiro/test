@@ -26,7 +26,7 @@ import { RoomService } from './rooms/service.js';
 import { registerRoomRoutes } from './rooms/routes.js';
 import type { MediaStorage } from './media/storage.js';
 import { DiskStorage } from './media/disk.js';
-import { R2Storage } from './media/r2.js';
+import { createMediaStorage } from './media/factory.js';
 import { registerDiskMediaRoute, registerMediaParsing } from './media/routes.js';
 import { startMaintenance } from './maintenance.js';
 import { LocalEventBus, type EventBus } from './realtime/bus.js';
@@ -68,12 +68,6 @@ export interface AppOptions {
   now?: () => Date;
   /** 미디어 저장소 대역(테스트). 없으면 설정(`MEDIA_STORAGE`)대로 만든다. */
   media?: MediaStorage;
-}
-
-function createMediaStorage(config: Config): MediaStorage {
-  const media = config.media;
-  if (media.storage === 'r2') return new R2Storage(media);
-  return new DiskStorage(media.dir, media.publicBaseUrl);
 }
 
 const BODY_LIMIT_BYTES = 64 * 1024;

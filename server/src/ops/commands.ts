@@ -1,6 +1,25 @@
-import { and, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chatMessages, reports, users } from '../db/schema.js';
+import {
+  chatMessages,
+  leagueGroupMembers,
+  leagueGroups,
+  leagueMemberships,
+  leagueWeeks,
+  reports,
+  studyRoomMembers,
+  studyRooms,
+  studySessions,
+  userRestrictions,
+  users,
+} from '../db/schema.js';
+import { deleteAccount } from '../auth/accounts.js';
+import type { LeagueService } from '../league/service.js';
+import { LEAGUE_TIMEZONE, weekStartOf } from '../league/week.js';
+import type { RoomService } from '../rooms/service.js';
+import { computeStreak } from '../study/streak.js';
+import { addDays, isDateString, mondayOf, studyDateOf } from '../study/time.js';
+import { weeklyMetrics } from './metrics.js';
 import { hideMessage, restoreMessage } from '../chat/service.js';
 import { readSettings, writeSetting, SETTING_KEYS, isSettingKey } from '../moderation/settings.js';
 import {
@@ -34,6 +53,10 @@ export interface CliContext {
   /** `tags merge`가 방 태그도 옮기도록 방 모듈이 넘긴다. 없으면 사용자 태그만 옮긴다. */
   moveTagRefs?: Parameters<typeof mergeTags>[3];
   now: () => Date;
+  /** 리그 정산(`league settle`)에 필요하다. 없으면 그 명령만 실패한다. */
+  league?: LeagueService;
+  /** 강제 탈퇴(`users delete`)가 방 정리까지 하도록 넘긴다. 없으면 그 명령만 실패한다. */
+  rooms?: RoomService;
   /** 명령 결과(표준 출력). */
   out: (line: string) => void;
   /** 오류·사용법(표준 오류). */
@@ -60,7 +83,14 @@ export const USAGE = `사용법: npm run cli -- <명령>
   suggestions list [--pending] [--limit N]
   suggestions accept <제안 id> <exam|kind>   제안 이름으로 새 태그
   suggestions alias <제안 id> <정규 이름>     제안 이름을 기존 태그의 별칭으로
-  suggestions reject <제안 id>`;
+  suggestions reject <제안 id>
+  league settle                              마감 + 지연이 지난 주를 오래된 것부터 정산(이미 한 주는 건너뜀)
+  league weeks [--limit N]                   최근 리그 주 상태·그룹 수·인원
+  metrics week [--week YYYY-MM-DD]           주간 지표(기본: 지난 주). 날짜가 든 주(월–일)
+  users find <id 앞부분(4자 이상)>             id로 찾기(최대 20명)
+  users find --nickname <닉네임>              닉네임이 같은 사람(최대 20명)
+  users show <user_id>                       계정 요약(방·정지·리그·스트릭·신고)
+  users delete <user_id> --yes               강제 탈퇴(내 데이터 지우기와 같음, 되돌릴 수 없음)`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HOUR_MS = 60 * 60 * 1000;
@@ -387,6 +417,149 @@ async function messagesCommand(ctx: CliContext, args: string[]): Promise<void> {
   throw new UsageError('messages show|hide|restore <메시지 id>');
 }
 
+async function leagueCommand(ctx: CliContext, args: string[]): Promise<void> {
+  const [action, ...rest] = args;
+  if (action === 'settle') {
+    exactly(rest, 0, 'league settle');
+    if (!ctx.league) throw new Error('league settle에는 리그 서비스가 필요하다');
+    const weeks = await ctx.league.settleDue();
+    if (weeks.length === 0) ctx.out('nothing due');
+    for (const week of weeks) ctx.out(`settled week_start: ${new Date(week).toISOString()}`);
+    return;
+  }
+  if (action === 'weeks') {
+    const { flags, rest: extra } = parseFlags(rest, ['limit']);
+    if (extra.length > 0) throw new UsageError(`남는 인자: ${extra.join(' ')}`);
+    const limitRaw = stringFlag(flags, 'limit');
+    const limit = limitRaw === undefined ? 8 : Math.floor(positiveNumber(limitRaw, 'limit'));
+    const weeks = await ctx.db.select().from(leagueWeeks).orderBy(desc(leagueWeeks.weekStart)).limit(limit);
+    for (const week of weeks) {
+      const groups = await ctx.db
+        .select({ league: leagueGroups.league, groups: sql<number>`count(distinct ${leagueGroups.id})::int`, members: sql<number>`count(${leagueGroupMembers.userId})::int` })
+        .from(leagueGroups)
+        .leftJoin(leagueGroupMembers, eq(leagueGroupMembers.groupId, leagueGroups.id))
+        .where(eq(leagueGroups.weekStart, week.weekStart))
+        .groupBy(leagueGroups.league)
+        .orderBy(asc(leagueGroups.league));
+      ctx.out(
+        JSON.stringify({
+          week_start: week.weekStart.toISOString(),
+          status: week.status,
+          settled_at: week.settledAt?.toISOString() ?? null,
+          leagues: groups,
+        }),
+      );
+    }
+    return;
+  }
+  throw new UsageError('league settle|weeks');
+}
+
+async function metricsCommand(ctx: CliContext, args: string[]): Promise<void> {
+  const [action, ...rest] = args;
+  if (action !== 'week') throw new UsageError('metrics week [--week YYYY-MM-DD]');
+  const { flags, rest: extra } = parseFlags(rest, ['week']);
+  if (extra.length > 0) throw new UsageError(`남는 인자: ${extra.join(' ')}`);
+  const raw = stringFlag(flags, 'week');
+  if (raw !== undefined && !isDateString(raw)) throw new UsageError(`--week는 YYYY-MM-DD: ${raw}`);
+  // 기본은 끝난 지난 주(리그 시간대 기준 이번 주 월요일의 7일 전).
+  const monday = raw !== undefined ? mondayOf(raw) : addDays(mondayOf(studyDateOf(weekStartOf(ctx.now().getTime()), LEAGUE_TIMEZONE)), -7);
+  ctx.out(JSON.stringify(await weeklyMetrics(ctx.db, monday)));
+}
+
+const userSummary = (row: typeof users.$inferSelect) => ({ id: row.id, nickname: row.nickname, created_at: row.createdAt.toISOString() });
+
+/**
+ * 사용자 조회·강제 탈퇴. 계정은 익명이라 이메일이 없다(로그인을 붙이면 마스킹해서 보인다). CLI는 운영자가 다음 명령
+ * (`restrict user` 등)에 쓸 수 있게 전체 id를 표준 출력에 낸다(서버 로그의 앞 4자 규칙은 로그에만 적용).
+ */
+async function usersCommand(ctx: CliContext, args: string[]): Promise<void> {
+  const [action, ...rest] = args;
+  if (action === 'find') {
+    const { flags, rest: positional } = parseFlags(rest, ['nickname']);
+    const nickname = stringFlag(flags, 'nickname');
+    let rows: (typeof users.$inferSelect)[];
+    if (nickname !== undefined) {
+      if (positional.length > 0) throw new UsageError(`남는 인자: ${positional.join(' ')}`);
+      rows = await ctx.db.select().from(users).where(eq(users.nickname, nickname)).orderBy(asc(users.createdAt)).limit(20);
+    } else {
+      exactly(positional, 1, 'users find <id 앞부분(4자 이상)> | users find --nickname <닉네임>');
+      const prefix = positional[0]!.toLowerCase();
+      if (!/^[0-9a-f-]{4,36}$/.test(prefix)) throw new UsageError(`id 앞부분은 16진수 4자 이상: ${prefix}`);
+      rows = await ctx.db
+        .select()
+        .from(users)
+        .where(sql`${users.id}::text like ${`${prefix}%`}`)
+        .orderBy(asc(users.createdAt))
+        .limit(20);
+    }
+    if (rows.length === 0) ctx.out('no users');
+    for (const row of rows) ctx.out(JSON.stringify(userSummary(row)));
+    return;
+  }
+  if (action === 'show') {
+    exactly(rest, 1, 'users show <user_id>');
+    const id = userId(rest[0]);
+    const [row] = await ctx.db.select().from(users).where(eq(users.id, id));
+    if (!row) throw new Error(`없는 사용자: ${id}`);
+    const now = ctx.now();
+    const [room] = await ctx.db
+      .select({ roomId: studyRoomMembers.roomId, hostUserId: studyRooms.hostUserId })
+      .from(studyRoomMembers)
+      .innerJoin(studyRooms, eq(studyRoomMembers.roomId, studyRooms.id))
+      .where(eq(studyRoomMembers.userId, id));
+    const restrictions = await ctx.db
+      .select({ kind: userRestrictions.kind, until: userRestrictions.until, reason: userRestrictions.reason })
+      .from(userRestrictions)
+      .where(and(eq(userRestrictions.userId, id), gt(userRestrictions.until, now)));
+    const [membership] = await ctx.db.select().from(leagueMemberships).where(eq(leagueMemberships.userId, id));
+    const [sessions] = await ctx.db
+      .select({
+        finished: sql<number>`count(*) filter (where ${studySessions.status} = 'finished')::int`,
+        active: sql<number>`count(*) filter (where ${studySessions.status} = 'active')::int`,
+      })
+      .from(studySessions)
+      .where(eq(studySessions.userId, id));
+    const [received] = await ctx.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where ${reports.handledAt} is null)::int`,
+      })
+      .from(reports)
+      .where(eq(reports.targetUserId, id));
+    const [filed] = await ctx.db.select({ total: sql<number>`count(*)::int` }).from(reports).where(eq(reports.reporterUserId, id));
+    const streak = await computeStreak(ctx.db, id, LEAGUE_TIMEZONE, now);
+    ctx.out(
+      JSON.stringify({
+        ...userSummary(row),
+        email: null,
+        onboarding_completed_at: row.onboardingCompletedAt?.toISOString() ?? null,
+        room: room ? { room_id: room.roomId, is_host: room.hostUserId === id } : null,
+        restrictions: restrictions.map((r) => ({ kind: r.kind, until: r.until.toISOString(), reason: r.reason })),
+        league: membership?.league ?? 'general',
+        streak_current: streak.current,
+        sessions: sessions ?? { finished: 0, active: 0 },
+        reports_received: received ?? { total: 0, pending: 0 },
+        reports_filed: filed?.total ?? 0,
+      }),
+    );
+    return;
+  }
+  if (action === 'delete') {
+    const { flags, rest: positional } = parseFlags(rest, ['yes']);
+    exactly(positional, 1, 'users delete <user_id> --yes');
+    const id = userId(positional[0]);
+    if (flags.get('yes') !== true) throw new UsageError('강제 탈퇴는 되돌릴 수 없다. 확인하려면 --yes를 붙인다');
+    const [row] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.id, id));
+    if (!row) throw new Error(`없는 사용자: ${id}`);
+    if (!ctx.rooms) throw new Error('users delete에는 방 서비스가 필요하다');
+    await deleteAccount(ctx.rooms, id);
+    ctx.out(`deleted user ${id}`);
+    return;
+  }
+  throw new UsageError('users find|show|delete');
+}
+
 /** 운영 CLI 진입점(테스트가 직접 부른다). 종료 코드: 0 성공, 1 실행 오류, 2 사용법 오류. */
 export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
   const [command, ...args] = argv;
@@ -415,6 +588,15 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
         break;
       case 'suggestions':
         await suggestionsCommand(ctx, args);
+        break;
+      case 'league':
+        await leagueCommand(ctx, args);
+        break;
+      case 'metrics':
+        await metricsCommand(ctx, args);
+        break;
+      case 'users':
+        await usersCommand(ctx, args);
         break;
       default:
         throw new UsageError(command ? `모르는 명령: ${command}` : '명령이 없다');

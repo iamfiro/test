@@ -5,8 +5,8 @@ last_verified: 2026-11-24
 
 # 운영 CLI
 
-관리자 화면이 없다(결정 9). 긴급 스위치·정지·신고 확인·채팅 메시지 숨김·태그 카탈로그 관리는 서버 CLI로 한다. CLI는 `DATABASE_URL`만 읽고
-DB에 바로 쓴다. 서버는 설정을 짧게(`SETTINGS_CACHE_MS`, 기본 5초) 캐시하므로 바꾼 값은 그 안에 모든 서버에 적용된다.
+관리자 화면이 없다(결정 9). 긴급 스위치·정지·신고 확인·채팅 메시지 숨김·태그 카탈로그 관리·리그 정산·주간 지표·사용자 조회·강제 탈퇴는
+서버 CLI로 한다. CLI는 서버와 같은 환경 변수를 읽고(설정 검증도 같다: 빠진 값이 있으면 종료 코드 2) DB에 바로 쓴다. 서버는 설정을 짧게(`SETTINGS_CACHE_MS`, 기본 5초) 캐시하므로 바꾼 값은 그 안에 모든 서버에 적용된다.
 정지·신고는 캐시 없이 바로 적용된다.
 
 - 개발: `cd server && npm run cli -- <명령>` (`.env`의 `DATABASE_URL`)
@@ -105,3 +105,47 @@ npm run cli -- suggestions reject <id>
 ```
 
 제안한 사람이 "내 데이터 지우기"를 하면 그 제안도 지워진다.
+
+## 리그 정산
+
+정산은 서버가 시작할 때(밀린 주를 오래된 것부터)와 1분마다 스스로 돈다. 리그 주는 `Asia/Seoul` 월요일 04:00부터이고 마감 +
+`LEAGUE_SETTLE_DELAY`(기본 10분)가 지나야 정산한다. 서버가 꺼져 있었거나 바로 확인하고 싶을 때 수동으로 돌린다. 서버와 함께 돌아도
+정산 잠금(`pg_advisory_xact_lock`)과 주 상태로 한 번만 반영된다(이미 정산한 주는 건너뛴다).
+
+```sh
+npm run cli -- league settle                         # "settled week_start: <ISO>" 줄 또는 "nothing due"
+npm run cli -- league weeks                          # 최근 8주: week_start, status(open·settled), settled_at, 리그별 그룹 수·인원
+npm run cli -- league weeks --limit 20
+```
+
+마감이 지나지 않은 주를 앞당겨 정산하는 방법은 없다(그 주 점수가 굳어 버린다). 출시 전 리허설(launch.md 6절 리그)은 실제 주 마감 뒤에 한다.
+
+## 주간 지표
+
+study-league.md §7의 성공 지표. 주는 공부일(인정 구간의 `study_date`) 월–일이고 기본은 끝난 지난 주다.
+
+```sh
+npm run cli -- metrics week                          # 지난 주
+npm run cli -- metrics week --week 2026-12-07        # 그 날짜가 든 주
+```
+
+JSON 한 줄: `active_users`(그 주 인정 공부가 있는 사람, 비율의 분모), `studied_3_days`·`studied_3_days_ratio`(10분 이상인 날이 3일
+이상), `streak_7`·`streak_30`과 비율(그 주 안에 스트릭 7·30일에 닿아 있던 사람), `league_participants`·`league_groups`(그 리그 주의
+리그별 그룹 인원·그룹 수), `league_memberships_now`(지금 리그 소속 행 수). 도토리 지급 합계는 보상이 없어(launch.md M1) 내지 않는다.
+기준선은 리그 출시 전 2주.
+
+## 사용자 조회·강제 탈퇴
+
+계정은 익명이라 이메일이 없다(`email`은 항상 null, 로그인을 붙이면 `ab***@domain`으로 가려서 보인다). 출력에는 다음 명령에 쓸 수 있게
+전체 id가 나온다(서버 로그의 "식별자 앞 4자" 규칙은 로그에만 적용). 운영 기록·대화에 옮길 때는 앞 4자만 쓴다.
+
+```sh
+npm run cli -- users find 3f2a                       # id 앞부분(16진수 4자 이상), 최대 20명: id, nickname, created_at
+npm run cli -- users find --nickname "졸린 수달"       # 닉네임이 같은 사람
+npm run cli -- users show <user_id>                  # 방(방장 여부)·진행 중 정지·리그·스트릭(서울 기준)·세션 수·받은/한 신고 수
+npm run cli -- users delete <user_id> --yes          # 강제 탈퇴: 내 데이터 지우기와 같다(방장인 방 삭제, 모든 행 cascade). 되돌릴 수 없다
+```
+
+강제 탈퇴는 세션이 지워져 그 사람의 다음 요청이 401이 된다. CLI는 서버와 다른 프로세스라 열린 소켓·방 실시간 명단에는 바로 알리지
+못한다(다시 연결할 때 끊기고, 방 명단은 그 방에 다시 들어올 때 빠진다). 바로 끊어야 하면 먼저 `restrict user <id> chat ...`로
+채팅을 막는다.

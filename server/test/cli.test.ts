@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { runCli } from '../src/ops/commands.js';
+import { LeagueService } from '../src/league/service.js';
 import { readSettings } from '../src/moderation/settings.js';
 import { activeIpRestriction, activeUserRestriction } from '../src/moderation/restrictions.js';
 import { listCatalog, userTagsOf } from '../src/tags/catalog.js';
 import { createTestApp, resetDatabase } from './helpers/app.js';
-import { startAnonymous, withKey } from './helpers/session.js';
+import { authHeaders, startAnonymous, withKey } from './helpers/session.js';
+import { seedRanked } from './helpers/study.js';
 
 const NOW = new Date('2026-11-24T03:00:00.000Z');
 
@@ -16,7 +18,15 @@ describe('운영 CLI', () => {
   let err: string[];
 
   const cli = (...args: string[]) =>
-    runCli(args, { db: app.db, now: () => NOW, out: (line) => out.push(line), err: (line) => err.push(line) });
+    runCli(args, {
+      db: app.db,
+      now: () => clock,
+      league: new LeagueService(app.db, () => clock, app.config.league, app.config.entryIdSecret),
+      rooms: app.rooms,
+      out: (line) => out.push(line),
+      err: (line) => err.push(line),
+    });
+  let clock = NOW;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -28,6 +38,7 @@ describe('운영 CLI', () => {
     await resetDatabase(app);
     out = [];
     err = [];
+    clock = NOW;
   });
 
   it('settings set·get', async () => {
@@ -174,6 +185,107 @@ describe('운영 CLI', () => {
       const all = out.map((line) => JSON.parse(line) as { name: string; status: string; resolution: string | null });
       expect(all.filter((s) => s.status === 'accepted')).toHaveLength(3);
       expect(all.find((s) => s.name === '쌍기사')?.resolution).toBe('alias:정보처리기사');
+    });
+  });
+
+  describe('리그·지표·사용자', () => {
+    // 리그 주 2026-03-02(월) 04:00 KST ~ 03-09 04:00 KST.
+    const W1 = '2026-03-01T19:00:00.000Z';
+
+    async function studyDays(userId: string, dates: string[], minutes: number) {
+      for (const date of dates) {
+        const from = `${date}T10:00:00+09:00`;
+        const to = new Date(Date.parse(from) + minutes * 60_000).toISOString();
+        await seedRanked(app, userId, from, to);
+        await app.league.syncUser(userId, Date.parse(from), Date.parse(to));
+      }
+    }
+
+    it('league settle: 마감 + 지연이 지난 주만 정산하고 다시 돌리면 할 일이 없다. league weeks로 상태를 본다', async () => {
+      const me = await startAnonymous(app);
+      await studyDays(me.userId, ['2026-03-03'], 60 * 8);
+      clock = new Date('2026-03-09T04:05:00+09:00');
+      expect(await cli('league', 'settle')).toBe(0);
+      expect(out).toEqual(['nothing due']);
+      clock = new Date('2026-03-09T04:11:00+09:00');
+      out = [];
+      expect(await cli('league', 'settle')).toBe(0);
+      expect(out).toEqual([`settled week_start: ${W1}`]);
+      out = [];
+      expect(await cli('league', 'settle')).toBe(0);
+      expect(out).toEqual(['nothing due']);
+      out = [];
+      expect(await cli('league', 'weeks')).toBe(0);
+      const settled = out.map((line) => JSON.parse(line)).find((w) => w.week_start === W1);
+      expect(settled).toMatchObject({ status: 'settled', leagues: [{ league: 'general', groups: 1, members: 1 }] });
+      expect(await cli('league', 'nope')).toBe(2);
+    });
+
+    it('metrics week: 주 3일 이상 비율, 스트릭 7일 도달, 리그 인원', async () => {
+      const [a, b] = [await startAnonymous(app), await startAnonymous(app, { remoteAddress: '10.9.9.9' })];
+      // a: 2/24–3/4 매일 15분(3월 2일 주에 스트릭 7일 도달, 3일 이상). b: 3/3 하루 5분(10분 미만).
+      const days = Array.from({ length: 9 }, (_, i) => new Date(Date.UTC(2026, 1, 24 + i)).toISOString().slice(0, 10));
+      await studyDays(a.userId, days, 15);
+      await studyDays(b.userId, ['2026-03-03'], 5);
+      clock = new Date('2026-03-10T12:00:00+09:00');
+      expect(await cli('metrics', 'week')).toBe(0); // 기본: 지난 주(3월 2일 주)
+      expect(JSON.parse(out[0]!)).toEqual({
+        week: '2026-03-02',
+        league_week_start: W1,
+        active_users: 2,
+        studied_3_days: 1,
+        studied_3_days_ratio: 0.5,
+        streak_7: 1,
+        streak_7_ratio: 0.5,
+        streak_30: 0,
+        streak_30_ratio: 0,
+        league_participants: { general: 2, top: 0 },
+        league_groups: { general: 1, top: 0 },
+        league_memberships_now: { general: 2, top: 0 },
+      });
+      out = [];
+      expect(await cli('metrics', 'week', '--week', '2026-02-25')).toBe(0);
+      expect(JSON.parse(out[0]!)).toMatchObject({ week: '2026-02-23', active_users: 1, studied_3_days: 1, streak_7: 0 });
+      expect(await cli('metrics', 'week', '--week', '3월')).toBe(2);
+    });
+
+    it('users find·show: id 앞부분·닉네임으로 찾고 요약을 본다(이메일 없음)', async () => {
+      const me = await startAnonymous(app);
+      const nickname = me.res.json().data.user.profile.nickname as string;
+      expect(await cli('users', 'find', me.userId.slice(0, 6))).toBe(0);
+      expect(out.map((line) => JSON.parse(line).id)).toContain(me.userId);
+      out = [];
+      expect(await cli('users', 'find', '--nickname', nickname)).toBe(0);
+      expect(JSON.parse(out[0]!)).toMatchObject({ id: me.userId, nickname });
+      out = [];
+      expect(await cli('restrict', 'user', me.userId, 'chat', '--days', '1', '--reason', '도배')).toBe(0);
+      out = [];
+      expect(await cli('users', 'show', me.userId)).toBe(0);
+      expect(JSON.parse(out[0]!)).toMatchObject({
+        id: me.userId,
+        email: null,
+        room: null,
+        league: 'general',
+        streak_current: 0,
+        restrictions: [{ kind: 'chat', reason: '도배' }],
+        reports_received: { total: 0, pending: 0 },
+      });
+      expect(await cli('users', 'find', 'ab')).toBe(2);
+      expect(await cli('users', 'show', randomUUID())).toBe(1);
+    });
+
+    it('users delete: --yes가 있어야 하고, 지우면 그 사람 세션이 끊기고 데이터가 남지 않는다', async () => {
+      const me = await startAnonymous(app);
+      await studyDays(me.userId, ['2026-03-03'], 30);
+      expect(await cli('users', 'delete', me.userId)).toBe(2);
+      expect((await app.inject({ method: 'GET', url: '/users/me/profile', headers: authHeaders(me) })).statusCode).toBe(200);
+      expect(await cli('users', 'delete', me.userId, '--yes')).toBe(0);
+      expect(out).toEqual([`deleted user ${me.userId}`]);
+      expect((await app.inject({ method: 'GET', url: '/users/me/profile', headers: authHeaders(me) })).statusCode).toBe(401);
+      out = [];
+      expect(await cli('users', 'find', me.userId.slice(0, 8))).toBe(0);
+      expect(out).toEqual(['no users']);
+      expect(await cli('users', 'delete', me.userId, '--yes')).toBe(1);
     });
   });
 });

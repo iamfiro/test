@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
-import { idempotencyKeys, sessions, users } from '../db/schema.js';
+import { sessions, users } from '../db/schema.js';
 import { errors } from '../http/errors.js';
 import { awaitStored, claimKey, completeKey, readIdempotencyKey, releaseKey } from '../http/idempotency.js';
 import { serializeSession } from '../profile/serialize.js';
-import { createAnonymousAccount, findOrCreateDevAccount } from './accounts.js';
+import { createAnonymousAccount, deleteAccount, findOrCreateDevAccount } from './accounts.js';
 import { activeIpRestriction } from '../moderation/restrictions.js';
 import { clearSessionCookie, createSession, SESSION_COOKIE, setSessionCookie } from './session.js';
 
@@ -80,12 +80,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
 
   app.delete('/users/me', async (request, reply) => {
     const userId = request.auth!.user.id;
-    // 내가 방장인 방은 지우고 다른 방 자리는 비운다(방 서비스가 같은 트랜잭션에서 하고 커밋 뒤 알린다).
-    await app.rooms.deleteAccount(userId, async (tx) => {
-      // 멱등 기록은 사용자 id를 열이 아닌 범위 문자열로 갖고 있어 따로 지운다.
-      await tx.delete(idempotencyKeys).where(eq(idempotencyKeys.scope, `user:${userId}`));
-      await tx.delete(users).where(eq(users.id, userId)); // 세션 등 사용자에 딸린 행은 cascade
-    });
+    await deleteAccount(app.rooms, userId);
     app.bus.publish({ kind: 'user_deleted', userId }); // 열린 소켓을 닫는다
     clearSessionCookie(reply);
     return reply.code(204).send();

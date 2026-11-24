@@ -66,7 +66,7 @@ last_verified: 2026-11-23
   스트릭은 테이블 없이 `ranked_segments`로 계산한다. 새 환경 변수: `ENTRY_ID_HMAC_SECRET`(필수, 32자 이상, 순위표 항목 id HMAC 키.
   바꾸면 그 주 항목 id만 바뀐다), `LEAGUE_PROMOTE_MIN`(초, 기본 25200)·`LEAGUE_STAY_MIN`(초, 기본 12600)·`LEAGUE_SETTLE_DELAY`(초, 기본 600).
   정산은 서버가 시작할 때(밀린 주를 순서대로)와 1분마다 확인해 돈다(`pg_advisory_xact_lock`으로 하나만). 서버가 마감 뒤 오래
-  꺼져 있으면 다시 켤 때 밀린 주가 한꺼번에 정산된다.
+  꺼져 있으면 다시 켤 때 밀린 주가 한꺼번에 정산된다. 수동 실행·주간 지표·사용자 조회·강제 탈퇴는 운영 CLI([cli.md](cli.md)).
 
 ## 환경 변수
 
