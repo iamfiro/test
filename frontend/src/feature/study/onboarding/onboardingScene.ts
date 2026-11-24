@@ -6,7 +6,7 @@ import { MathUtils, Vector3 } from 'three'
 import { StudyRoomCamera, type StudyRoomSeat } from '../room3d/model/scene'
 import { StudyRoomSeatCamera } from '../room3d/domain/seatCamera'
 import { StudyRoomPose } from '../room3d/domain/motion'
-import { standingLift, standingPose, walkBob, walkingPose, wavePose } from '../room3d/domain/actorMotion'
+import { idleMotion, selectMotion, selectSeconds, standingLift, standingPose, walkBob, walkingPose } from '../room3d/domain/actorMotion'
 import type { StudyRoomCharacter } from '../room3d/model/character'
 import type { StudyRoomActor } from '../room3d/three/ThreeStudyRoomRenderer'
 import type { StudyRoomCinematicFrame } from '../room3d/StudyRoom3dView'
@@ -29,7 +29,7 @@ const stepsPerMeter = 2.2
 
 export type OnboardingStep = 'pick' | 'name' | 'goal' | 'enter'
 
-type ActorState = { x: number; z: number; yaw: number; phase: number; walk: number; waveAt: number | null }
+type ActorState = { x: number; z: number; yaw: number; phase: number; walk: number; selectAt: number | null }
 
 const groundAt = (x: number) => (x >= floorEdgeX ? floorY : x <= floorEdgeX - 0.25 ? lawnY : lawnY + ((x - (floorEdgeX - 0.25)) / 0.25) * (floorY - lawnY))
 const angleDelta = (from: number, to: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from))
@@ -111,8 +111,8 @@ export class OnboardingScene {
   private step: OnboardingStep = 'pick'
   private gender: Gender | null = null
   private readonly actors: Record<Gender, ActorState> = {
-    male: { x: standX, z: pickZ.male, yaw: faceCamera, phase: 0, walk: 0, waveAt: null },
-    female: { x: standX, z: pickZ.female, yaw: faceCamera, phase: 0, walk: 0, waveAt: null },
+    male: { x: standX, z: pickZ.male, yaw: faceCamera, phase: 0, walk: 0, selectAt: null },
+    female: { x: standX, z: pickZ.female, yaw: faceCamera, phase: 0, walk: 0, selectAt: null },
   }
   private camera: StudyRoomCamera | null = null
   private lastMs: number | null = null
@@ -129,8 +129,8 @@ export class OnboardingScene {
   private free(size: Size): FreeArea { return this.freeArea ?? { top: 64, bottom: size.height * 0.6 } }
 
   set(step: OnboardingStep, gender: Gender | null) {
-    if (gender !== this.gender && gender && step === 'pick') this.actors[gender].waveAt = null
-    if (gender !== this.gender && gender) this.actors[gender].waveAt = -1
+    if (gender !== this.gender && gender && step === 'pick') this.actors[gender].selectAt = null
+    if (gender !== this.gender && gender) this.actors[gender].selectAt = -1
     this.step = step
     this.gender = gender
   }
@@ -162,9 +162,10 @@ export class OnboardingScene {
     for (const g of ['male', 'female'] as const) {
       if (this.step !== 'pick' && g !== chosen) continue
       const a = this.actors[g]
-      if (a.waveAt === -1) a.waveAt = nowMs
       const target = this.step === 'pick' ? { x: g === chosen ? standX + 0.4 : standX, z: pickZ[g] } : { x: standX + 0.4, z: doorZ }
       this.moveToward(a, target.x, target.z, faceCamera, dt)
+      // 고른 동작은 한 걸음 앞으로 나와 멈춘 뒤에 시작한다.
+      if (a.selectAt === -1 && a.walk < 0.05) a.selectAt = nowMs
       actors.push(this.actorOf(g, a, t, nowMs, this.step === 'pick' && g === chosen ? 1.06 : 1))
     }
     const focus = this.step === 'pick'
@@ -177,12 +178,14 @@ export class OnboardingScene {
   }
 
   private actorOf(g: Gender, a: ActorState, t: number, nowMs: number, scale: number): StudyRoomActor {
-    let pose: StudyRoomPose
-    if (a.walk > 0.02) pose = StudyRoomPose.lerp(standingPose(t), walkingPose(a.phase), a.walk)
-    else if (a.waveAt != null && a.waveAt >= 0 && nowMs - a.waveAt < 1600 && !this.reduceMotion) pose = wavePose(t, (nowMs - a.waveAt) / 1600)
-    else pose = standingPose(this.reduceMotion ? 0 : t)
+    // 둘이 같이 움직이지 않게 사람마다 시작 시각을 달리한다. 줄인 움직임 설정이면 가만히 선 채로.
+    const clock = this.reduceMotion ? 0 : t + (g === 'female' ? 1.7 : 0)
+    const k = a.selectAt != null && a.selectAt >= 0 ? (nowMs - a.selectAt) / 1000 / selectSeconds : 1
+    const motion = k < 1 && !this.reduceMotion && a.walk < 0.05 ? selectMotion(g, clock, k) : idleMotion(g, clock)
+    const pose = a.walk > 0.02 ? StudyRoomPose.lerp(motion.pose, walkingPose(a.phase), a.walk) : motion.pose
     const ground = groundAt(a.x)
-    return { id: g, character: this.characters[g], x: a.x, y: ground + standingLift + walkBob(a.phase, a.walk), z: a.z, yaw: a.yaw, pose, scale }
+    const lift = motion.lift * (1 - a.walk)
+    return { id: g, character: this.characters[g], x: a.x, y: ground + standingLift + lift + walkBob(a.phase, a.walk), z: a.z, yaw: a.yaw + motion.yaw * (1 - a.walk), pose, scale }
   }
 
   /** a를 (x, z)로 걸어서 옮긴다. 다 오면 yaw 쪽으로 돈다. */
