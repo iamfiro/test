@@ -75,24 +75,25 @@ async function assign(tx: DbExecutor, userId: string, weekStart: number, league:
  * 다르면(정산 전에 새 주를 시작한 승급·강등자) 그 리그의 그룹으로 옮긴다.
  */
 export async function syncLeagueWeek(tx: DbExecutor, userId: string, weekStart: number): Promise<void> {
-  await tx.insert(leagueWeeks).values({ weekStart: weekDate(weekStart), status: 'open' }).onConflictDoNothing();
-  const [week] = await tx.execute<{ status: string }>(
-    sql`select status from league_weeks where week_start = ${weekDate(weekStart)} for share`,
-  ).then((r) => r.rows);
-  if (week?.status !== 'open') return;
-
   const score = await weekScore(tx, userId, weekStart);
   const [current] = await tx
     .select({ groupId: leagueGroupMembers.groupId, league: leagueGroups.league })
     .from(leagueGroupMembers)
     .innerJoin(leagueGroups, eq(leagueGroupMembers.groupId, leagueGroups.id))
     .where(and(eq(leagueGroupMembers.weekStart, weekDate(weekStart)), eq(leagueGroupMembers.userId, userId)));
+  if (!current && score.reachedAt === null) return; // 이 주 인정 시간이 없고 그룹에도 없다
+
+  await tx.insert(leagueWeeks).values({ weekStart: weekDate(weekStart), status: 'open' }).onConflictDoNothing();
+  const [week] = await tx.execute<{ status: string }>(
+    sql`select status from league_weeks where week_start = ${weekDate(weekStart)} for share`,
+  ).then((r) => r.rows);
+  if (week?.status !== 'open') return;
+
+  const league = await leagueFor(tx, userId, weekStart);
   if (!current) {
-    if (score.seconds <= 0 && score.reachedAt === null) return;
-    await assign(tx, userId, weekStart, await leagueFor(tx, userId, weekStart), score);
+    await assign(tx, userId, weekStart, league, score);
     return;
   }
-  const league = await leagueFor(tx, userId, weekStart);
   if (league !== current.league) {
     // 정산이 끝나기 전에 들어간 그룹: 그 주 리그가 정해졌으니 옮긴다(이 자리는 탈퇴가 아니라 바로잡기라 인원을 줄인다).
     await tx
