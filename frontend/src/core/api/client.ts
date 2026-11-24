@@ -38,11 +38,18 @@ export function newIdempotencyKey(): string { return crypto.randomUUID() }
 
 export type ApiError = { code: string; message: string; details?: unknown }
 
-/** 봉투 `{data, error}`에서 오류를 꺼낸다. 네트워크 실패는 code `NETWORK`로 바꾼다. */
+/**
+ * 오류를 꺼낸다. openapi-fetch 결과(`{error: 봉투}`), 봉투(`{data, error}`), ApiError 어느 것을 줘도 같은 ApiError가 된다.
+ * 요청 자체가 실패(fetch 예외)했으면 code `NETWORK`, 봉투가 아닌 응답(JSON이 아닌 5xx 등)이면 `HTTP_ERROR`.
+ */
 export function errorOf(e: unknown): ApiError {
-  if (e && typeof e === 'object' && 'error' in e) {
-    const err = (e as { error: ApiError | null }).error
-    if (err) return err
+  let cur: unknown = e
+  for (let depth = 0; depth < 3 && cur != null && typeof cur === 'object'; depth++) {
+    const o = cur as { code?: unknown; message?: unknown; error?: unknown }
+    if (typeof o.code === 'string' && typeof o.message === 'string') return cur as ApiError
+    if (cur instanceof Error || !('error' in o)) break
+    cur = o.error
   }
-  return { code: 'NETWORK', message: e instanceof Error ? e.message : 'network error' }
+  if (cur instanceof Error) return { code: 'NETWORK', message: cur.message }
+  return { code: 'HTTP_ERROR', message: 'unexpected response' }
 }
