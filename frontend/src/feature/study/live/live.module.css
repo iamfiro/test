@@ -1,0 +1,62 @@
+/* 머리 위 칩(원본 StudySeatTag): 흰 글자 + 그림자, 이름 10/600(흐림 없는 1px 그림자), 시간 12/800 숫자 고정폭.
+   양옆 4(AppSpacing.xs). 쉬는 사람은 이름표 전체 0.5. */
+.tag { display: flex; flex-direction: column; align-items: center; padding: 0 4px; max-width: 136px; pointer-events: none; color: #fff; }
+.tagResting { opacity: 0.5; }
+.tagName {
+  max-width: 100%; font-size: 10px; line-height: 1.25; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.67);
+}
+.tagCaption {
+  font-size: 12px; line-height: 1.15; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.6), 0 0 2px rgb(0 0 0 / 0.4);
+}
+
+/* 프로필 시트의 이번 세션·지금 방 순위(원본 _StatCard: muted 면, 턱 4, 안쪽 16, 라벨 labelMedium 700 inkSoft, 값 titleLarge 800). */
+.stats { display: flex; gap: 12px; }
+.statCard { flex: 1; min-width: 0; }
+.statBody { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
+.statLabel { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--i-ink-soft); }
+.statLabel span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.statValue { font-size: 22px; line-height: 1.2; font-weight: 800; color: var(--i-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 실시간 순위 시트(원본 _LiveBoard: 안쪽 24·20, 제목 titleLarge 800 + 닫기 34, 간격 16, 비었으면 가운데 안내). */
+.board { padding: 20px 24px 16px; color: var(--i-ink); }
+.boardHead { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.boardTitle { flex: 1; margin: 0; font-size: 22px; line-height: 1.2; font-weight: 800; }
+.close {
+  flex: none; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: #2b2118; color: #fff;
+}
+.close:active { transform: scale(0.92); }
+.close:focus-visible { outline: 2px solid var(--i-sun); outline-offset: 2px; }
+.boardEmpty { margin: 0; padding: 32px 0; text-align: center; font-size: 15px; color: var(--i-ink-soft); }
+
+/* 시상대(원본 StudyRoomIslandPodium): 2·1·3, 윗면 사다리꼴 + 앞면이 종이색으로 바래는 받침, 앞면에 흰 순위. */
+.podium { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-end; }
+.podiumCol { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.place1 { --c: #edbe3e; }
+.place2 { --c: #b4bec8; }
+.place3 { --c: #d9935d; }
+.podiumWho { display: flex; flex-direction: column; align-items: center; width: 100%; padding: 0 4px 10px; box-sizing: border-box; text-align: center; }
+.podiumTrophy { display: block; margin-bottom: 4px; user-select: none; }
+.podiumName { max-width: 100%; font-size: 14px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.podiumMe { padding: 1px 10px; border-radius: 999px; background: var(--i-studying); color: var(--i-on-studying); }
+.podiumTime { margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--i-ink-soft); font-variant-numeric: tabular-nums; }
+.block { display: flex; flex-direction: column; width: calc(100% + 1px); }
+.blockTop { display: block; height: 14px; background: color-mix(in srgb, var(--c) 55%, #fff); clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 100%, 0 100%); }
+.place2 .blockTop { clip-path: polygon(13px 0, 100% 0, 100% 100%, 0 100%); }
+.place3 .blockTop { clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 100%, 0 100%); }
+.blockFront {
+  display: block; height: var(--h); padding-top: 10px; box-sizing: border-box; text-align: center; text-shadow: 0 2px 0 color-mix(in srgb, var(--c) 70%, var(--i-ink));
+  font-family: var(--font-round); font-size: 34px; line-height: 1; font-weight: 800; color: #fff;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--c) 78%, #fff) 0%, var(--c) 18%, color-mix(in srgb, var(--c) 30%, var(--i-paper)) 55%, var(--i-paper) 90%);
+}
+
+/* 4위부터(원본 StudyRoomIslandDashedLine + StudyRoomIslandRankRow). */
+.list { list-style: none; margin: 16px 0 0; padding: 12px 0 0; border-top: 2px dashed var(--i-paper-line); }
+.row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 8px; border-radius: 16px; }
+.rank { flex: none; width: 28px; text-align: center; font-family: var(--font-round); font-size: 20px; font-weight: 800; color: var(--i-ink-soft); font-variant-numeric: tabular-nums; }
+.name { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.time { flex: none; font-size: 14px; font-weight: 700; color: var(--i-ink-soft); font-variant-numeric: tabular-nums; }
+.me { background: var(--i-studying); }
+.me .rank, .me .name, .me .time { color: var(--i-on-studying); }
