@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.7
+  version: 0.5.8
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -143,34 +143,6 @@ paths:
         '401': { $ref: '#/components/responses/InvalidCredentials' }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
-  /auth/kakao/start:
-    get:
-      tags: [auth]
-      operationId: startKakaoLogin
-      summary: 카카오 로그인 시작(브라우저 이동)
-      security: []
-      parameters:
-        - name: return_to
-          in: query
-          required: true
-          description: 로그인 뒤 돌아갈 웹 경로. `/`로 시작하는 같은 사이트 경로만 받는다.
-          schema: { type: string, pattern: '^/' }
-      responses:
-        '302': { description: 카카오 인가 화면으로 이동. state를 HttpOnly 쿠키에 둔다 }
-  /auth/kakao/callback:
-    get:
-      tags: [auth]
-      operationId: finishKakaoLogin
-      summary: 카카오 인가 코드 교환(브라우저 이동)
-      security: []
-      parameters:
-        - { name: code, in: query, schema: { type: string } }
-        - { name: state, in: query, schema: { type: string } }
-        - { name: error, in: query, schema: { type: string } }
-      responses:
-        '302':
-          description: |
-            성공하면 세션 쿠키를 두고 `return_to`로, 실패하면 웹 `/login?error=kakao`로 이동한다.
   /auth/login/dev:
     post:
       tags: [auth]
