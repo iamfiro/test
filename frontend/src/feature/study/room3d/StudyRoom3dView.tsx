@@ -14,7 +14,7 @@ import { StudyRoomCharacter } from './model/character'
 import { colorToHex } from './model/color'
 import { StudyRoomLayout } from './model/layout'
 import { StudyRoomCamera, type StudyRoom3dScene, type StudyRoomSeat } from './model/scene'
-import { ThreeStudyRoomRenderer, roomLookFromLocation } from './three/ThreeStudyRoomRenderer'
+import { ThreeStudyRoomRenderer, roomLookFromLocation, type StudyRoomActor } from './three/ThreeStudyRoomRenderer'
 import { registerRoomSnapshot } from './roomSnapshot'
 import { StudyRoomSky } from './StudyRoomSky'
 
@@ -24,6 +24,19 @@ export type SeatPlacement = {
   head: { x: number; y: number }
   pixelsPerMeter: number
 }
+
+/** 웹 전용(온보딩): 카메라·자리 밖 사람을 바깥에서 정하는 연출 한 장면. */
+export type StudyRoomCinematicFrame = {
+  camera: StudyRoomCamera
+  actors: readonly StudyRoomActor[]
+  /** 이 자리 사람은 그리지 않는다(걸어 들어오는 동안 내 자리). */
+  hiddenSeat?: number | null
+  /** 지붕·벽 윗부분을 걷어 낼 높이(m). 0이면 걷지 않는다. */
+  cutHeight?: number
+}
+/** frame이 null을 돌려주면 연출이 끝나 평소 카메라로 돌아간다. 있는 동안은 매 화면 다시 그린다. */
+export type StudyRoomCinematic = { frame: (nowMs: number, size: { width: number; height: number }) => StudyRoomCinematicFrame | null }
+export type ActorPlacement = { id: string; head: { x: number; y: number }; feet: { x: number; y: number }; pixelsPerMeter: number }
 
 type Frame = { modeBlend: number; zoom: number; plan: number; motionSeconds: number; orbit: number; pitch: number; distance: number; cameraSeconds: number }
 /** 다가간 자리 위·아래 위젯 위치(px). above는 아래 끝, below는 위 끝. landscape면 양옆. */
@@ -70,6 +83,9 @@ export function StudyRoom3dView(props: {
   planView?: boolean
   /** 위에서 볼 때 맵 자리(번호 mapSeat)마다 그릴 표시. null이면 그리지 않는다. */
   planSeatBuilder?: (mapSeat: number, placement: SeatPlacement) => ReactNode | null
+  cinematic?: StudyRoomCinematic | null
+  /** 연출 속 사람 머리 위에 띄울 것(이름표 등). */
+  actorOverlay?: (placement: ActorPlacement) => ReactNode | null
 }) {
   const host = useRef<HTMLDivElement>(null)
   // 렌더러는 마운트마다 새로 만들고 해제한다(StrictMode의 두 번 실행에도 안전).
@@ -80,6 +96,7 @@ export function StudyRoom3dView(props: {
   const [zoomSpots, setZoomSpots] = useState<ZoomSpots>(null)
   const [planSpots, setPlanSpots] = useState<{ t: number; list: SeatPlacement[] }>({ t: 0, list: [] })
   const [placements, setPlacements] = useState<{ list: SeatPlacement[]; built: { p: SeatPlacement; node: ReactNode }[] }>({ list: [], built: [] })
+  const [actorSpots, setActorSpots] = useState<ActorPlacement[]>([])
   const viewerSeat = props.viewerSeat ?? 0
   const reduceMotion = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, [])
 
@@ -178,9 +195,16 @@ export function StudyRoom3dView(props: {
     kick.current()
   }, [props.planView, reduceMotion, scheduler])
 
+  // 연출이 붙거나 떨어지면 바로 다시 그린다.
+  useEffect(() => {
+    scheduler.invalidateCamera()
+    kick.current()
+  }, [props.cinematic, scheduler])
+
   useEffect(() => {
     if (!renderer || phase !== 'ready' || size.width === 0) return
     const quality = props.quality
+    let hadCinematic = false
     let raf = 0
     let wake: number | undefined
     let visible = document.visibilityState === 'visible'
@@ -241,6 +265,9 @@ export function StudyRoom3dView(props: {
         if (now - s.zoomStarted >= zoomMs) s.zoomStarted = null
         scheduler.invalidateCamera()
       }
+      const cine = latest.current.cinematic?.frame(now, size) ?? null
+      if (cine) { hadCinematic = true; scheduler.invalidateCamera() }
+      else if (hadCinematic) { hadCinematic = false; renderer.setActors([]); setActorSpots([]); scheduler.invalidateCamera() }
       if (scheduler.needsRender(s.motionMs)) {
         const wait = scheduler.untilCapAllows(now)
         if (wait > 0) {
@@ -249,18 +276,37 @@ export function StudyRoom3dView(props: {
         }
         const motionFrame = scheduler.motionFrameAt(s.motionMs)
         const frame: Frame = { modeBlend, zoom, plan, motionSeconds: scheduler.motionSecondsOf(motionFrame), orbit: s.orbit, pitch: s.pitch, distance: s.distance, cameraSeconds: s.cameraSeconds }
-        draw(frame, now)
+        draw(frame, now, cine)
         scheduler.didRender({ frameTimeMs: now, motionFrame })
       }
-      if (s.modeStarted != null || s.zoomStarted != null || s.planStarted != null || StudyRoomDirector.moves(s.mode)) { schedule(); return }
+      if (cine || s.modeStarted != null || s.zoomStarted != null || s.planStarted != null || StudyRoomDirector.moves(s.mode)) { schedule(); return }
       const next = scheduler.untilNextMotionFrame(s.motionMs)
       if (next != null) wake = window.setTimeout(schedule, next)
     }
 
     let lastFrame: Frame | null = null
-    const draw = (frame: Frame, now: number) => {
+    const draw = (frame: Frame, now: number, cine: StudyRoomCinematicFrame | null = null) => {
       lastFrame = frame
       const p = latest.current
+      if (cine) {
+        renderer.setActors(cine.actors)
+        const result = renderer.render({
+          camera: cine.camera,
+          width: size.width,
+          height: size.height,
+          devicePixelRatio: window.devicePixelRatio || 1,
+          motionSeconds: frame.motionSeconds,
+          quality: currentQuality(),
+          hiddenSeat: cine.hiddenSeat ?? null,
+          cutHeight: cine.cutHeight ?? 0,
+        })
+        if (result && quality?.isWatching) quality.onTimings([{ atMs: now, buildMs: 0, rasterMs: result.ms }])
+        setZoomSpots(null)
+        setPlanSpots({ t: 0, list: [] })
+        setPlacements(placeSeats(p, layout, cine.camera, size, cine.hiddenSeat ?? -1))
+        setActorSpots(p.actorOverlay ? actorPlacements(cine.actors, cine.camera, size) : [])
+        return
+      }
       const zoomSeat = state.current.zoomedSeat != null && state.current.zoomedSeat < layout.seatCount ? state.current.zoomedSeat : null
       const base = cameraFor(p.scene, layout, size, frame, state.current.fromMode, state.current.mode, viewerSeat)
       const zoomed = frame.zoom === 0 || zoomSeat == null
@@ -437,11 +483,32 @@ export function StudyRoom3dView(props: {
           })}
         </div>
       )}
+      {phase === 'ready' && props.actorOverlay && actorSpots.length > 0 && (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>
+          {actorSpots.map((a) => <div key={a.id}>{props.actorOverlay!(a)}</div>)}
+        </div>
+      )}
       {phase === 'ready' && zoomSpots && (
         <ZoomOverlays spots={zoomSpots} above={props.zoomAbove} below={props.zoomBelow} />
       )}
     </div>
   )
+}
+
+/** 연출 속 사람의 머리 꼭대기·발 화면 위치. */
+function actorPlacements(actors: readonly StudyRoomActor[], camera: StudyRoomCamera, size: { width: number; height: number }): ActorPlacement[] {
+  const rig = new StudyRoomCameraRig(camera, size)
+  const out: ActorPlacement[] = []
+  for (const a of actors) {
+    const scale = a.scale ?? 1
+    const base = new Vector3(a.x, a.y, a.z)
+    const head = rig.project(base.clone().add(new Vector3(0, StudyRoomCharacter.headTopMeters * scale, 0)))
+    const feet = rig.project(base.clone().add(new Vector3(0, -0.146 * scale, 0)))
+    if (!head || !feet) continue
+    const top = rig.project(base.clone().add(new Vector3(0, 1, 0)))
+    out.push({ id: a.id, head, feet, pixelsPerMeter: top ? Math.max(1, Math.hypot(feet.x - top.x, feet.y - top.y) / 1.146) : 1 })
+  }
+  return out
 }
 
 function pinchDistance(points: Map<number, { x: number; y: number }>): number {
@@ -640,9 +707,10 @@ function placeSeats(
     const facing = layout.seat(seat).facing
     const head = rig.project(anchor3d.clone().add(new Vector3(0, StudyRoomCharacter.headTopMeters, 0)).add(facing.clone().multiplyScalar(0.12))) ?? anchor
     const p: SeatPlacement = { seat, anchor, head, pixelsPerMeter: Math.max(1, Math.hypot(anchor.x - top.x, anchor.y - top.y)) }
+    // 누르기 판정은 위젯이 없는 자리도 한다(사람을 누르면 프로필).
+    list.push(p)
     const node = props.seatBuilder(p)
     if (node == null) continue
-    list.push(p)
     built.push({ p, node })
   }
   // 칩이 서로 덮지 않게: 앞(가까운) 사람부터 놓고, 이미 놓은 칩을 12% 넘게 덮는 뒤쪽 칩은 그리지 않는다.

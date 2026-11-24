@@ -15,10 +15,26 @@ import { createRetroMaterial, retroFloats, setRetroFloats, setSoft, setToon, set
 import { ToonComposer, type MoodLook } from './toonComposer'
 import { SkyDome } from './skyDome'
 import type { StudyRoomDaylight } from '../domain/daylight'
+import type { StudyRoomPose } from '../domain/motion'
 
 const log = logger('StudyRoom3d')
 
 export type RenderPhase = 'idle' | 'loading' | 'ready' | 'failed'
+
+/**
+ * 웹 전용(온보딩): 자리에 앉지 않은 사람. 위치는 발바닥이 아니라 사람 원점(앉은 방석 기준점),
+ * yaw는 자리와 같은 규약(보는 방향 = (sin, 0, cos)).
+ */
+export type StudyRoomActor = {
+  id: string
+  character: StudyRoomCharacter
+  x: number
+  y: number
+  z: number
+  yaw: number
+  pose: StudyRoomPose
+  scale?: number
+}
 
 /** 원본 에셋 경로(`assets/...`)를 웹 public 경로로. */
 const url = (asset: string) => `/${asset}`
@@ -48,6 +64,8 @@ export class ThreeStudyRoomRenderer {
   private readonly uncutMaterials = new Set<THREE.ShaderMaterial>()
   private kit: CharacterKit | null = null
   private seatPeople: (SeatedPerson | null)[] = []
+  private readonly actorGroup = new THREE.Group()
+  private readonly actorPeople = new Map<string, { character: StudyRoomCharacter; person: SeatedPerson }>()
   private lastLookKey: string | null = null
   private layout: StudyRoomLayout | null = null
   private characters: readonly (StudyRoomCharacter | null)[] = []
@@ -191,6 +209,36 @@ export class ThreeStudyRoomRenderer {
       for (const child of node.children) visit(child, outdoors)
     }
     visit(root, false)
+  }
+
+  /** 자리 밖 사람들을 이 자세로 둔다(다음 render부터). 빈 목록이면 모두 치운다. */
+  setActors(actors: readonly StudyRoomActor[]) {
+    if (this.phaseValue !== 'ready' || !this.kit) return
+    if (this.actorGroup.parent !== this.world) this.world.add(this.actorGroup)
+    const seen = new Set<string>()
+    for (const a of actors) {
+      seen.add(a.id)
+      let entry = this.actorPeople.get(a.id)
+      if (!entry || !entry.character.equals(a.character)) {
+        if (entry) this.actorGroup.remove(entry.person.node)
+        const person = this.kit.assemble(a.character, 'desk')
+        if (!person) continue
+        entry = { character: a.character, person }
+        this.actorPeople.set(a.id, entry)
+        this.actorGroup.add(person.node)
+      }
+      const node = entry.person.node
+      node.position.set(a.x, a.y, a.z)
+      node.rotation.set(0, a.yaw, 0)
+      node.scale.setScalar(a.scale ?? 1)
+      node.visible = true
+      entry.person.applyPose(a.pose)
+    }
+    for (const [id, entry] of this.actorPeople) {
+      if (seen.has(id)) continue
+      this.actorGroup.remove(entry.person.node)
+      this.actorPeople.delete(id)
+    }
   }
 
   setLayout(layout: StudyRoomLayout, characters: readonly (StudyRoomCharacter | null)[]) {

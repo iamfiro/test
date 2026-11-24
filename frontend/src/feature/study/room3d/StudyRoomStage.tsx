@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSession } from '../../auth/session'
 import { StudyRoom3dScenes } from './scenes'
-import { StudyRoom3dView } from './StudyRoom3dView'
+import { StudyRoom3dView, type ActorPlacement, type StudyRoomCinematic } from './StudyRoom3dView'
 import { studyRoomCharacterOf } from './participantCharacter'
 import { StudyRoomQualityController } from './domain/qualityController'
 import { LocalStorageStudyRoomQualityStore } from './infrastructure/localStorageQualityStore'
@@ -23,6 +23,15 @@ export function StudyRoomStage(props: {
   /** 자리 이동 중(카메라가 방 위로 떠 있음). 빈자리를 고르면 잠깐 보여 준 뒤 onClose. */
   seatPlanOpen?: boolean
   onCloseSeatPlan?: () => void
+  /** 온보딩 연출(문밖 캐릭터 고르기·걸어 들어오기). */
+  cinematic?: StudyRoomCinematic | null
+  actorOverlay?: (placement: ActorPlacement) => ReactNode | null
+  /** 온보딩: 걸어 들어갈 수 있는 자리 중에서 내 자리를 정한다(맵 자리 번호 목록). */
+  seatChoices?: readonly number[] | null
+  /** 내 자리(맵 자리 번호)가 정해지거나 바뀌면 알린다. */
+  onSeat?: (mapSeat: number) => void
+  /** 앉은 사람을 누르면(0번이 나). */
+  onPersonTap?: (seat: number) => void
 }) {
   const { state } = useSession()
   const me = state.status === 'signedIn' ? state.me : null
@@ -37,6 +46,16 @@ export function StudyRoomStage(props: {
   )
   const scene = StudyRoom3dScenes.cafe
   const [mine, setMine] = useState(() => (savedSeat ??= Math.floor(Math.random() * scene.seats.length)))
+  const choices = props.seatChoices
+  useEffect(() => {
+    if (!choices || choices.includes(mine)) return
+    const next = choices[Math.floor(Math.random() * choices.length)]!
+    savedSeat = next
+    setMine(next)
+  }, [choices, mine])
+  const onSeat = useRef(props.onSeat)
+  onSeat.current = props.onSeat
+  useEffect(() => { onSeat.current?.(mine) }, [mine])
   // 0번이 나인 자리 순서(원본 _seatOrder). 내 자리가 바뀔 때만 새로 만든다.
   const seatMap = useMemo(() => [scene.seats[mine]!, ...scene.seats.filter((_, i) => i !== mine)], [scene, mine])
   // 다른 사람은 남은 자리에 차례로 앉는다(원본 _takenSeats). 지금은 나 혼자라 비어 있다.
@@ -70,6 +89,9 @@ export function StudyRoomStage(props: {
       zoomAbove={props.focus?.above}
       zoomBelow={props.focus?.below}
       seatBuilder={() => null}
+      onSeatTap={props.onPersonTap}
+      cinematic={props.cinematic}
+      actorOverlay={props.actorOverlay}
       placeholder={<div style={{ position: 'absolute', inset: 0, background: '#F3E1DC' }} />}
     />
   )
