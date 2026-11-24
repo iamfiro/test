@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.1
+  version: 0.5.2
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -68,6 +68,23 @@ paths:
                   error: { type: 'null' }
                   meta: { $ref: '#/components/schemas/Meta' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/start:
+    post:
+      tags: [auth]
+      operationId: startAnonymousSession
+      summary: 익명 계정으로 시작하기(데모)
+      security: []
+      description: |
+        로그인 없이 쓰는 데모의 진입점. 유효한 세션 쿠키가 있으면 그 계정을 그대로 돌려주고, 없으면 익명 계정과
+        세션을 만들어 `sv_session` 쿠키를 둔다. 닉네임·캐릭터는 무작위로 정한다. CSRF 토큰은 필요 없다
+        (세션이 없을 수 있다). 같은 `Idempotency-Key`를 다시 보내면 같은 계정에 새 세션을 발급한다(쿠키를 못
+        받은 응답의 재시도). IP당 시간당 새 계정 수에 상한이 있다.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/LoggedIn' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '429': { $ref: '#/components/responses/AccountRateLimited' }
   /auth/nonce:
     get:
       tags: [auth]
@@ -951,6 +968,11 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     PayloadTooLarge:
       description: 요청 본문이 64KB를 넘음(`PAYLOAD_TOO_LARGE`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    AccountRateLimited:
+      description: 이 IP에서 새 계정을 너무 많이 만듦(`ACCOUNT_RATE_LIMITED`). `Retry-After` 헤더.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
