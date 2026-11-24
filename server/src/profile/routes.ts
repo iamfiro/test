@@ -3,6 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { users } from '../db/schema.js';
 import { errors } from '../http/errors.js';
 import { parseAvatar } from './avatar.js';
+import { containsBannedWord } from '../moderation/banned-words.js';
 import { parseNickname } from './nickname.js';
 import { serializeMe, serializeProfile } from './serialize.js';
 
@@ -24,6 +25,8 @@ export function registerProfileRoutes(app: FastifyInstance): void {
     if ('nickname' in input) {
       const nickname = parseNickname(input.nickname);
       if (nickname === null) throw errors.validation('닉네임은 1–12자로, 줄바꿈 같은 문자는 쓸 수 없어요', 'nickname');
+      // 무엇이 걸렸는지는 말하지 않는다(목록을 더듬어 피해 가는 것을 막는다).
+      if (containsBannedWord(nickname)) throw errors.validation('이 닉네임은 쓸 수 없어요. 다른 이름을 골라 주세요', 'nickname');
       changes.nickname = nickname;
     }
     if ('avatar' in input) {
