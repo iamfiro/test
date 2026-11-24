@@ -15,7 +15,7 @@ try {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(2);
 }
-const handle = createDb(config.databaseUrl);
+const handle = createDb(config.database);
 const now = () => new Date();
 const media = createMediaStorage(config);
 const err = (line: string) => process.stderr.write(`${line}\n`);

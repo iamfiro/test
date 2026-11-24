@@ -16,5 +16,5 @@ export default async function setup(): Promise<void> {
   }
   const url = new URL(ADMIN_URL);
   url.pathname = `/${TEST_DB_NAME}`;
-  await runMigrations(url.toString());
+  await runMigrations({ url: url.toString(), caCert: null });
 }

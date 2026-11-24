@@ -8,7 +8,10 @@ const base = {
   MEDIA_PUBLIC_BASE_URL: 'https://media.example.test',
   ENTRY_ID_HMAC_SECRET: 'x'.repeat(32),
 };
+/** 모양만 맞춘 PEM(검증 대상이 아니라 설정 검사용). 운영 CA가 아니다. */
+const TEST_PEM = '-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUTEST\n-----END CERTIFICATE-----\n';
 const r2 = {
+  DATABASE_CA_CERT: TEST_PEM,
   MEDIA_STORAGE: 'r2',
   R2_ACCOUNT_ID: 'acc',
   R2_ACCESS_KEY_ID: 'id',
@@ -76,7 +79,7 @@ describe('설정 검증', () => {
       storage: 'disk',
       publicBaseUrl: 'http://localhost:5191/media',
     });
-    expect(() => loadConfig({ ...base, NODE_ENV: 'production' })).toThrow(/MEDIA_STORAGE/);
+    expect(() => loadConfig({ ...base, NODE_ENV: 'production', DATABASE_CA_CERT: TEST_PEM })).toThrow(/MEDIA_STORAGE/);
     const { R2_BUCKET: _bucket, ...noBucket } = r2;
     expect(() => loadConfig({ ...base, ...noBucket, NODE_ENV: 'production' })).toThrow(/R2_BUCKET/);
     expect(loadConfig({ ...base, ...r2, NODE_ENV: 'production' }).media).toMatchObject({ storage: 'r2', bucket: 'bucket' });
@@ -95,5 +98,23 @@ describe('설정 검증', () => {
       loadConfig({ ...base, NODE_ENV: 'development', LEAGUE_PROMOTE_MIN: '3600', LEAGUE_STAY_MIN: '60', LEAGUE_SETTLE_DELAY: '0' }).league,
     ).toEqual({ promoteMinSeconds: 3600, stayMinSeconds: 60, settleDelayMs: 0 });
     expect(() => loadConfig({ ...base, NODE_ENV: 'development', LEAGUE_PROMOTE_MIN: '7h' })).toThrow(/LEAGUE_PROMOTE_MIN/);
+  });
+
+  it('DB TLS: DATABASE_CA_CERT(PEM 문자열)가 있으면 CA 검증 TLS, 운영은 필수, 연결 문자열의 ssl 매개변수는 거부', () => {
+    expect(loadConfig({ ...base, NODE_ENV: 'development' }).database).toEqual({ url: base.DATABASE_URL, caCert: null });
+    expect(loadConfig({ ...base, NODE_ENV: 'development', DATABASE_CA_CERT: TEST_PEM }).database).toEqual({
+      url: base.DATABASE_URL,
+      caCert: TEST_PEM,
+    });
+    const { DATABASE_CA_CERT: _omit, ...r2WithoutCa } = r2;
+    expect(() => loadConfig({ ...base, ...r2WithoutCa, NODE_ENV: 'production' })).toThrow(/DATABASE_CA_CERT/);
+    // 파일 경로나 줄바꿈이 `\n` 글자로 들어간 값은 받지 않는다.
+    expect(() => loadConfig({ ...base, NODE_ENV: 'development', DATABASE_CA_CERT: '/etc/ssl/supabase.crt' })).toThrow(/DATABASE_CA_CERT/);
+    expect(() =>
+      loadConfig({ ...base, NODE_ENV: 'development', DATABASE_CA_CERT: '-----BEGIN CERTIFICATE-----\\nAAAA\\n-----END CERTIFICATE-----' }),
+    ).toThrow(/DATABASE_CA_CERT/);
+    for (const query of ['sslmode=require', 'sslrootcert=/x.crt', 'ssl=true']) {
+      expect(() => loadConfig({ ...base, NODE_ENV: 'development', DATABASE_URL: `${base.DATABASE_URL}?${query}` })).toThrow(/DATABASE_URL/);
+    }
   });
 });

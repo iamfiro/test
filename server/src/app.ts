@@ -94,7 +94,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     routerOptions: { ignoreTrailingSlash: true },
   });
 
-  const handle = createDb(config.databaseUrl);
+  const handle = createDb(config.database);
   app.decorate('db', handle.db);
   app.decorate('config', config);
   const now = options.now ?? (() => new Date());
