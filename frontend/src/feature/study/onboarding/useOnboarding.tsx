@@ -91,8 +91,9 @@ export function useOnboarding(enabled: boolean): Onboarding | null {
       })
     } catch (e) {
       const field = e instanceof OnboardingSaveError ? e.field : null
+      // 이름 칸 문제(금칙어)는 칸 아래에 보이고, 그 밖의 실패는 토스트로 알린다. 고른 값은 그대로 둔다.
       if (field === 'nickname') { setNameServerProblem(true); setPhase('name') }
-      toast(webText.onboardingSaveFailed, { type: 'error' })
+      else toast(webText.onboardingSaveFailed, { type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -126,7 +127,7 @@ export function useOnboarding(enabled: boolean): Onboarding | null {
         onGender={setGender}
         name={name}
         onName={(v) => { setName(v); setNameServerProblem(false) }}
-        nameProblem={nameServerProblem ? 'invalid' : nameTouched ? problem : null}
+        nameProblem={nameServerProblem ? 'blocked' : nameTouched ? problem : null}
         onNameBlur={() => setNameTouched(true)}
         tags={tags}
         onTags={setTags}

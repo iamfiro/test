@@ -8,6 +8,7 @@ import { webText } from '../../../l10n/web_ko'
 import { t } from '../../../l10n/t'
 import { useOnboarding } from './useOnboarding'
 import { nicknameProblem } from './onboardingSave'
+import { launchText } from '../../../l10n/web_launch_ko'
 
 // 사용자에게 보이는 것: 처음 온 사람은 캐릭터·이름·목표를 고르고 들어간다. 저장이 실패하면 그 단계에 머물고 고른 값이
 // 그대로 남으며, 다시 누르면 서버에는 같은 Idempotency-Key로 가서 한 번만 적용된다. 온보딩을 마친 사람은 보지 않는다.
@@ -74,6 +75,30 @@ describe('첫 가입 온보딩', () => {
     expect(patchKeys[0]).toBeTruthy()
     expect(patchKeys[1]).toBe(patchKeys[0])
     expect(patchBodies[1]).toEqual({ gender: 'female', nickname: '공부하는 수달' })
+  })
+
+  it('서버가 이름을 금칙어로 거절하면 이름 단계로 돌아가 이유를 보이고 적은 이름을 남긴다', async () => {
+    setTransport(async (request) => {
+      const url = new URL(request.url)
+      if (request.method === 'GET' && url.pathname === '/auth/session') return envelope({ user: meOf(), csrf_token: 'c' })
+      if (request.method === 'GET' && url.pathname === '/tags') return envelope({ tags: [toeic] })
+      if (request.method === 'PATCH' && url.pathname === '/users/me/profile') {
+        return new Response(JSON.stringify({ data: null, error: { code: 'VALIDATION_ERROR', message: 'blocked', details: { field: 'nickname' } }, meta: { requestId: 'r', timestamp: '2026-11-23T00:00:00Z' } }), { status: 422, headers: { 'Content-Type': 'application/json' } })
+      }
+      throw new Error(`unexpected ${request.method} ${url.pathname}`)
+    })
+    app()
+    await userEvent.click(await screen.findByRole('radio', { name: t('studyOnboardingGenderMale') }))
+    await userEvent.click(screen.getByRole('button', { name: webText.onboardingNext }))
+    const name = screen.getByLabelText(webText.onboardingNameLabel)
+    await userEvent.clear(name)
+    await userEvent.type(name, '나쁜이름')
+    await userEvent.click(screen.getByRole('button', { name: webText.onboardingNext }))
+    await userEvent.click(await screen.findByRole('button', { name: '토익' }))
+    await userEvent.click(screen.getByRole('button', { name: webText.onboardingEnter }))
+
+    expect(await screen.findByText(launchText.nicknameBlocked)).toBeInTheDocument()
+    expect(screen.getByLabelText(webText.onboardingNameLabel)).toHaveValue('나쁜이름')
   })
 
   it('온보딩을 마친 사람은 다시 들어와도 온보딩을 보지 않는다', async () => {

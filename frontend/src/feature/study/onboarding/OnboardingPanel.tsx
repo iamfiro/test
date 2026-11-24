@@ -11,6 +11,7 @@ import type { Tag } from '../tags/tagsStore'
 import type { Gender } from './onboardingScene'
 import type { NicknameProblem } from './onboardingSave'
 import { cloudMargin, cloudPath } from './thoughtCloud'
+import { launchText } from '../../../l10n/web_launch_ko'
 import s from './onboarding.module.css'
 
 const genderLabel = (g: Gender) => (g === 'male' ? t('studyOnboardingGenderMale') : t('studyOnboardingGenderFemale'))
@@ -18,6 +19,7 @@ const problemText: Record<NicknameProblem, string> = {
   empty: webText.onboardingNameEmpty,
   tooLong: webText.onboardingNameTooLong,
   invalid: webText.onboardingNameInvalid,
+  blocked: launchText.nicknameBlocked,
 }
 
 export function OnboardingPanel(props: {

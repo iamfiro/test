@@ -8,7 +8,8 @@ import type { Gender } from './onboardingScene'
 
 const log = logger('Onboarding')
 
-export type NicknameProblem = 'empty' | 'tooLong' | 'invalid'
+/** `blocked`: 서버가 금칙어로 거절(422 VALIDATION_ERROR, field nickname). 나머지는 화면이 먼저 검사한다. */
+export type NicknameProblem = 'empty' | 'tooLong' | 'invalid' | 'blocked'
 
 const segmenter = new Intl.Segmenter('ko', { granularity: 'grapheme' })
 /** 계약 Nickname: 앞뒤 공백을 지운 뒤 1–12자(grapheme), UTF-8 48바이트 이하, 제어 문자 금지. */
