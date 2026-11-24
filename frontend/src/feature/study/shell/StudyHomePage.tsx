@@ -22,6 +22,8 @@ import { ChatSheet } from '../chat/ChatSheet'
 import { StudyRecapModal } from '../recap/StudyRecapModal'
 import { useRecapDemo } from '../recap/useRecapDemo'
 import { chatStore, useChat } from '../chat/chatStore'
+import { useOnboarding } from '../onboarding/useOnboarding'
+import { MemberProfileSheet } from '../home/MemberProfileSheet'
 import s from './StudyHomePage.module.css'
 
 /** 방이 없을 때의 채팅 토픽(원본 앱과 같다). 방 도메인(Phase 4)이 붙으면 `room:<id>`. */
@@ -49,6 +51,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [soundOpen, setSoundOpen] = useState(false)
   const [seatPlanOpen, setSeatPlanOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const sound = useStudySound(state.status === 'signedIn')
   useEffect(() => {
     if (!seatPlanOpen) return
@@ -57,6 +60,9 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [seatPlanOpen])
   const focus = useFocusMode(tab === 'study', () => setSoundOpen(false))
+  // 첫 가입 온보딩: 1–3단계·걸어 들어오는 동안은 공부 탭 UI를 숨기고 3D 연출과 온보딩 카드만 보인다.
+  const onboarding = useOnboarding(tab === 'study')
+  const bare = onboarding?.hidesStudyUi ?? false
   const wide = useMediaQuery('(min-width: 768px) and (min-height: 500px) and (orientation: landscape)')
   const myId = state.status === 'signedIn' ? state.me.id : null
   // 원본 `_chat != null`: 내 id가 정해지면 방(없으면 lobby) 채팅에 붙는다.
@@ -77,6 +83,12 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
             topInset={68}
             seatPlanOpen={seatPlanOpen}
             onCloseSeatPlan={() => setSeatPlanOpen(false)}
+            cinematic={onboarding?.stage.cinematic ?? null}
+            actorOverlay={onboarding?.stage.actorOverlay}
+            seatChoices={onboarding?.stage.seatChoices ?? null}
+            onSeat={onboarding?.stage.onSeat}
+            // 지금 방에는 나(0번)만 앉아 있다. 다른 사람이 붙으면 그 사람 프로필을 연다.
+            onPersonTap={bare || focus.on || seatPlanOpen ? undefined : (seat) => { if (seat === 0) setProfileOpen(true) }}
             focus={focus.on ? (wide ? { above: null, below: null } : {
               above: <FocusClock timer={timer.view} portrait={window.innerHeight >= window.innerWidth} />,
               below: <FocusControls timer={timer.view} size={80} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />,
@@ -85,7 +97,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
       {/* 뒤로 버튼은 공부 탭을 뺀 모든 탭에서 창 왼쪽 위의 흰 버튼(사용자 결정 2026-11-23). 공부 탭은 3D 방이
           전체라 버튼도 제목도 없다. 제목은 앱 폭 칸 가운데에 두고, 공부방은 본문의 "모든 공부방"이 대신한다. */}
       {/* 공부 탭 맨 위 가운데 로고(사용자 제공 이미지 2026-11-23). 3D 방 위에 떠 있어 누를 수 없다. */}
-      {tab === 'study' && !focus.on && !seatPlanOpen && <img className={s.logo} src="/assets/brand/study_with_me.webp" alt="Study With Me" draggable={false} />}
+      {tab === 'study' && !bare && !focus.on && !seatPlanOpen && <img className={s.logo} src="/assets/brand/study_with_me.webp" alt="Study With Me" draggable={false} />}
       {/* 자리 이동 중에는 뒤로 버튼이 위에서 보기만 닫고 내 자리로 내려온다(원본 _studyBackButton). */}
       {tab === 'study' && seatPlanOpen && (
         <header className={`${s.header} ${s.headerCorner}`}>
@@ -104,7 +116,7 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
           <span className={s.side} />
         </header>
       )}
-      {tab === 'study' && (
+      {tab === 'study' && !bare && (
         <StudyTabOverlay
           timer={timer.view}
           onStart={() => void timer.onTogglePause()}
@@ -135,9 +147,13 @@ export function StudyHomePage({ tab }: { tab: StudyTab }) {
         <FocusStack timer={timer.view} onTogglePause={() => void timer.onTogglePause()} onFinish={() => void timer.onFinish()} />
       )}
       {tab === 'study' && subjects.sheets}
+      {tab === 'study' && profileOpen && state.status === 'signedIn' && (
+        <MemberProfileSheet profile={state.me.profile} mine onDismiss={() => setProfileOpen(false)} />
+      )}
       {tab === 'study' && chatOpen && myId != null && <ChatSheet myId={myId} onDismiss={() => setChatOpen(false)} />}
       {timer.recap && <StudyRecapModal recap={timer.recap} onClose={timer.closeRecap} />}
-      <StudyTabBar current={tab} hidden={tab === 'study' && studyTabBarHidden({ timer: timer.view, focusMode: focus.on, seatPlanOpen })} onSelect={(next) => navigate(paths[next])} />
+      <StudyTabBar current={tab} hidden={tab === 'study' && (bare || studyTabBarHidden({ timer: timer.view, focusMode: focus.on, seatPlanOpen }))} onSelect={(next) => navigate(paths[next])} />
+      {onboarding?.overlay}
     </div>
   )
 }

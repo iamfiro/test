@@ -101,7 +101,7 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
       )}
       <div className={`${s.rail} palette-day`}>
         {!seatPlanOpen && (
-          <div className={s.railRow}>
+          <div className={s.railRow} data-coach="sounds">
             <StickerButton
               asset={icon('study_music.png')}
               emitAsset={icon('study_music_note.svg')}
@@ -187,6 +187,7 @@ export function StudyTabOverlay(props: StudyTabOverlayProps) {
       {timer.phase === 'ready' && (
         <div
           className={`${s.miniTimer} ${studyTabBarHidden(props) ? s.miniTimerLow : ''} ${timerVeiled ? s.veiled : ''}`}
+          data-coach="timer"
           aria-hidden={timerVeiled || undefined}
           inert={timerVeiled || undefined}
         >

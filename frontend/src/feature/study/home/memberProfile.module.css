@@ -1,0 +1,9 @@
+/* 캐릭터 프로필 시트: 과목·태그 시트(PaperSheet)와 같은 제목·칩 값. */
+.sheet { display: flex; flex-direction: column; padding: 24px 24px 28px; }
+.head { display: flex; align-items: center; gap: 8px; }
+.name { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-round); font-size: 22px; font-weight: 800; color: var(--i-ink); }
+.me { flex: none; padding: 3px 10px; border-radius: 999px; background: var(--i-sun); color: var(--i-on-sun); font-size: 12px; font-weight: 800; }
+.label { margin: 20px 0 10px; font-size: 14px; font-weight: 800; color: var(--i-ink-soft); }
+.tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { height: 34px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 999px; background: var(--i-muted); box-shadow: 0 3px 0 var(--i-paper-ledge); font-size: 15px; font-weight: 800; color: var(--i-ink); }
+.empty { margin: 0; font-size: 14px; font-weight: 600; color: var(--i-ink-soft); }

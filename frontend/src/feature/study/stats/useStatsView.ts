@@ -6,7 +6,7 @@ import { useStats, type StudyStats } from '../timer/statsStore'
 import { dateKey, splitByStudyDate, studyDateOf } from '../timer/studyDay'
 
 /** 연속일에 드는 하루 최소 공부 시간(초). 서버 규칙: 하루 10분. */
-const streakMinSeconds = 600
+export const streakMinSeconds = 600
 
 export type StatsView = {
   todaySeconds: number

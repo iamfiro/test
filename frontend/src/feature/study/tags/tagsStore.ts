@@ -28,8 +28,8 @@ export function loadMyTags(): Promise<boolean> {
   return inflight
 }
 
-/** 응답을 못 받으면 호출한 쪽이 같은 키로 다시 부른다. */
-export async function saveMyTags(tagIds: string[], idempotencyKey: string): Promise<void> {
+/** 응답을 못 받으면 호출한 쪽이 같은 키로 다시 부른다. 돌려주는 값은 서버가 저장한 내 태그. */
+export async function saveMyTags(tagIds: string[], idempotencyKey: string): Promise<Tag[]> {
   const res = await api.PUT('/users/me/tags', { params: { header: { 'Idempotency-Key': idempotencyKey } }, body: { tag_ids: tagIds } })
     .catch((e: unknown) => ({ data: undefined, error: e }))
   if (!res.data) throw Object.assign(new Error('save failed'), { api: errorOf(res) satisfies ApiError })
@@ -37,6 +37,7 @@ export async function saveMyTags(tagIds: string[], idempotencyKey: string): Prom
   revision += 1
   emit()
   log.info('my tags saved', { count: mine.length })
+  return mine
 }
 
 export async function suggestTag(name: string, idempotencyKey: string): Promise<void> {

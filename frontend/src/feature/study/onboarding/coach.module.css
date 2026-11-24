@@ -1,0 +1,43 @@
+/* 온보딩 둘러보기 코치 마크. 어두운 가림막에 짚는 단추만 뚫고, 크림 종이 말풍선(PaperBubble 모양)을 띄운다. */
+.root { position: fixed; inset: 0; z-index: 40; }
+.shade { position: absolute; inset: 0; width: 100%; height: 100%; }
+.shade > rect { fill: rgb(20 14 6 / 0.62); }
+.ring {
+  position: absolute; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--i-sun), 0 0 0 7px rgb(248 214 106 / 0.35);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe { 50% { box-shadow: 0 0 0 3px var(--i-sun), 0 0 0 11px rgb(248 214 106 / 0.18); } }
+.column {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: min(calc(100% - 24px), calc(var(--app-column) - 24px));
+}
+.bubble {
+  position: relative;
+  padding: 20px 20px 16px;
+  border-radius: 26px;
+  background: var(--i-paper); color: var(--i-ink);
+  box-shadow: 0 4px 0 var(--i-paper-ledge), 0 8px 20px rgb(0 0 0 / 0.18);
+  outline: none;
+  animation: pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bubbleBelow { transform-origin: 50% 0; }
+.bubbleAbove { transform-origin: 50% 100%; }
+@keyframes pop { from { transform: scale(0.85); opacity: 0; } }
+.tail {
+  position: absolute; width: 18px; height: 11px; margin-left: -9px;
+  background: var(--i-paper);
+}
+.bubbleBelow .tail { top: -10px; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.bubbleAbove .tail { bottom: -10px; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.title { margin: 0; font-family: var(--font-round); font-size: 18px; font-weight: 800; line-height: 1.35; outline: none; }
+.description { margin: 8px 0 14px; font-size: 14px; font-weight: 600; line-height: 1.5; color: var(--i-ink-soft); }
+.footer { display: flex; align-items: center; gap: 10px; }
+.dots { flex: 1 1 auto; display: flex; gap: 5px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--i-paper-ledge); }
+.dots i.dotOn { width: 18px; border-radius: 999px; background: var(--i-sun); }
+.skip {
+  border: 0; background: transparent; padding: 8px 6px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--i-ink-soft);
+}
+@media (prefers-reduced-motion: reduce) { .ring, .bubble { animation: none; } }

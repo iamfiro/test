@@ -47,11 +47,13 @@ export function LoginPage() {
     }
   }
 
-  const devLogin = async () => {
+  // subject `me`는 늘 같은 개발 계정, 새 계정은 매번 다른 subject(갓 가입한 사람으로 온보딩을 본다).
+  const devLogin = async (fresh: boolean) => {
     if (busy) return
-    setBusy('dev')
+    setBusy(fresh ? 'devNew' : 'dev')
     try {
-      const res = await api.POST('/auth/login/dev', { body: { subject: 'me' } })
+      const subject = fresh ? `new_${crypto.randomUUID().slice(0, 8)}` : 'me'
+      const res = await api.POST('/auth/login/dev', { body: { subject } })
       if (!res.data) throw res.error
       accept(res.data.data)
     } catch (e) {
@@ -74,8 +76,13 @@ export function LoginPage() {
         {params.get('error') === 'kakao' && <p className={s.error} role="alert">{webText.authLoginFailedGeneric}</p>}
         <div className={s.actions}>
           {providerConfig.devLoginEnabled && (
-            <button type="button" className={`${s.button} ${s.dev}`} onClick={devLogin} aria-busy={busy === 'dev'}>
+            <button type="button" className={`${s.button} ${s.dev}`} onClick={() => devLogin(false)} aria-busy={busy === 'dev'}>
               {busy === 'dev' ? <span className={s.spinner} /> : webText.devLogin}
+            </button>
+          )}
+          {providerConfig.devLoginEnabled && (
+            <button type="button" className={`${s.button} ${s.dev}`} onClick={() => devLogin(true)} aria-busy={busy === 'devNew'}>
+              {busy === 'devNew' ? <span className={s.spinner} /> : webText.devLoginNew}
             </button>
           )}
           {providerConfig.appleServiceId && providerConfig.appleRedirectUri && (

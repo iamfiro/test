@@ -57,6 +57,7 @@ function TabButton(props: { tab: StudyTab; selected: boolean; onSelect: (tab: St
       type="button"
       className={`${s.tab} ${props.selected ? s.selected : ''}`}
       aria-current={props.selected ? 'page' : undefined}
+      data-coach={`tab-${props.tab}`}
       onClick={() => { wiggle(); props.onSelect(props.tab) }}
     >
       <span className={s.iconBox}>

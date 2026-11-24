@@ -33,5 +33,7 @@ function RequireSession({ children }: { children: ReactNode }) {
   if (state.status === 'loading') return null
   if (state.status === 'error') return <LoadFailed onRetry={refresh} />
   if (state.status === 'signedOut') return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  // 첫 가입 온보딩을 끝내기 전에는 공부 탭(온보딩이 거기서 열린다)으로만 간다.
+  if (state.me.onboarding_completed_at == null && location.pathname !== '/') return <Navigate to="/" replace />
   return <>{children}</>
 }

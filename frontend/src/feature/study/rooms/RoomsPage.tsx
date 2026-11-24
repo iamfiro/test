@@ -15,6 +15,7 @@ import { IslandSurface } from '../../../core/ui/IslandSurface'
 import { tagText } from '../../../l10n/web_tags_ko'
 import { studySubjectColors } from '../timer/subjectPalette'
 import { MyTagsSheet } from '../tags/MyTagsSheet'
+import { useSession } from '../../auth/session'
 import { loadMyTags, useMyTags } from '../tags/tagsStore'
 import ts from '../tags/tags.module.css'
 import s from './rooms.module.css'
@@ -61,12 +62,17 @@ export function RoomsPage(props: { onOpenRoom?: (room: Room) => void }) {
 /** 내 태그와 겹치는 방. 태그가 없으면 고르기 안내, 겹치는 방이 없으면 한 줄 안내(빈 상태 그림은 쓰지 않는다). */
 function Recommended(props: { onOpenRoom?: (room: Room) => void }) {
   const { tags, revision } = useMyTags()
+  const { state, replaceMe } = useSession()
   const [editing, setEditing] = useState(false)
   useEffect(() => { void loadMyTags() }, [])
   const has = tags != null && tags.length > 0
   const { rooms } = useRooms('recommended', '', { enabled: has, revision })
   if (tags == null) return null
-  const sheet = editing && <MyTagsSheet initial={tags} onDismiss={() => setEditing(false)} />
+  // 내 태그는 공개 프로필에도 실린다: 저장이 성공하면 세션의 내 프로필 태그도 서버 값으로 바꾼다.
+  const onSaved = (saved: typeof tags & object) => {
+    if (state.status === 'signedIn') replaceMe({ ...state.me, profile: { ...state.me.profile, tags: saved } })
+  }
+  const sheet = editing && <MyTagsSheet initial={tags} onDismiss={() => setEditing(false)} onSaved={onSaved} />
   if (!has) {
     return (
       <section className={ts.recSection}>
