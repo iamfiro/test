@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { IconMessageCircle, IconSend } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { PaperSheet } from '../../../core/ui/PaperSheet'
@@ -8,6 +9,9 @@ import { chatBodyMax, type ChatMessage } from './chatProtocol'
 import { chatStore, useChat, type ChatState } from './chatStore'
 import { launchText } from '../../../l10n/web_launch_ko'
 import type { ChatErrorCode } from './chatProtocol'
+import { MessageMenuSheet } from '../moderation/MessageMenuSheet'
+import { ReportSheet, type ReportTarget } from '../moderation/ReportSheet'
+import { moderationText } from '../../../l10n/web_moderation_ko'
 import s from './ChatSheet.module.css'
 
 const timeFormat = new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: '2-digit' })
@@ -41,6 +45,9 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
   const [draft, setDraft] = useState('')
   const list = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
+  // 남의 말을 길게 누르면 메뉴(신고·차단), 신고를 고르면 신고 시트. 시트 위에 시트를 쌓지 않고 하나씩 바꾼다.
+  const [menu, setMenu] = useState<ChatMessage | null>(null)
+  const [report, setReport] = useState<ReportTarget | null>(null)
 
   useEffect(() => {
     chatStore.setSheetOpen(true)
@@ -67,6 +74,7 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
   const submit = () => { if (canSend) chatStore.send(draft) }
 
   return (
+    <>
     <PaperSheet label={t('studyChatTitle')} onDismiss={props.onDismiss} height="min(560px, calc(100dvh - 120px))" tone="sun" className={s.sheet}>
       <div
         ref={list}
@@ -96,6 +104,7 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
                 mine={m.author.id === props.myId}
                 first={chat.messages[i - 1]?.author.id !== m.author.id}
                 last={chat.messages[i + 1]?.author.id !== m.author.id}
+                onMenu={m.author.id === props.myId ? undefined : () => setMenu(m)}
               />
             ))}
           </ol>
@@ -124,11 +133,45 @@ export function ChatSheet(props: { myId: string; onDismiss: () => void }) {
         />
       </form>
     </PaperSheet>
+      {menu && createPortal(
+        <MessageMenuSheet
+          message={menu}
+          onReport={(target) => { setMenu(null); setReport(target) }}
+          onDismiss={() => setMenu(null)}
+        />,
+        document.body,
+      )}
+      {report && createPortal(<ReportSheet target={report} onDone={() => setReport(null)} onDismiss={() => setReport(null)} />, document.body)}
+    </>
   )
 }
 
-function MessageRow(props: { message: ChatMessage; mine: boolean; first: boolean; last: boolean }) {
-  const { message, mine, first, last } = props
+/** 길게 누르기(500ms, 손가락이 10px 넘게 움직이면 취소). 스크롤하다 떼면 열지 않는다. */
+const longPressMs = 500
+function useLongPress(onLong: (() => void) | undefined) {
+  const timer = useRef<number | null>(null)
+  const start = useRef<{ x: number; y: number } | null>(null)
+  const cancel = () => { if (timer.current != null) window.clearTimeout(timer.current); timer.current = null; start.current = null }
+  if (!onLong) return {}
+  return {
+    onPointerDown: (e: ReactPointerEvent) => {
+      if (e.button !== 0) return
+      start.current = { x: e.clientX, y: e.clientY }
+      timer.current = window.setTimeout(() => { timer.current = null; onLong() }, longPressMs)
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      const s0 = start.current
+      if (s0 && Math.hypot(e.clientX - s0.x, e.clientY - s0.y) > 10) cancel()
+    },
+    onPointerUp: cancel,
+    onPointerCancel: cancel,
+    onPointerLeave: cancel,
+  }
+}
+
+function MessageRow(props: { message: ChatMessage; mine: boolean; first: boolean; last: boolean; onMenu?: () => void }) {
+  const { message, mine, first, last, onMenu } = props
+  const press = useLongPress(onMenu)
   const time = timeFormat.format(new Date(message.sent_at))
   const cls = [s.row, mine ? s.mine : '', first ? s.first : '', last ? s.last : ''].join(' ')
   return (
@@ -141,7 +184,20 @@ function MessageRow(props: { message: ChatMessage; mine: boolean; first: boolean
       <span className={s.stack}>
         {!mine && first && <span className={s.name}>{message.author.nickname}</span>}
         <span className={s.line}>
-          <span className={s.bubble}>{message.body}</span>
+          {onMenu ? (
+            <span
+              className={`${s.bubble} ${s.bubbleMenu}`}
+              role="button"
+              tabIndex={0}
+              aria-haspopup="dialog"
+              aria-label={`${moderationText.messageMenu(message.author.nickname)}: ${message.body}`}
+              onContextMenu={(e) => { e.preventDefault(); onMenu() }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ContextMenu') { e.preventDefault(); onMenu() } }}
+              {...press}
+            >
+              {message.body}
+            </span>
+          ) : <span className={s.bubble}>{message.body}</span>}
           {last && <time className={s.time} dateTime={message.sent_at}>{time}</time>}
         </span>
       </span>

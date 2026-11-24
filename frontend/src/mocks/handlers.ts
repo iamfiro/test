@@ -5,6 +5,7 @@ import { API, fail, ok } from './util'
 import { timerHandlers } from './timer'
 import { roomHandlers } from './rooms'
 import { myTags, resetMyTags, tagHandlers } from './tags'
+import { moderationHandlers } from './moderation'
 
 type Me = components['schemas']['Me']
 type Session = components['schemas']['Session']
@@ -68,4 +69,5 @@ export const handlers = [
   ...timerHandlers,
   ...roomHandlers,
   ...tagHandlers,
+  ...moderationHandlers,
 ]
