@@ -1,7 +1,7 @@
 // 온보딩 1–3단계 화면(문밖 잔디 위). 카드 없이 화면 아래 검은 그라데이션 위에 흰 제목·설명과 단순한 알약 단추
 // (사용자 결정 2026-11-24: "쓸데없는 모달 UI 없애고 아래 배경에 검은색 그라디언트"), 위에 진행 표시·뒤로.
 import { useEffect, useRef } from 'react'
-import { IconChevronLeft } from '@tabler/icons-react'
+import { IconChevronLeft, IconGenderFemale, IconGenderMale } from '@tabler/icons-react'
 import { t } from '../../../l10n/t'
 import { webText } from '../../../l10n/web_ko'
 import { IslandIconButton } from '../../../core/ui/IslandIconButton'
@@ -115,6 +115,7 @@ export function OnboardingPanel(props: {
                   className={`${s.choice} ${gender === g ? s.choiceOn : ''}`}
                   onClick={() => props.onGender(g)}
                 >
+                  {g === 'male' ? <IconGenderMale size={20} stroke={2.4} aria-hidden /> : <IconGenderFemale size={20} stroke={2.4} aria-hidden />}
                   {genderLabel(g)}
                 </button>
               ))}
@@ -148,7 +149,10 @@ export function OnboardingPanel(props: {
           )}
           <button
             type="submit"
-            className={s.primary}
+            // 캐릭터를 고르기 전에는 다음 단추를 숨긴다(자리는 그대로 두어 카메라 구도가 흔들리지 않게).
+            className={`${s.primary} ${phase === 'pick' && !gender ? s.primaryHidden : ''}`}
+            aria-hidden={(phase === 'pick' && !gender) || undefined}
+            tabIndex={phase === 'pick' && !gender ? -1 : undefined}
             disabled={props.saving || (phase === 'pick' && !gender) || (phase === 'goal' && props.tags.length === 0)}
           >
             {phase === 'goal' ? webText.onboardingEnter : webText.onboardingNext}
@@ -159,7 +163,7 @@ export function OnboardingPanel(props: {
   )
 }
 
-/** 1단계: 캐릭터 몸 위 누름 칸과 발밑 이름 알약(남자·여자). */
+/** 1단계: 캐릭터 몸 위 누름 칸(보이지 않음). 발밑 남자·여자 알약은 사용자 요청(2026-11-24)으로 뺐다. */
 export function ActorHit(props: { placement: ActorPlacement; gender: Gender; selected: boolean; onPick: (g: Gender) => void }) {
   const { head, feet, pixelsPerMeter } = props.placement
   const width = Math.max(64, pixelsPerMeter * 0.62)
@@ -173,9 +177,6 @@ export function ActorHit(props: { placement: ActorPlacement; gender: Gender; sel
         aria-pressed={props.selected}
         onClick={() => props.onPick(props.gender)}
       />
-      <span className={`${s.actorLabel} ${props.selected ? s.actorLabelOn : ''}`} style={{ left: feet.x, top: feet.y + 6 }} aria-hidden>
-        {genderLabel(props.gender)}
-      </span>
     </>
   )
 }
