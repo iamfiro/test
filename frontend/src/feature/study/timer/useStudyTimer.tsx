@@ -14,13 +14,15 @@ import { currentSettings, loadSettings, useStudySettings } from './settingsStore
 import { buildRecap, type StudyRecap } from '../recap/studyRecap'
 import { portraitSize, sceneSize } from '../recap/cardDraw'
 import { takeRoomSnapshot } from '../room3d/roomSnapshot'
+import { myLiveRank, roomLiveStore } from '../live/roomLiveStore'
 import { subjectColorOf } from './subjectPalette'
 import { dateKey, splitByStudyDate, studyDateOf } from './studyDay'
 
 const log = logger('StudyTimerUi')
 
 /** nickname: 로그인한 사람의 닉네임(요약 카드 이름 칸). 로그인 전이면 null. */
-export function useStudyTimer(nickname: string | null) {
+/** myId: 내 사용자 id(공부 카드의 방 순위 줄을 방 실시간 상태에서 찾는다). */
+export function useStudyTimer(nickname: string | null, myId: string | null = null) {
   const hasOwner = nickname != null
   const timer = useTimer()
   const stats = useStats()
@@ -100,6 +102,8 @@ export function useStudyTimer(nickname: string | null) {
     // 끝내기 전 내 자리 사진(카드 사진 칸). 방이 없으면 null이고 카드는 사진 칸 없이 그린다.
     // 끝내기 전 내 자리 사진 두 장(시트의 프로필 사진·폴라로이드). 방이 없으면 null이고 빈 사진 칸을 그린다.
     // 저장 이미지는 2.5배라(렌더러 화소 배율 상한 2) 칸의 1.25배 화면으로 찍는다(비율은 같다).
+    // 끝내기 직전 방 안 실시간 순위(서버 rank). 끝내면 나는 순위에서 빠지므로 지금 값을 잡아 둔다.
+    const rank = myId != null ? myLiveRank(roomLiveStore.get().members, myId) : null
     const photo = takeRoomSnapshot(portraitSize.width * 1.25, portraitSize.height * 1.25, 'portrait')
     const scenePhoto = takeRoomSnapshot(sceneSize.width * 1.25, sceneSize.height * 1.25, 'scene')
     try {
@@ -108,7 +112,7 @@ export function useStudyTimer(nickname: string | null) {
       if (!record) return
       toast(t('studyFinishedSnack', { duration: formatStudyDuration(record.focused_seconds) }))
       // 요약 카드는 끝낸 기록이 들어간 새 통계로만 만든다. 통계를 못 읽으면 카드 없이 기록 알림만 남긴다.
-      if (fresh && nickname != null) setRecap(buildRecap({ stats: fresh, record, settings: currentSettings(), nickname, photo, scenePhoto }))
+      if (fresh && nickname != null) setRecap(buildRecap({ stats: fresh, record, settings: currentSettings(), nickname, photo, scenePhoto, rank }))
       else log.warn('recap skipped: stats unavailable')
     } catch (e) { failed(e) }
   }
