@@ -1,0 +1,14 @@
+# 이미지에는 소스(src)·마이그레이션(drizzle)·금칙어(data)·package 파일만 필요하다. 비밀값·로컬 산출물은 넣지 않는다.
+node_modules
+dist
+var
+test
+docs
+.env
+.env.*
+*.log
+docker-compose.yml
+vitest.config.ts
+drizzle.config.ts
+Dockerfile
+.dockerignore

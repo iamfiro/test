@@ -9,8 +9,9 @@ last_verified: 2026-11-24
 서버 CLI로 한다. CLI는 서버와 같은 환경 변수를 읽고(설정 검증도 같다: 빠진 값이 있으면 종료 코드 2) DB에 바로 쓴다. 서버는 설정을 짧게(`SETTINGS_CACHE_MS`, 기본 5초) 캐시하므로 바꾼 값은 그 안에 모든 서버에 적용된다.
 정지·신고는 캐시 없이 바로 적용된다.
 
-- 개발: `cd server && npm run cli -- <명령>` (`.env`의 `DATABASE_URL`)
-- 운영 호스트: `node --env-file-if-exists=.env dist/cli.js <명령>` (빌드 산출물, 운영 DB 비밀값은 호스트 환경에서)
+- 개발: `cd server && npm run cli -- <명령>` (`.env`)
+- 운영 호스트: `docker exec <서버 컨테이너> node dist/cli.js <명령>`(서버 이미지 `server/Dockerfile`, 환경 변수는 컨테이너 것을 그대로 쓴다)
+  또는 `node --env-file-if-exists=.env dist/cli.js <명령>`(빌드 산출물, 운영 DB 비밀값은 호스트 환경에서)
 
 종료 코드: 0 성공, 1 실행 오류(없는 사용자 등), 2 사용법 오류(사용법을 표준 오류에 보인다).
 
