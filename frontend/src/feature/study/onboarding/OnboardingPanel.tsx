@@ -115,7 +115,7 @@ export function OnboardingPanel(props: {
                   className={`${s.choice} ${gender === g ? s.choiceOn : ''}`}
                   onClick={() => props.onGender(g)}
                 >
-                  {g === 'male' ? <IconGenderMale size={20} stroke={2.4} aria-hidden /> : <IconGenderFemale size={20} stroke={2.4} aria-hidden />}
+                  {g === 'male' ? <IconGenderMale size={40} stroke={2.2} aria-hidden /> : <IconGenderFemale size={40} stroke={2.2} aria-hidden />}
                   {genderLabel(g)}
                 </button>
               ))}
