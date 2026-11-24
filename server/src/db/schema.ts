@@ -393,3 +393,46 @@ export const roomCreations = pgTable(
   },
   (table) => [index('room_creations_ip_created_idx').on(table.ip, table.createdAt)],
 );
+
+/**
+ * 채팅 메시지(docs/contracts/study-room-chat.md). `topic`은 `lobby` 또는 `room:<room_id>`. 같은 사람의 같은
+ * `client_id`는 한 번만 저장한다(재연결 재전송 멱등). 30일이 지나면 정리 잡이 지운다. 신고 기준에 닿거나 운영자가
+ * 숨기면 `hidden_at`이 생기고 누구에게도 보내지 않는다. 작성자가 계정을 지우면 함께 지운다.
+ */
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    topic: text('topic').notNull(),
+    authorUserId: uuid('author_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id').notNull(),
+    body: text('body').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+    hiddenAt: timestamp('hidden_at', { withTimezone: true, precision: 3 }),
+  },
+  (table) => [
+    uniqueIndex('chat_messages_author_client_key').on(table.authorUserId, table.clientId),
+    index('chat_messages_topic_created_idx').on(table.topic, table.createdAt),
+    index('chat_messages_created_idx').on(table.createdAt),
+  ],
+);
+
+/** 채팅 차단(내 화면에서 숨김). `user_id`가 `blocked_user_id`의 메시지를 받지 않는다. 방 명단에서는 빼지 않는다. */
+export const chatBlocks = pgTable(
+  'chat_blocks',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blockedUserId: uuid('blocked_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.blockedUserId] }),
+    index('chat_blocks_blocked_user_idx').on(table.blockedUserId),
+  ],
+);

@@ -26,6 +26,11 @@ import { DiskStorage } from './media/disk.js';
 import { R2Storage } from './media/r2.js';
 import { registerDiskMediaRoute, registerMediaParsing } from './media/routes.js';
 import { startMaintenance } from './maintenance.js';
+import { LocalEventBus, type EventBus } from './realtime/bus.js';
+import { LiveRooms } from './realtime/live-rooms.js';
+import { SocketHub } from './realtime/socket.js';
+import { ChatService } from './chat/service.js';
+import { registerChatRoutes } from './chat/routes.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -40,6 +45,13 @@ declare module 'fastify' {
     rooms: RoomService;
     /** 미디어 저장소(방 배너·로고). */
     media: MediaStorage;
+    /** 실시간 채널로 나갈 일(커밋 뒤). 서버 1대는 프로세스 안 전달, 늘리면 LISTEN/NOTIFY(결정 M7). */
+    bus: EventBus;
+    chat: ChatService;
+    /** `/socket` 연결·토픽. */
+    sockets: SocketHub;
+    /** 방 실시간 상태(구독 중인 방). */
+    live: LiveRooms;
   }
 }
 
@@ -60,6 +72,8 @@ function createMediaStorage(config: Config): MediaStorage {
 }
 
 const BODY_LIMIT_BYTES = 64 * 1024;
+/** 방 실시간 상태 다시 보기 간격(자리 비움·순위가 이만큼 늦을 수 있다). */
+const LIVE_SWEEP_INTERVAL_MS = 5_000;
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 
@@ -103,6 +117,28 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   );
   app.addHook('onClose', async () => {
     await handle.pool.end();
+  });
+
+  const bus = new LocalEventBus((error) => app.log.error({ err: error }, 'live event handler failed'));
+  app.decorate('bus', bus);
+  app.timer.onChange((change) => bus.publish({ kind: 'timer', userId: change.userId, change: change.type }));
+  app.rooms.onChange((change) => bus.publish({ kind: 'room', change }));
+  app.decorate('chat', new ChatService(handle.db, now, app.settings));
+  const sockets = new SocketHub({
+    db: handle.db,
+    config,
+    bus,
+    chat: app.chat,
+    live: (sink) =>
+      new LiveRooms(handle.db, now, (key) => media.publicUrl(key), sink, (error) => app.log.error({ err: error }, 'live room task failed')),
+    log: app.log,
+  });
+  sockets.attach(app.server);
+  app.decorate('sockets', sockets);
+  app.decorate('live', sockets.live);
+  // 서버를 닫기 전에 소켓을 닫는다(열린 소켓이 HTTP 서버 종료를 붙잡지 않게, 클라이언트는 1001을 받고 다시 연결한다).
+  app.addHook('preClose', async () => {
+    await sockets.close();
   });
 
   registerEnvelope(app);
@@ -173,10 +209,20 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerReportRoutes(app);
   registerTagRoutes(app);
   registerRoomRoutes(app);
+  registerChatRoutes(app);
   if (media instanceof DiskStorage) registerDiskMediaRoute(app, media);
   await options.registerExtraRoutes?.(app);
 
-  if (config.env !== 'test') startMaintenance(app);
+  if (config.env !== 'test') {
+    startMaintenance(app);
+    sockets.startHeartbeat();
+    // 자리 비움(presence 75초 끊김)·순위 앞지름을 몇 초마다 다시 본다. 테스트는 시계를 옮긴 뒤 `app.live.sweep()`을 직접 부른다.
+    const sweep = setInterval(() => {
+      app.live.sweep().catch((error: unknown) => app.log.error({ err: error }, 'live sweep failed'));
+    }, LIVE_SWEEP_INTERVAL_MS);
+    sweep.unref();
+    app.addHook('onClose', async () => clearInterval(sweep));
+  }
 
   return app;
 }

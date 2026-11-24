@@ -51,6 +51,14 @@ last_verified: 2026-11-23
   미디어 절대 URL의 앞부분. 운영 `https://media.pocket-time.study`, 로컬 `http://localhost:5191/media`), `R2_ACCOUNT_ID`·
   `R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY`·`R2_BUCKET`(`r2`일 때 필수. 토큰 권한은 그 버킷의 객체 읽기·쓰기만), `MEDIA_DIR`
   (`disk`일 때 파일 위치, 기본 `server/var/media`, git 제외. 개발 서버가 `/media/*`로 내준다).
+- 실시간 채널·채팅(launch.md L5, 구현됨): `chat_messages`(작성자 `author_user_id` `ON DELETE CASCADE`, 고유
+  `chat_messages_author_client_key (author_user_id, client_id)`로 재전송 멱등, 인덱스 `(topic, created_at)`·`(created_at)`, 30일 지나면
+  서버가 지움, 숨김 `hidden_at`), `chat_blocks`(PK `(user_id, blocked_user_id)`, 둘 다 `ON DELETE CASCADE`, 인덱스 `(blocked_user_id)`),
+  `study_room_members.seat`(3D 자리 번호, 고유 `study_room_members_room_seat (room_id, seat)`, 검사 `seat >= 0`. 마이그레이션이 기존 멤버를
+  방마다 방장 먼저·들어온 순으로 0번부터 앉힌다). 새 환경 변수 없음. 호스트·프록시(Cloudflare 포함)가 `/socket` WebSocket 업그레이드를
+  API와 같은 호스트·포트로 넘겨야 하고, 유휴 제한이 서버 ping 25초보다 길어야 한다(Cloudflare 100초). 채팅 IP 쓰기 제한·IP 정지도
+  `TRUST_PROXY`에 달려 있다. 서버 1대 전제(결정 M7): 늘리면 실시간 이벤트를 `LISTEN/NOTIFY`로 바꿔야 하므로, Supabase는 세션 모드
+  연결을 쓴다.
 
 ## 환경 변수
 

@@ -1,14 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
-import { studyRooms, users } from '../db/schema.js';
+import { chatMessages, studyRooms, users } from '../db/schema.js';
+import { canAccessTopic, CHAT_RETENTION_MS, hideMessage, parseTopic } from '../chat/service.js';
 import { errors } from '../http/errors.js';
 import { randomNickname } from '../profile/nickname.js';
 import { fileReport, REPORT_DETAIL_MAX, REPORT_REASONS, type ReportReason, type ReportRow } from './reports.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_FIELDS = ['target_type', 'target_id', 'reason', 'detail'];
-/** HTTP로 받는 대상 종류. 메시지 신고는 L5 소켓 계약에서 한다. */
-const HTTP_TARGET_TYPES = new Set(['nickname', 'room_name']);
+/**
+ * 신고 대상 종류. 메시지 신고도 HTTP로 받는다(L5): 신고는 성공 응답을 확인해야 하는 쓰기라 멱등 키·오류 봉투가 있는
+ * 이 경로를 함께 쓴다. 숨김은 소켓 이벤트(`message_hidden`)로 알린다.
+ */
+const TARGET_TYPES = new Set(['nickname', 'room_name', 'message']);
 /** 줄바꿈·탭을 뺀 제어 문자. */
 const CONTROL = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/;
 
@@ -48,7 +52,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
     const input = body as Record<string, unknown>;
     const unknown = Object.keys(input).find((key) => !ALLOWED_FIELDS.includes(key));
     if (unknown) throw errors.validation('알 수 없는 항목이에요', unknown);
-    if (typeof input.target_type !== 'string' || !HTTP_TARGET_TYPES.has(input.target_type)) {
+    if (typeof input.target_type !== 'string' || !TARGET_TYPES.has(input.target_type)) {
       throw errors.validation('신고할 대상 종류가 올바르지 않아요', 'target_type');
     }
     if (typeof input.target_id !== 'string' || !UUID.test(input.target_id)) {
@@ -60,7 +64,7 @@ export function registerReportRoutes(app: FastifyInstance): void {
     }
     const detail = parseDetail(reason as ReportReason, input.detail);
     const targetId = input.target_id.toLowerCase();
-    const targetType = input.target_type as 'nickname' | 'room_name';
+    const targetType = input.target_type as 'nickname' | 'room_name' | 'message';
     const common = {
       reporterUserId: request.auth!.user.id,
       targetType,
@@ -70,8 +74,31 @@ export function registerReportRoutes(app: FastifyInstance): void {
       threshold: app.config.reportHideThreshold,
     };
 
+    let hiddenTopic: string | null = null;
     const result =
-      targetType === 'nickname'
+      targetType === 'message'
+        ? await fileReport(app.db, {
+            ...common,
+            // 신고자가 볼 수 있는 메시지만(로비이거나 지금 그 방 멤버, 숨기지 않았고 보관 기간 안). 아니면 없는 것과 같다.
+            loadTarget: async (tx) => {
+              const [row] = await tx
+                .select({ topic: chatMessages.topic, authorUserId: chatMessages.authorUserId, body: chatMessages.body, createdAt: chatMessages.createdAt, hiddenAt: chatMessages.hiddenAt })
+                .from(chatMessages)
+                .where(eq(chatMessages.id, targetId))
+                .for('update');
+              if (!row || row.hiddenAt !== null || row.createdAt.getTime() < app.now().getTime() - CHAT_RETENTION_MS) return null;
+              const topic = parseTopic(row.topic);
+              if (!topic || !(await canAccessTopic(tx, common.reporterUserId, topic))) return null;
+              hiddenTopic = topic.name;
+              return { targetUserId: row.authorUserId, content: row.body };
+            },
+            // 사람이 보기 전에 서로 다른 여러 명이 같은 메시지를 신고했다: 바로 모두에게서 숨긴다(운영 CLI로 되돌릴 수 있다).
+            onThreshold: async (tx) => {
+              await hideMessage(tx, targetId, app.now());
+              return 'message_hidden';
+            },
+          })
+        : targetType === 'nickname'
         ? await fileReport(app.db, {
             ...common,
             loadTarget: async (tx) => {
@@ -112,6 +139,8 @@ export function registerReportRoutes(app: FastifyInstance): void {
           });
     if (result.action) {
       if (result.action === 'room_name_reset') app.rooms.notify({ type: 'room_updated', roomId: targetId });
+      if (result.action === 'nickname_reset') app.bus.publish({ kind: 'profile', userId: targetId });
+      if (result.action === 'message_hidden' && hiddenTopic) app.bus.publish({ kind: 'chat_hidden', topic: hiddenTopic, messageId: targetId });
       request.log.warn(
         `report threshold reached target_type: ${targetType} target: ${shortId(targetId)} action: ${result.action} elapsed_ms: ${Date.now() - startedAt}`,
       );

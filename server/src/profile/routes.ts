@@ -40,6 +40,7 @@ export function registerProfileRoutes(app: FastifyInstance): void {
     }
 
     const [updated] = await app.db.update(users).set(changes).where(eq(users.id, request.auth!.user.id)).returning();
+    app.bus.publish({ kind: 'profile', userId: updated!.id }); // 방 실시간 명단의 닉네임·캐릭터
     return reply.ok({ profile: await serializeProfile(app.db, updated!) });
   });
 

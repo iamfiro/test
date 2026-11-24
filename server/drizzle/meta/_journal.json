@@ -64,6 +64,13 @@
       "when": 1795529919696,
       "tag": "0008_room_seats",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795529927227,
+      "tag": "0009_chat",
+      "breakpoints": true
     }
   ]
 }

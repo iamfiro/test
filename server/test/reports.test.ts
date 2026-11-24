@@ -82,7 +82,6 @@ describe('신고', () => {
 
     it.each([
       ['모르는 대상 종류', { target_type: 'room', target_id: 'x', reason: 'spam' }, 'target_type'],
-      ['메시지는 소켓으로만', { target_type: 'message', target_id: randomUUID(), reason: 'spam' }, 'target_type'],
       ['id 형식', { target_type: 'nickname', target_id: 'abc', reason: 'spam' }, 'target_id'],
       ['모르는 사유', { target_type: 'nickname', target_id: '__target__', reason: 'ugly' }, 'reason'],
       ['그 밖의 문제는 설명 필요', { target_type: 'nickname', target_id: '__target__', reason: 'other' }, 'detail'],

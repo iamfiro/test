@@ -1,6 +1,7 @@
 import { and, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { reports, users } from '../db/schema.js';
+import { chatMessages, reports, users } from '../db/schema.js';
+import { hideMessage, restoreMessage } from '../chat/service.js';
 import { readSettings, writeSetting, SETTING_KEYS, isSettingKey } from '../moderation/settings.js';
 import {
   IP_RESTRICTION_KINDS,
@@ -48,6 +49,9 @@ export const USAGE = `사용법: npm run cli -- <명령>
   unrestrict ip <ip> <종류>
   restrictions list
   reports list [--pending | --handled] [--type message|nickname|room_name] [--limit N]
+  messages show <메시지 id>                   본문·작성자·숨김 여부
+  messages hide <메시지 id>                   모두에게서 숨김(그 메시지의 미처리 신고는 처리됨으로)
+  messages restore <메시지 id>                숨김을 되돌림
   tags seed                                  study-tags.md 2절 초기 카탈로그(이미 있는 것은 건너뜀)
   tags list
   tags add <exam|kind> <이름>
@@ -339,6 +343,50 @@ async function suggestionsCommand(ctx: CliContext, args: string[]): Promise<void
   throw new UsageError('suggestions list|accept|alias|reject');
 }
 
+/**
+ * 메시지 확인·숨김·복구. CLI는 서버와 다른 프로세스라 열려 있는 소켓에 바로 알리지 못한다: 숨김은 그 토픽에
+ * 다시 들어올 때(`joined`)부터 빠진다. 바로 지워야 하면 신고 기준 도달(서버가 `message_hidden`을 보냄)을 쓴다.
+ */
+async function messagesCommand(ctx: CliContext, args: string[]): Promise<void> {
+  const [action, id, ...extra] = args;
+  if (extra.length > 0) throw new UsageError(`남는 인자: ${extra.join(' ')}`);
+  if (!id || !UUID.test(id)) throw new UsageError(`메시지 id는 UUID여야 한다: ${id}`);
+  const messageId = id.toLowerCase();
+  const [row] = await ctx.db.select().from(chatMessages).where(eq(chatMessages.id, messageId));
+  if (!row) throw new Error(`없는 메시지: ${messageId}`);
+  if (action === 'show') {
+    ctx.out(
+      JSON.stringify({
+        id: row.id,
+        topic: row.topic,
+        author_user_id: row.authorUserId,
+        body: row.body,
+        sent_at: row.createdAt.toISOString(),
+        hidden_at: row.hiddenAt?.toISOString() ?? null,
+      }),
+    );
+    return;
+  }
+  if (action === 'hide') {
+    const now = ctx.now();
+    const hidden = await ctx.db.transaction(async (tx) => {
+      const changed = await hideMessage(tx, messageId, now);
+      await tx
+        .update(reports)
+        .set({ handledAt: now, action: 'message_hidden' })
+        .where(and(eq(reports.targetType, 'message'), eq(reports.targetId, messageId), isNull(reports.handledAt)));
+      return changed;
+    });
+    ctx.out(hidden ? `hidden ${messageId}` : `already hidden ${messageId}`);
+    return;
+  }
+  if (action === 'restore') {
+    ctx.out((await restoreMessage(ctx.db, messageId)) ? `restored ${messageId}` : `not hidden ${messageId}`);
+    return;
+  }
+  throw new UsageError('messages show|hide|restore <메시지 id>');
+}
+
 /** 운영 CLI 진입점(테스트가 직접 부른다). 종료 코드: 0 성공, 1 실행 오류, 2 사용법 오류. */
 export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
   const [command, ...args] = argv;
@@ -358,6 +406,9 @@ export async function runCli(argv: string[], ctx: CliContext): Promise<number> {
         break;
       case 'reports':
         await reportsCommand(ctx, args);
+        break;
+      case 'messages':
+        await messagesCommand(ctx, args);
         break;
       case 'tags':
         await tagsCommand(ctx, args);

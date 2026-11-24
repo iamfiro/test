@@ -86,6 +86,7 @@ export function registerAuthRoutes(app: FastifyInstance): void {
       await tx.delete(idempotencyKeys).where(eq(idempotencyKeys.scope, `user:${userId}`));
       await tx.delete(users).where(eq(users.id, userId)); // 세션 등 사용자에 딸린 행은 cascade
     });
+    app.bus.publish({ kind: 'user_deleted', userId }); // 열린 소켓을 닫는다
     clearSessionCookie(reply);
     return reply.code(204).send();
   });

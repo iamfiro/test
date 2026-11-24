@@ -5,7 +5,7 @@ last_verified: 2026-11-24
 
 # 운영 CLI
 
-관리자 화면이 없다(결정 9). 긴급 스위치·정지·신고 확인·태그 카탈로그 관리는 서버 CLI로 한다. CLI는 `DATABASE_URL`만 읽고
+관리자 화면이 없다(결정 9). 긴급 스위치·정지·신고 확인·채팅 메시지 숨김·태그 카탈로그 관리는 서버 CLI로 한다. CLI는 `DATABASE_URL`만 읽고
 DB에 바로 쓴다. 서버는 설정을 짧게(`SETTINGS_CACHE_MS`, 기본 5초) 캐시하므로 바꾼 값은 그 안에 모든 서버에 적용된다.
 정지·신고는 캐시 없이 바로 적용된다.
 
@@ -64,8 +64,21 @@ npm run cli -- reports list --handled --type nickname --limit 100
 
 - 같은 내용에 대한 서로 다른 사람의 신고가 `REPORT_HIDE_THRESHOLD`(기본 3)에 닿으면 서버가 바로 처리하고
   `handled_at`·`action`을 남긴다. 닉네임은 `nickname_reset`(무작위 닉네임으로 되돌림), 방 이름은 `room_name_reset`(`<방장 닉네임>의 공부방`으로
-  바꿈, `target_id`는 방 id). 메시지 숨김(L5)·복구는 채팅이 붙으면 추가한다.
+  바꿈, `target_id`는 방 id), 채팅 메시지는 `message_hidden`(모두에게서 숨김, 열린 소켓에도 바로 알림).
 - 신고자·신고당한 사람이 "내 데이터 지우기"를 하면 그 신고도 함께 지워진다.
+
+### 채팅 메시지 확인·숨김·복구
+
+```sh
+npm run cli -- reports list --pending --type message   # 아직 기준에 닿지 않은 메시지 신고(content가 메시지 본문)
+npm run cli -- messages show <메시지 id>               # 본문·토픽·작성자·숨김 여부
+npm run cli -- messages hide <메시지 id>               # 모두에게서 숨김, 그 메시지의 미처리 신고는 handled(action message_hidden)
+npm run cli -- messages restore <메시지 id>            # 숨김(자동 숨김 포함)을 되돌림
+```
+
+CLI는 서버와 다른 프로세스라 열려 있는 소켓에 바로 알리지 못한다: CLI로 숨기거나 되돌린 것은 사람들이 그 토픽에
+다시 들어올 때(다시 연결·방 이동)부터 반영된다. 메시지는 30일 뒤 서버가 지운다(숨긴 것도). 작성자 정지는
+`restrict user <작성자 id> chat ...`(`target_user_id`가 작성자).
 - 반복 악용이면 위 정지 명령으로 계정·IP를 정지한다.
 
 ## 태그 카탈로그·제안
