@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: StudyVillage API
-  version: 0.5.5
+  version: 0.5.6
   description: |
     StudyVillage HTTP 계약의 원천. 응답은 PocketTime과 같은 봉투 `{data, error, meta}`를 쓴다.
     인증은 API 호스트 전용 세션 쿠키(`sv_session`, HttpOnly·Secure·SameSite=Lax)다. 상태를 바꾸는
@@ -482,7 +482,7 @@ paths:
     post:
       tags: [moderation]
       operationId: createReport
-      summary: 신고하기(닉네임·방 이름)
+      summary: 신고하기(닉네임·방 이름·채팅 메시지)
       description: |
         다른 사람의 닉네임을 신고한다. `target_id`는 그 사람의 사용자 id다. 한 사람은 같은 사람의 같은 닉네임을
         한 번만 신고한다: 다시 보내면(다른 키여도) 처음 신고를 그대로 200으로 돌려주고 더 세지 않는다. 서로 다른
@@ -490,7 +490,11 @@ paths:
         되돌린다(신고자에게 결과를 알리지 않는다). 내 닉네임은 신고할 수 없다(422, `field: target_id`).
         방 이름도 신고할 수 있다(`target_type: room_name`, `target_id`는 방 id, 주인은 방장). 같은 이름에 대한 서로 다른
         사람의 신고가 기준에 닿으면 서버가 방 이름을 앱 기본 이름(`<방장 닉네임>의 공부방`)으로 바로 바꾼다. 내 방 이름은
-        신고할 수 없다(422). 메시지 신고는 실시간 채널(`docs/contracts/study-room-chat.md`, L5)에서 한다.
+        신고할 수 없다(422).
+        채팅 메시지도 신고할 수 있다(`target_type: message`, `target_id`는 메시지 `id`, 주인은 작성자). 신고자가 지금 볼 수
+        있는 메시지만 받는다(로비, 또는 지금 멤버인 방의 메시지. 숨겼거나 30일 지났으면 404). 같은 메시지에 대한 서로 다른
+        사람의 신고가 기준에 닿으면 서버가 바로 모두에게서 숨기고 그 토픽에 `message_hidden`을 보낸다
+        (`docs/contracts/study-room-chat.md`). 내 메시지는 신고할 수 없다(422).
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
@@ -505,6 +509,53 @@ paths:
         '403': { $ref: '#/components/responses/CsrfRejected' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /users/me/blocks:
+    get:
+      tags: [moderation]
+      operationId: listChatBlocks
+      summary: 내 채팅 차단 목록
+      description: |
+        내가 차단한 사람(최근 차단 먼저, 최대 500명). 닉네임·캐릭터는 지금 값이다(해제 화면). 차단은 내 화면에서만
+        숨긴다(결정 9): 그 사람의 채팅 메시지를 서버가 나에게 보내지 않고(`joined`·`message`), 방 실시간 명단에서는 빼지 않는다.
+        상대는 차단당한 것을 모른다.
+      responses:
+        '200': { $ref: '#/components/responses/BlocksOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /users/me/blocks/{user_id}:
+    parameters:
+      - name: user_id
+        in: path
+        required: true
+        description: 차단할 사람의 사용자 id(채팅 `author.id`, 방 명단 `user_id`).
+        schema: { type: string, format: uuid }
+    put:
+      tags: [moderation]
+      operationId: blockChatUser
+      summary: 채팅 차단
+      description: |
+        이미 차단했으면 그대로 200(처음 차단 시각). 나는 차단할 수 없다(422 `field: user_id`), 없는 사용자는 404,
+        500명을 넘으면 422. 열려 있는 내 소켓에도 바로 적용된다(그 뒤로 오는 메시지부터).
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '200': { $ref: '#/components/responses/BlockOk' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [moderation]
+      operationId: unblockChatUser
+      summary: 채팅 차단 해제
+      description: 차단하지 않았던 사람이어도(재시도) 204.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '204': { description: 해제했다 }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CsrfRejected' }
   /study-rooms:
     get:
       tags: [rooms]
@@ -688,6 +739,38 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/RoomForbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /study-rooms/{room_id}/seat:
+    parameters:
+      - { $ref: '#/components/parameters/RoomId' }
+    put:
+      tags: [rooms]
+      operationId: moveStudyRoomSeat
+      summary: 내 자리 옮기기
+      description: |
+        3D 방의 자리 번호(0–32, 웹 `room3d/scenes.ts` `cafeSeats` 순서)를 바꾼다. 들어올 때 서버가 비어 있는 가장 작은
+        번호를 준다(방장은 0). 같은 자리면 그대로 200, 다른 사람이 앉은 자리면 409 `STUDY_ROOM_SEAT_TAKEN`, 멤버가
+        아니면 403 `STUDY_ROOM_NOT_MEMBER`, 범위 밖이면 422 `field: seat`. 바뀌면 방 실시간 채널에 `member_updated`
+        (docs/contracts/study-room-live.md)가 간다.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [seat]
+              properties:
+                seat: { type: integer, minimum: 0, maximum: 32 }
+      responses:
+        '200': { $ref: '#/components/responses/SeatOk' }
+        '400': { $ref: '#/components/responses/IdempotencyKeyRequired' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/RoomForbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/RoomConflict' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /study-rooms/{room_id}/images/{slot}:
     parameters:
@@ -1036,6 +1119,15 @@ components:
         신고 사유(PocketTime 앱 `ReportReason`과 같은 값, 시간표용 `wrong_info` 제외). 앱 문구: 개인정보가 담겼어요 /
         누군가를 비방해요 / 욕설이 있어요 / 성적인 내용이에요 / 사칭해요 / 장난이거나 도배예요 / 그 밖의 문제예요.
         `other`는 `detail`이 필요하다.
+    ChatBlock:
+      type: object
+      additionalProperties: false
+      required: [user_id, nickname, avatar, blocked_at]
+      properties:
+        user_id: { type: string, format: uuid }
+        nickname: { $ref: '#/components/schemas/Nickname' }
+        avatar: { $ref: '#/components/schemas/Avatar' }
+        blocked_at: { type: string, format: date-time }
     ReportCreate:
       type: object
       additionalProperties: false
@@ -1043,11 +1135,11 @@ components:
       properties:
         target_type:
           type: string
-          enum: [nickname, room_name]
+          enum: [nickname, room_name, message]
         target_id:
           type: string
           format: uuid
-          description: 닉네임이면 그 사람의 사용자 id, 방 이름이면 방 id.
+          description: 닉네임이면 그 사람의 사용자 id, 방 이름이면 방 id, 메시지면 메시지 id.
         reason: { $ref: '#/components/schemas/ReportReason' }
         detail:
           type: [string, 'null']
@@ -1058,7 +1150,7 @@ components:
       additionalProperties: false
       required: [target_type, target_id, reason, created_at]
       properties:
-        target_type: { type: string, enum: [nickname, room_name] }
+        target_type: { type: string, enum: [nickname, room_name, message] }
         target_id: { type: string, format: uuid }
         reason: { $ref: '#/components/schemas/ReportReason' }
         created_at: { type: string, format: date-time }
@@ -1304,14 +1396,16 @@ components:
     RoomForbidden:
       description: |
         `STUDY_ROOM_HOST_ONLY`(방장만 할 수 있음), `STUDY_ROOM_WRONG_PASSWORD`(비밀번호가 틀림),
-        `STUDY_ROOM_MAP_NOT_OWNED`(안 산 유료 맵), `ROOM_CREATE_RESTRICTED`(운영자가 이 계정·IP의 방 만들기를 정지), `CSRF_REJECTED`.
+        `STUDY_ROOM_MAP_NOT_OWNED`(안 산 유료 맵), `ROOM_CREATE_RESTRICTED`(운영자가 이 계정·IP의 방 만들기를 정지),
+        `STUDY_ROOM_NOT_MEMBER`(멤버만 할 수 있음: 자리 옮기기), `CSRF_REJECTED`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     RoomConflict:
       description: |
         `STUDY_ROOM_FULL`(정원 참), `STUDY_ROOM_ALREADY_MEMBER`(다른 방 멤버, `details.room_id`·`details.is_host`),
-        `STUDY_ROOM_CAPACITY_BELOW_MEMBERS`(정원을 멤버 수 아래로), `IDEMPOTENCY_KEY_REUSED`.
+        `STUDY_ROOM_CAPACITY_BELOW_MEMBERS`(정원을 멤버 수 아래로), `STUDY_ROOM_SEAT_TAKEN`(다른 사람이 앉은 자리),
+        `IDEMPOTENCY_KEY_REUSED`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -1445,6 +1539,57 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
+    BlocksOk:
+      description: 내 차단 목록
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [blocks]
+                properties:
+                  blocks: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/ChatBlock' } }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    BlockOk:
+      description: 차단함(처음이든 반복이든 같은 모양)
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [block]
+                properties:
+                  block: { $ref: '#/components/schemas/ChatBlock' }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
+    SeatOk:
+      description: 옮긴(또는 이미 앉아 있던) 자리
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [data, error, meta]
+            properties:
+              data:
+                type: object
+                additionalProperties: false
+                required: [seat]
+                properties:
+                  seat: { type: integer, minimum: 0, maximum: 32 }
+              error: { type: 'null' }
+              meta: { $ref: '#/components/schemas/Meta' }
     ReportOk:
       description: 신고를 받음(처음이든 같은 신고의 반복이든 같은 모양).
       content:
