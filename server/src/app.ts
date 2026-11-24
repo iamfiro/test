@@ -15,6 +15,7 @@ import { registerProfileRoutes } from './profile/routes.js';
 import { registerStudySettingsRoutes } from './study/settings.js';
 import { registerTimerRoutes } from './study/routes.js';
 import { registerStatsRoutes } from './study/stats.js';
+import { registerStreakRoutes } from './study/streak.js';
 import { TimerService } from './study/timer.js';
 import { SettingsService } from './moderation/settings.js';
 import { registerReportRoutes } from './moderation/routes.js';
@@ -161,7 +162,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['content-type', 'x-csrf-token', 'idempotency-key'],
-    exposedHeaders: ['x-request-id', 'retry-after', 'idempotent-replayed'],
+    exposedHeaders: ['x-request-id', 'retry-after', 'idempotent-replayed', 'etag'],
     maxAge: 600,
   });
   await app.register(rateLimit, {
@@ -206,6 +207,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   registerStudySettingsRoutes(app);
   registerTimerRoutes(app);
   registerStatsRoutes(app);
+  registerStreakRoutes(app);
   registerReportRoutes(app);
   registerTagRoutes(app);
   registerRoomRoutes(app);
