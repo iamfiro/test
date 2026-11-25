@@ -1,6 +1,7 @@
 // 원본: lib/feature/study/room3d/widgets/study_room_3d_view.dart (PocketTime f574f242).
 // 3D 방 + 창밖 하늘 + 자리 위 위젯. 언제 다시 그릴지(시점 옮기기·끌기·동작 박자·단계 상한)는
 // 원본과 같은 스케줄러가 정하고, 탭이 가려지면 그리지 않는다.
+import { LoadingCurtain } from '../../../core/ui/LoadingCurtain'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Vector3 } from 'three'
 import { StudyRoomCameraRig } from './domain/cameraRig'
@@ -476,6 +477,7 @@ export function StudyRoom3dView(props: {
       {phase === 'ready' && planSpots.t >= 0.8 && props.planSeatBuilder && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 4, opacity: Math.min(1, (planSpots.t - 0.8) / 0.2), pointerEvents: planSpots.t >= 1 ? 'auto' : 'none' }}>
           {planSpots.list.map((pl) => {
+      <LoadingCurtain show={phase !== 'ready'} />
             const node = props.planSeatBuilder!(pl.seat, pl)
             return node == null ? null : (
               <div key={pl.seat} style={{ position: 'absolute', left: pl.anchor.x, top: pl.anchor.y, transform: 'translate(-50%, -50%)' }}>{node}</div>

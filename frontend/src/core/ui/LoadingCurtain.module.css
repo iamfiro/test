@@ -1,0 +1,30 @@
+.curtain { position: absolute; inset: 0; z-index: 50; overflow: hidden; pointer-events: all; }
+.fixed { position: fixed; }
+/* 바탕: 종이색 위에 작은 점무늬(동숲 로딩 같은 잔잔한 패턴). */
+.paper {
+  position: absolute; inset: 0;
+  background-color: var(--i-paper);
+  background-image: radial-gradient(color-mix(in srgb, var(--c-accent) 18%, transparent) 2px, transparent 2.5px);
+  background-size: 28px 28px;
+  transition: opacity 240ms ease-out;
+}
+.center {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  transition: opacity 200ms ease-out, transform 320ms ease-in;
+}
+.logo { width: min(56vw, 240px); height: auto; animation: bob 1.6s ease-in-out infinite; }
+.dots { display: flex; gap: 10px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--c-accent); animation: hop 1s ease-in-out infinite; }
+.dots i:nth-child(2) { animation-delay: 0.15s; }
+.dots i:nth-child(3) { animation-delay: 0.3s; }
+/* 열리는 중: 가운데에서 동그랗게 구멍이 커지며 화면이 드러난다(box-shadow로 구멍 밖을 덮는다). */
+.hole {
+  position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-radius: 50%; transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 150vmax var(--i-paper); opacity: 0;
+}
+.opening .paper { opacity: 0; transition-delay: 0ms; }
+.opening .center { opacity: 0; transform: scale(1.15); }
+.opening .hole { opacity: 1; animation: iris 640ms cubic-bezier(0.6, 0, 0.3, 1) forwards; }
+@keyframes iris { from { width: 0; height: 0; } to { width: 260vmax; height: 260vmax; } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes hop { 0%, 100% { transform: translateY(0); opacity: 0.55; } 40% { transform: translateY(-12px); opacity: 1; } }
