@@ -1,0 +1,16 @@
+{
+  // 웹(frontend/dist) 정적 자산만 주는 Worker. 빌드: frontend에서
+  //   VITE_DATA_SOURCE=http VITE_API_ORIGIN=https://village-api.pocket-time.study VITE_MEDIA_ORIGIN=https://media.pocket-time.study npm run build
+  // 보안 헤더는 dist/_headers(scripts/security-headers.mjs)가 그대로 쓰인다. SPA 폴백은 not_found_handling으로 한다.
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "studyvillage-web",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "study.pocket-time.study", "custom_domain": true }],
+  "assets": {
+    "directory": "../../../frontend/dist",
+    "not_found_handling": "single-page-application",
+    "html_handling": "auto-trailing-slash"
+  }
+}
